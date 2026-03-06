@@ -60,7 +60,7 @@ public:
 	void received_POI_Zona        (const Protocol_RLS_Mini::POI_Zona       & msg) {piCout << "rec msg" << "received_POI_Zona     ";}
 	void received_POI_Kan         (const Protocol_RLS_Mini::POI_Kan        & msg) {piCout << "rec msg" << "received_POI_Kan      ";}
 	void received_POI_Kvit        (const Protocol_RLS_Mini::POI_Kvit       & msg) {piCout << "rec msg" << "received_POI_Kvit     ";}
-	void received_POI_TK_Zapros   (const Protocol_RLS_Mini::POI_TK_Zapros  & msg) {piCout << "rec msg" << "received_POI_TK_Zapros";}
+	void received_POI_TK_Zapros   (const Protocol_RLS_Mini::POI_TK_Zapros  & msg);
 	void received_POI_TK_Kvit     (const Protocol_RLS_Mini::POI_TK_Kvit    & msg) {piCout << "rec msg" << "received_POI_TK_Kvit  ";}
 	void received_CIT_Zapros      (const Protocol_RLS_Mini::CIT_Zapros     & msg) {piCout << "rec msg" << "received_CIT_Zapros   ";}
 	void received_CIT_KU          (const Protocol_RLS_Mini::CIT_KU         & msg) {piCout << "rec msg" << "received_CIT_KU       ";}

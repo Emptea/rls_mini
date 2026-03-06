@@ -73,6 +73,13 @@ void GlobalDataEth::stopEth() {
 	piDeleteSafety(eth_rlso_send);
 }
 
+void GlobalDataEth::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
+	piCout << "rec msg" << "received_POI_TK_Zapros";
+	Protocol_RLS_Mini::POI_TK_Kvit ans;
+	ans.nw = 3;
+	ans.words << 1 << 2 << 3;
+	global->sendMessage(ans);
+}
 
 template<typename T>
 bool RLS_CheckType(const Protocol_RLS_Mini::Header & header, int port) {
@@ -86,7 +93,7 @@ bool RLS_CheckType(const Protocol_RLS_Mini::Header & header, int port) {
 #define RLS_TRY_PARSE(T)                                                      \
 	if (RLS_CheckType<Protocol_RLS_Mini::T>(header, port)) {                  \
 		Protocol_RLS_Mini::T msg = piDeserialize<Protocol_RLS_Mini::T>(data); \
-		received_##T(msg);                                                    \
+		global->received_##T(msg);                                            \
 		return;                                                               \
 	}
 
@@ -126,18 +133,7 @@ void GlobalDataEth::receivedRLS(PIByteArray data, int port) {
 	RLS_TRY_PARSE(KTA_VO        );
 	RLS_TRY_PARSE(TRVO          );
 	RLS_TRY_PARSE(TRETA         );
-	RLS_TRY_PARSE(STRSOPR       );
-	RLS_TRY_PARSE(KORTR         );
-	RLS_TRY_PARSE(KV_KORTR      );
-	RLS_TRY_PARSE(CMD_ZZT       );
-	RLS_TRY_PARSE(ZZT           );
-	RLS_TRY_PARSE(CMD_ZBL       );
-	RLS_TRY_PARSE(ZBL           );
 	RLS_TRY_PARSE(AZIMUTH       );
-	RLS_TRY_PARSE(VKL_REG       );
-	RLS_TRY_PARSE(OTKL_REG      );
-	RLS_TRY_PARSE(ZPR_SOST_REG  );
-	RLS_TRY_PARSE(SOST_REG      );
 	// clang-format on
 }
 
