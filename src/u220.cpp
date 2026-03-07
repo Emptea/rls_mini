@@ -57,8 +57,8 @@ void U220::fill_buffer_with_wavetable(std::vector<std::complex<float>> & buffer)
 }
 
 
-U220::U220(const std::string & args, uint64_t num_samps, u220_config_t config)
-	: serial("")
+U220::U220(const std::string & serial, const std::string & args, uint64_t num_samps, u220_config_t config)
+	: serial(serial)
 	, device_args(args)
 	, total_num_samps(num_samps)
 	, user_config(config)

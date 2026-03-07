@@ -15,9 +15,11 @@ private:
 
 	void find_devices();
 
+	std::vector<std::string> serials_list = {"U220200", "U220201", "U220202", "U220203"}
 public:
 	UHD_UTILS(const std::string & args = "");
 	~UHD_UTILS();
 	void uhd_print_devices();
 	device_addrs_filtered_t uhd_get_devices();
+	std::vector<std::string> get_serials_list { return serials_list; }
 };

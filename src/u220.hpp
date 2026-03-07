@@ -69,9 +69,10 @@ private:
 	std::atomic<bool> rx_running{false};
 
 public:
-	U220(const std::string & args = "recv_frame_size=4096,num_recv_frames=128,send_frame_size=8192,num_send_frames=512",
-	     uint64_t num_samps       = 0,
-	     u220_config_t config     = {
+	U220(const std::string & serial = "",
+	     const std::string & args   = "recv_frame_size=4096,num_recv_frames=128,send_frame_size=8192,num_send_frames=512",
+	     uint64_t num_samps         = 0,
+	     u220_config_t config       = {
              5e6,
              3.6e9,
              {0.0},
