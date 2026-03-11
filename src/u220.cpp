@@ -1,6 +1,8 @@
 #include "u220.hpp"
 
 #include "rlso_const.hpp"
+
+#include <pistring_std.h>
 // clang-format off
 void print_config(const u220_config_t& config) {
     std::cout << boost::format("       === U220 Configuration ===\n"
@@ -30,22 +32,21 @@ void print_config(const u220_config_t& config) {
 // clang-format on
 
 
-static std::vector<std::complex<float>> init_wavetable() {
-	std::vector<std::complex<float>> result;
-	result.reserve(wave_table_far.size() + SAMPLES_WAIT_AFTER_FAR + wave_table_close.size() + SAMPLES_WAIT_AFTER_CLOSE);
+static PIVector<complexf> init_wavetable() {
+	PIVector<complexf> result;
 
-	result.insert(result.end(), wave_table_far.begin(), wave_table_far.end());
-	result.insert(result.end(), SAMPLES_WAIT_AFTER_FAR, std::complex<float>(0.0f, 0.0f));
-	result.insert(result.end(), wave_table_close.begin(), wave_table_close.end());
-	result.insert(result.end(), SAMPLES_WAIT_AFTER_CLOSE, std::complex<float>(0.0f, 0.0f));
+	result.append(wave_table_far);
+	result.insert(result.size() + SAMPLES_WAIT_AFTER_FAR, {0.0f, 0.0f});
+	result.append(wave_table_close);
+	result.insert(result.size() + SAMPLES_WAIT_AFTER_CLOSE, {0.0f, 0.0f});
 
 	return result;
 }
 
-void U220::fill_buffer_with_wavetable(std::vector<std::complex<float>> & buffer) {
-	static const std::vector<std::complex<float>> wave_table = init_wavetable();
+void U220::fill_buffer_with_wavetable(PIVector<complexf> & buffer) {
+	static const PIVector<complexf> wave_table = init_wavetable();
 
-	if (wave_table.empty()) {
+	if (wave_table.isEmpty()) {
 		throw std::invalid_argument("Wave table cannot be empty");
 	}
 
@@ -57,13 +58,12 @@ void U220::fill_buffer_with_wavetable(std::vector<std::complex<float>> & buffer)
 }
 
 
-U220::U220(const std::string & serial, const std::string & args, uint64_t num_samps, u220_config_t config)
+U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u220_config_t config)
 	: serial(serial)
 	, device_args(args)
-	, total_num_samps(num_samps)
 	, user_config(config)
-	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS
-                                     : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE) {}
+	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE)
+	, {}
 
 U220::~U220() {}
 
@@ -77,10 +77,10 @@ void U220::initialize_usrp() {
 	std::cout << std::endl;
 	std::cout << boost::format("Creating the usrp device with: %s...") % device_args << std::endl;
 
-	usrp = uhd::usrp::multi_usrp::make(device_args);
+	usrp = uhd::usrp::multi_usrp::make(PIString2StdString(device_args));
 
-	if (!user_config.ref.empty()) {
-		usrp->set_clock_source(user_config.ref);
+	if (!user_config.ref.isEmpty()) {
+		usrp->set_clock_source(PIString2StdString(user_config.ref));
 	}
 
 	usrp->set_tx_rate(user_config.rate);
@@ -114,7 +114,7 @@ void U220::configure_channel(size_t channel) {
 
 void U220::setup_tx_streamer() {
 	// Create transmit streamer
-	uhd::stream_args_t stream_args("fc32", user_config.otw_format);
+	uhd::stream_args_t stream_args("fc32", PIString2StdString(user_config.otw_format));
 	stream_args.channels = {0, 1};
 	tx_stream            = usrp->get_tx_stream(stream_args);
 
@@ -133,17 +133,17 @@ void U220::setup_tx_streamer() {
 }
 
 void U220::setup_rx_streamer() {
-	uhd::stream_args_t stream_args(user_config.cpu_format, user_config.otw_format);
+	uhd::stream_args_t stream_args(PIString2StdString(user_config.cpu_format), PIString2StdString(user_config.otw_format));
 	stream_args.channels = {0, 1};
 	rx_stream            = usrp->get_rx_stream(stream_args);
 
 	if (user_config.rx_spb == 0) {
-		user_config.rx_spb  = rx_stream->get_max_num_samps() * 20;
+		user_config.rx_spb  = rx_stream->get_max_num_samps();
 		user_config.rx_spb  = ((user_config.rx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
 		board_config.rx_spb = user_config.rx_spb;
 	}
 
-	rx_buffer.resize(2, std::vector<std::complex<float>>(board_config.rx_spb));
+	rx_buffer.resize(2, PIVector<complexf>(board_config.rx_spb) * 2);
 	rx_buffer_ptrs.resize(2);
 	for (size_t ch = 0; ch < 2; ch++) {
 		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
@@ -151,7 +151,7 @@ void U220::setup_rx_streamer() {
 }
 
 void U220::set_pps_source() {
-	usrp->set_time_source(user_config.pps);
+	usrp->set_time_source(PIString2StdString(user_config.pps));
 }
 
 void U220::set_time_sync() {
@@ -213,6 +213,57 @@ bool U220::check_ref_lock() {
 	return true;
 }
 
+
+void U220::transmit() {
+	// Send buffer contents
+	uint64_t num_samps = tx_stream->send(tx_buffer_ptrs, tx_buffer.size(), tx_metadata);
+	fill_buffer_with_wavetable(tx_buffer);
+
+	tx_metadata.start_of_burst = false;
+	tx_metadata.has_time_spec  = false;
+	tx_metadata.time_spec      = usrp->get_time_now() + uhd::time_spec_t(0.05);
+	stats.tx_packet_cnt += num_samps;
+}
+
+void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
+	switch (err) {
+	case uhd::rx_metadata_t::ERROR_CODE_TIMEOUT: {
+		stats.rx_timeouts++;
+		break;
+	}
+	case uhd::rx_metadata_t::ERROR_CODE_LATE_COMMAND: {
+		stats.rx_late_commands++;
+		break;
+	}
+	case uhd::rx_metadata_t::ERROR_CODE_BROKEN_CHAIN: {
+		stats.rx_broken_chains++;
+		break;
+	}
+	case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW: {
+		stats.rx_overflows++;
+		break;
+	}
+	case uhd::rx_metadata_t::ERROR_CODE_ALIGNMENT: {
+		stats.rx_alignment_errors++;
+		break;
+	}
+	case uhd::rx_metadata_t::ERROR_CODE_BAD_PACKET: {
+		stats.rx_bad_packets++;
+		break;
+	}
+	default: {
+		break;
+	}
+	}
+}
+
+void U220::receive() {
+	size_t num_rx_samps    = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout);
+	rx_timeout             = 0.1f; // small timeout for subsequent recv
+	rx_errors_worker(rx_metadata.error_code);
+	rx_packet_cnt += num_rx_samps;
+}
+
 bool U220::start_transmission(double start_time) {
 	if (!usrp || !tx_stream) {
 		std::cerr << "USRP not properly initialized!" << std::endl;
@@ -232,8 +283,8 @@ bool U220::start_transmission(double start_time) {
 		return false;
 	}
 
-	board_config.pps = usrp->get_time_source(0);
-	board_config.ref = usrp->get_clock_source(0);
+	board_config.pps = StdString2PIString(usrp->get_time_source(0));
+	board_config.ref = StdString2PIString(usrp->get_clock_source(0));
 
 	std::cout << "Real board configuration for " << serial << std::endl;
 	print_config(board_config);
@@ -244,6 +295,8 @@ bool U220::start_transmission(double start_time) {
 	tx_metadata.has_time_spec  = true;
 	tx_metadata.time_spec      = uhd::time_spec_t(start_time);
 
+	tx_thread.start([this]() { transmit(); });
+	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 	return true;
 }
 
@@ -251,80 +304,17 @@ void U220::start_reception(double settling_time) {
 	rx_timeout               = settling_time + 0.1f; // expected settling time + padding for first recv
 
 	// setup streaming
-	rx_stream_cmd.num_samps  = total_num_samps;
+	rx_stream_cmd.num_samps  = 0;
 	rx_stream_cmd.stream_now = false;
 	rx_stream_cmd.time_spec  = uhd::time_spec_t(settling_time);
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
-}
 
-void U220::transmit(const bool * stop_signal) {
-	uint64_t num_acc_samps = 0;
-	std::cout << std::endl << "Transmission started for " << serial << std::endl;
-
-	while (true) {
-		if (*stop_signal) {
-			break;
-		}
-
-		if (total_num_samps > 0 && num_acc_samps >= total_num_samps) {
-			std::cout << "Completed transmission of " << total_num_samps << " samples" << std::endl;
-			break;
-		}
-
-		// Send buffer contents
-		num_acc_samps += tx_stream->send(tx_buffer_ptrs, tx_buffer.size(), tx_metadata);
-		fill_buffer_with_wavetable(tx_buffer);
-
-		tx_metadata.start_of_burst = false;
-		tx_metadata.has_time_spec  = false;
-		tx_metadata.time_spec      = usrp->get_time_now() + uhd::time_spec_t(0.05);
-	}
-}
-
-void U220::receive(const bool * stop_signal) {
-	uint64_t num_acc_samps = 0;
+	tx_thread.start([this]() { receive(); });
 	std::cout << std::endl << "Reception started for " << serial << std::endl;
-	bool overflow_message = true;
-
-	while (true) {
-		if (*stop_signal) {
-			break;
-		}
-
-		if (total_num_samps > 0 && num_acc_samps >= total_num_samps) {
-			std::cout << "Completed reception of " << total_num_samps << " samples" << std::endl;
-			break;
-		}
-
-		size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout);
-		rx_timeout          = 0.1f; // small timeout for subsequent recv
-
-		if (rx_metadata.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
-			std::cout << boost::format("Timeout while streaming") << std::endl;
-			break;
-		}
-		if (rx_metadata.error_code == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
-			if (overflow_message) {
-				overflow_message = false;
-				std::cerr << boost::format("Got an overflow indication. Please consider the following:\n"
-				                           "  Your write medium must sustain a rate of %fMB/s.\n"
-				                           "  Dropped samples will not be written to the file.\n"
-				                           "  Please modify this example for your purposes.\n"
-				                           "  This message will not appear again.\n") %
-								 (usrp->get_rx_rate() * 8.0 / 1e6);
-			}
-			continue;
-		}
-		if (rx_metadata.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
-			throw std::runtime_error(str(boost::format("Receiver error %s") % rx_metadata.strerror()));
-		}
-
-		num_acc_samps += num_rx_samps;
-		std::cout << "Received " << num_rx_samps << " and total of " << num_acc_samps << std::endl;
-	}
 }
 
 void U220::stop_transmission() {
+	tx_thread.stopAndWait();
 	if (tx_stream) {
 		tx_metadata.end_of_burst = true;
 		tx_stream->send("", 0, tx_metadata);
@@ -335,6 +325,7 @@ void U220::stop_transmission() {
 }
 
 void U220::stop_reception() {
+	rx_thread.stopAndWait();
 	rx_stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
 }
@@ -365,10 +356,9 @@ void U220::set_frequency(double new_freq) {
 	}
 }
 
-void U220::set_serial(const std::string & ser) {
+void U220::set_serial(const PIString & ser) {
 	serial = ser;
 	device_args.append(",serial=");
 	device_args.append(ser);
 	std::cout << device_args << std::endl;
 }
-

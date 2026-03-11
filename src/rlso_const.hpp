@@ -7,7 +7,10 @@
 #define SAMPLES_WAIT_AFTER_CLOSE (85)
 #define SAMPLES_PER_CYCLE        (232)
 
-const std::vector<std::complex<float>> wave_table_far = {
+#include <pivector.h>
+#include <pimathcomplex.h>
+
+const PIVector<complexf> wave_table_far = {
 	{1.0000f,  0.0000f },
     {-0.9969f, -0.0785f},
     {0.9511f,  0.3090f },
@@ -50,7 +53,7 @@ const std::vector<std::complex<float>> wave_table_far = {
     {-0.9969f, -0.0785f},
 };
 
-const std::vector<std::complex<float>> wave_table_close = {
+const PIVector<complexf> wave_table_close = {
 	{1.0000f,  0.0000f },
 	{-0.8660f, -0.5000f},
 	{-0.5000f, 0.8660f },
