@@ -28,6 +28,7 @@ void GlobalData::init() {
 		u220_ptrs << new U220(serial_list[i], u220_args, 0, u220_config);
 		if (StdString2PIString(dit->first) == u220_ptrs[i]->get_serial() & dit != devices.end()){
 			u220_ptrs[i]->init();
+			active_boards.push_back(i);
 			dit++;
 		}
 	}
@@ -36,10 +37,18 @@ void GlobalData::init() {
 
 void GlobalData::start() {
 	startEth();
+	for (size_t i = 0; i < active_boards.size(); i++) {
+		u220_ptrs[active_boards[i]]->start_reception(5);
+		u220_ptrs[active_boards[i]]->start_transmission(5);
+	}
 }
 
 
 void GlobalData::stop() {
 	stopEth();
+	for (size_t i = 0; i < active_boards.size(); i++) {
+		u220_ptrs[active_boards[i]]->stop_reception();
+		u220_ptrs[active_boards[i]]->stop_transmission();
+	}
 	piDeleteAllAndClear(u220_ptrs);
 }

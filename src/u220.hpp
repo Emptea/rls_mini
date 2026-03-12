@@ -44,6 +44,12 @@ struct u220_stats {
 	size_t tx_packet_cnt       = 0;
 };
 
+struct u220_status {
+	bool on       = false;
+	bool rx_on[2] = {false, false};
+	bool tx_on[2] = {false, false};
+};
+
 void print_config(const u220_config_t & config);
 
 class U220 {
@@ -70,11 +76,13 @@ private:
 	u220_config_t user_config;
 	u220_config_t board_config;
 
-	u220_stats stats = {0};
+	u220_stats stats;
+	u220_status status;
 
 	void fill_buffer_with_wavetable(PIVector<complexf> & buffer);
 	void initialize_usrp();
-	void configure_channel(size_t channel);
+	void configure_tx_channel(size_t channel);
+	void configure_rx_channel(size_t channel);
 	void setup_tx_streamer();
 	void setup_rx_streamer();
 	void rx_errors_worker(uhd::rx_metadata_t::error_code_t err);
@@ -130,13 +138,20 @@ public:
 	double get_rx_rate() const { return usrp ? usrp->get_rx_rate() : 0; };
 	double get_rx_freq_for_ch(size_t channel) const { return usrp ? usrp->get_rx_freq(channel) : 0; };
 	double get_rx_gain_for_ch(size_t channel) const { return usrp ? usrp->get_rx_gain(channel) : 0; };
-	const PIVector<complexf *> & get_rx_buffers() const noexcept { return rx_buffer_ptrs; };
+	const PIVector<complexf *> & get_rx_queue() const noexcept { return rx_queue; };
 
 	void set_serial(const PIString & ser);
 
 	void set_tx_gain(double new_gain);
 	void set_rx_gain(double new_gain);
 	void set_frequency(double new_freq);
+
+	void print_status(const struct u220_status & status) {
+		piCout << serial << " status";
+		piCout << "  on:       " << (status.on ? "true" : "false") << "\n";
+		piCout << "  rx_on:   [" << (status.rx_on[0] ? "true" : "false") << ", " << (status.rx_on[1] ? "true" : "false") << "]\n";
+		piCout << "  tx_on:   [" << (status.tx_on[0] ? "true" : "false") << ", " << (status.tx_on[1] ? "true" : "false") << "]\n";
+	}
 };
 
 #endif // U220_HPP

@@ -77,7 +77,8 @@ void U220::initialize_usrp() {
 	std::cout << std::endl;
 	std::cout << boost::format("Creating the usrp device with: %s...") % device_args << std::endl;
 
-	usrp = uhd::usrp::multi_usrp::make(PIString2StdString(device_args));
+	usrp      = uhd::usrp::multi_usrp::make(PIString2StdString(device_args));
+	status.on = true;
 
 	if (!user_config.ref.isEmpty()) {
 		usrp->set_clock_source(PIString2StdString(user_config.ref));
@@ -88,13 +89,14 @@ void U220::initialize_usrp() {
 
 	// Configure both channels (0 and 1)
 	for (size_t ch = 0; ch < 2; ch++) {
-		configure_channel(ch);
+		configure_tx_channel(ch);
+		configure_rx_channel(ch);
 	}
 
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
-void U220::configure_channel(size_t channel) {
+void U220::configure_tx_channel(size_t channel) {
 	uhd::tune_request_t tune_request(user_config.freq, 0);
 	usrp->set_tx_freq(tune_request, channel);
 	board_config.freq = usrp->get_tx_freq(channel);
@@ -109,6 +111,24 @@ void U220::configure_channel(size_t channel) {
 	if (user_config.tx_bw[channel] > 0) {
 		usrp->set_tx_bandwidth(user_config.tx_bw[channel], channel);
 		board_config.tx_bw[channel] = usrp->get_tx_bandwidth(channel);
+	}
+}
+
+void U220::configure_rx_channel(size_t channel) {
+	uhd::tune_request_t tune_request(user_config.freq, 0);
+	usrp->set_rx_freq(tune_request, channel);
+	board_config.freq = usrp->get_rx_freq(channel);
+
+	// Set rx gain if specified
+	if (user_config.rx_gain[channel] > 0) {
+		usrp->set_rx_gain(user_config.rx_gain[channel], channel);
+		board_config.rx_gain[channel] = usrp->get_rx_gain(channel);
+	}
+
+	// Set rx bandwidth if specified
+	if (user_config.rx_bw[channel] > 0) {
+		usrp->set_rx_bandwidth(user_config.rx_bw[channel], channel);
+		board_config.rx_bw[channel] = usrp->get_rx_bandwidth(channel);
 	}
 }
 
@@ -143,7 +163,7 @@ void U220::setup_rx_streamer() {
 		board_config.rx_spb = user_config.rx_spb;
 	}
 
-	rx_buffer.resize(2, PIVector<complexf>(board_config.rx_spb * 2));
+	rx_buffer.resize(2, PIVector<complexf>(board_config.rx_spb));
 	rx_buffer_ptrs.resize(2);
 	for (size_t ch = 0; ch < 2; ch++) {
 		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
@@ -258,8 +278,14 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 }
 
 void U220::receive() {
-	size_t num_rx_samps    = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout);
-	rx_timeout             = 0.1f; // small timeout for subsequent recv
+	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout);
+
+	auto ch0_ptr        = rx_queue[0].getRef();
+	ch0_ptr->push_back(rx_buffer[0]);
+	auto ch1_ptr = rx_queue[1].getRef();
+	ch1_ptr->push_back(rx_buffer[1]);
+
+	rx_timeout = 0.1f; // small timeout for subsequent recv
 	rx_errors_worker(rx_metadata.error_code);
 	stats.rx_packet_cnt += num_rx_samps;
 }
@@ -295,6 +321,8 @@ bool U220::start_transmission(double start_time) {
 	tx_metadata.has_time_spec  = true;
 	tx_metadata.time_spec      = uhd::time_spec_t(start_time);
 
+	status.tx_on[0]            = true;
+	status.tx_on[1]            = true;
 	tx_thread.start([this]() { transmit(); });
 	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 	return true;
@@ -309,6 +337,8 @@ void U220::start_reception(double settling_time) {
 	rx_stream_cmd.time_spec  = uhd::time_spec_t(settling_time);
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
 
+	status.rx_on[0] = true;
+	status.rx_on[1] = true;
 	tx_thread.start([this]() { receive(); });
 	std::cout << std::endl << "Reception started for " << serial << std::endl;
 }

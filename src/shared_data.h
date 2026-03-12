@@ -35,6 +35,7 @@ public:
     };
 	const PIString u220_args = "recv_frame_size=4096,num_recv_frames=128,send_frame_size=8192,num_send_frames=256";
 
+	PIVector<size_t> active_boards;
 	static GlobalData * instance();
 
 	void init();
