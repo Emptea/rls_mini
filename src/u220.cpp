@@ -62,8 +62,8 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 	: serial(serial)
 	, device_args(args)
 	, user_config(config)
-	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE)
-	, {}
+	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS
+                                     : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE) {}
 
 U220::~U220() {}
 
@@ -143,7 +143,7 @@ void U220::setup_rx_streamer() {
 		board_config.rx_spb = user_config.rx_spb;
 	}
 
-	rx_buffer.resize(2, PIVector<complexf>(board_config.rx_spb) * 2);
+	rx_buffer.resize(2, PIVector<complexf>(board_config.rx_spb * 2));
 	rx_buffer_ptrs.resize(2);
 	for (size_t ch = 0; ch < 2; ch++) {
 		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
@@ -261,7 +261,7 @@ void U220::receive() {
 	size_t num_rx_samps    = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout);
 	rx_timeout             = 0.1f; // small timeout for subsequent recv
 	rx_errors_worker(rx_metadata.error_code);
-	rx_packet_cnt += num_rx_samps;
+	stats.rx_packet_cnt += num_rx_samps;
 }
 
 bool U220::start_transmission(double start_time) {

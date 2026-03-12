@@ -1,3 +1,6 @@
+## Build
+```/usr/bin/cmake --build /home/ubuntu/rls_mini/build --config Debug --target install -j 3```
+
 | Название контрольной точки | Код |
 | - | - |
 | Управление | 0 |
