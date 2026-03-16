@@ -205,6 +205,33 @@ bool U220::check_lo_lock() {
 	return true;
 }
 
+
+PIVector<complexf> U220::take_rx_queue_and_clear(int index) {
+	if (index < 0 || index >= 2) return {};
+	auto ref = rx_queue[index].getRef();
+	if (ref->isEmpty()) return {};
+	auto ret = ref->dequeue();
+	ref->clear();
+	return ret;
+}
+
+
+PIVector<complexf> U220::take_rx_queue(int index) {
+	if (index < 0 || index >= 2) return {};
+	auto ref = rx_queue[index].getRef();
+	if (ref->isEmpty()) return {};
+	return ref->dequeue();
+}
+
+
+PIVector<complexf> U220::get_rx_queue(int index) {
+	if (index < 0 || index >= 2) return {};
+	auto ref = rx_queue[index].getRef();
+	if (ref->isEmpty()) return {};
+	return ref->head();
+}
+
+
 bool U220::check_ref_lock() {
 	// Check Ref Lock
 	std::vector<std::string> sensor_names;
@@ -280,10 +307,10 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 void U220::receive() {
 	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout);
 
-	auto ch0_ptr        = rx_queue[0].getRef();
-	ch0_ptr->push_back(rx_buffer[0]);
-	auto ch1_ptr = rx_queue[1].getRef();
-	ch1_ptr->push_back(rx_buffer[1]);
+	for (int ch: {0, 1}) {
+		auto ch_ptr = rx_queue[ch].getRef();
+		ch_ptr->push_back(rx_buffer[ch]);
+	}
 
 	rx_timeout = 0.1f; // small timeout for subsequent recv
 	rx_errors_worker(rx_metadata.error_code);
@@ -339,7 +366,7 @@ void U220::start_reception(double settling_time) {
 
 	status.rx_on[0] = true;
 	status.rx_on[1] = true;
-	tx_thread.start([this]() { receive(); });
+	rx_thread.start([this]() { receive(); });
 	std::cout << std::endl << "Reception started for " << serial << std::endl;
 }
 

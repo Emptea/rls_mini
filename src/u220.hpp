@@ -138,7 +138,9 @@ public:
 	double get_rx_rate() const { return usrp ? usrp->get_rx_rate() : 0; };
 	double get_rx_freq_for_ch(size_t channel) const { return usrp ? usrp->get_rx_freq(channel) : 0; };
 	double get_rx_gain_for_ch(size_t channel) const { return usrp ? usrp->get_rx_gain(channel) : 0; };
-	const PIVector<complexf *> & get_rx_queue() const noexcept { return rx_queue; };
+	PIVector<complexf> take_rx_queue_and_clear(int index);
+	PIVector<complexf> take_rx_queue(int index);
+	PIVector<complexf> get_rx_queue(int index);
 
 	void set_serial(const PIString & ser);
 
