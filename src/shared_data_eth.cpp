@@ -29,13 +29,13 @@ void GlobalDataEth::initEth() {
 		if (_eth) {
 			/*PIString d_s_ip = "255.255.255.255";
 			if (_eth) {
-				PIEthernet::InterfaceList ifaces   = PIEthernet::interfaces();
-				const PIEthernet::Interface * cint = 0;
-				cint                               = ifaces.getByAddress(_eth->readIP());
-				if (cint) {
-					d_s_ip = PIEthernet::getBroadcast(_eth->readIP(), cint->netmask);
-					piCout << _eth->readIP() << cint->netmask << d_s_ip;
-				}
+			    PIEthernet::InterfaceList ifaces   = PIEthernet::interfaces();
+			    const PIEthernet::Interface * cint = 0;
+			    cint                               = ifaces.getByAddress(_eth->readIP());
+			    if (cint) {
+			        d_s_ip = PIEthernet::getBroadcast(_eth->readIP(), cint->netmask);
+			        piCout << _eth->readIP() << cint->netmask << d_s_ip;
+			    }
 			}*/
 			PICodeInfo::ClassInfo * ci = PICODEINFO::classes().value("Protocol_RLS_Mini");
 			PISet<int> used_ports;
@@ -73,14 +73,6 @@ void GlobalDataEth::stopEth() {
 	piDeleteSafety(eth_rlso_send);
 }
 
-void GlobalDataEth::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
-	piCout << "rec msg" << "received_POI_TK_Zapros";
-	Protocol_RLS_Mini::POI_TK_Kvit ans;
-	ans.nw = 3;
-	ans.words << 1 << 2 << 3;
-	global->sendMessage(ans);
-}
-
 template<typename T>
 bool RLS_CheckType(const Protocol_RLS_Mini::Header & header, int port) {
 	if (T::Port != port) return false;
@@ -115,7 +107,6 @@ void GlobalDataEth::receivedRLS(PIByteArray data, int port) {
 	RLS_TRY_PARSE(RR_AzPopr     );
 	RLS_TRY_PARSE(RR_DPopr_POI  );
 	RLS_TRY_PARSE(RR_AzPopr_POI );
-	RLS_TRY_PARSE(RR_Kvit       );
 	RLS_TRY_PARSE(POI_Zapros    );
 	RLS_TRY_PARSE(POI_Shtat     );
 	RLS_TRY_PARSE(POI_SDC       );
@@ -123,14 +114,9 @@ void GlobalDataEth::receivedRLS(PIByteArray data, int port) {
 	RLS_TRY_PARSE(POI_APU       );
 	RLS_TRY_PARSE(POI_Zona      );
 	RLS_TRY_PARSE(POI_Kan       );
-	RLS_TRY_PARSE(POI_Kvit      );
 	RLS_TRY_PARSE(POI_TK_Zapros );
-	RLS_TRY_PARSE(POI_TK_Kvit   );
 	RLS_TRY_PARSE(CIT_Zapros    );
 	RLS_TRY_PARSE(CIT_KU        );
-	RLS_TRY_PARSE(CIT_Kvit      );
-	RLS_TRY_PARSE(PI            );
-	RLS_TRY_PARSE(KTA_VO        );
 	RLS_TRY_PARSE(TRVO          );
 	RLS_TRY_PARSE(TRETA         );
 	RLS_TRY_PARSE(AZIMUTH       );

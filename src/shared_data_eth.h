@@ -51,7 +51,6 @@ public:
 	void received_RR_AzPopr       (const Protocol_RLS_Mini::RR_AzPopr      & msg) {piCout << "rec msg" << "received_RR_AzPopr    ";}
 	void received_RR_DPopr_POI    (const Protocol_RLS_Mini::RR_DPopr_POI   & msg) {piCout << "rec msg" << "received_RR_DPopr_POI ";}
 	void received_RR_AzPopr_POI   (const Protocol_RLS_Mini::RR_AzPopr_POI  & msg) {piCout << "rec msg" << "received_RR_AzPopr_POI";}
-	void received_RR_Kvit         (const Protocol_RLS_Mini::RR_Kvit        & msg) {piCout << "rec msg" << "received_RR_Kvit      ";}
 	void received_POI_Zapros      (const Protocol_RLS_Mini::POI_Zapros     & msg) {piCout << "rec msg" << "received_POI_Zapros   ";}
 	void received_POI_Shtat       (const Protocol_RLS_Mini::POI_Shtat      & msg) {piCout << "rec msg" << "received_POI_Shtat    ";}
 	void received_POI_SDC         (const Protocol_RLS_Mini::POI_SDC        & msg) {piCout << "rec msg" << "received_POI_SDC      ";}
@@ -59,28 +58,12 @@ public:
 	void received_POI_APU         (const Protocol_RLS_Mini::POI_APU        & msg) {piCout << "rec msg" << "received_POI_APU      ";}
 	void received_POI_Zona        (const Protocol_RLS_Mini::POI_Zona       & msg) {piCout << "rec msg" << "received_POI_Zona     ";}
 	void received_POI_Kan         (const Protocol_RLS_Mini::POI_Kan        & msg) {piCout << "rec msg" << "received_POI_Kan      ";}
-	void received_POI_Kvit        (const Protocol_RLS_Mini::POI_Kvit       & msg) {piCout << "rec msg" << "received_POI_Kvit     ";}
-	void received_POI_TK_Zapros   (const Protocol_RLS_Mini::POI_TK_Zapros  & msg);
-	void received_POI_TK_Kvit     (const Protocol_RLS_Mini::POI_TK_Kvit    & msg) {piCout << "rec msg" << "received_POI_TK_Kvit  ";}
 	void received_CIT_Zapros      (const Protocol_RLS_Mini::CIT_Zapros     & msg) {piCout << "rec msg" << "received_CIT_Zapros   ";}
 	void received_CIT_KU          (const Protocol_RLS_Mini::CIT_KU         & msg) {piCout << "rec msg" << "received_CIT_KU       ";}
-	void received_CIT_Kvit        (const Protocol_RLS_Mini::CIT_Kvit       & msg) {piCout << "rec msg" << "received_CIT_Kvit     ";}
-	void received_PI              (const Protocol_RLS_Mini::PI             & msg) {piCout << "rec msg" << "received_PI           ";}
-	void received_KTA_VO          (const Protocol_RLS_Mini::KTA_VO         & msg) {piCout << "rec msg" << "received_KTA_VO       ";}
 	void received_TRVO            (const Protocol_RLS_Mini::TRVO           & msg) {piCout << "rec msg" << "received_TRVO         ";}
 	void received_TRETA           (const Protocol_RLS_Mini::TRETA          & msg) {piCout << "rec msg" << "received_TRETA        ";}
 	void received_STRSOPR         (const Protocol_RLS_Mini::STRSOPR        & msg) {piCout << "rec msg" << "received_STRSOPR      ";}
-	void received_KORTR           (const Protocol_RLS_Mini::KORTR          & msg) {piCout << "rec msg" << "received_KORTR        ";}
-	void received_KV_KORTR        (const Protocol_RLS_Mini::KV_KORTR       & msg) {piCout << "rec msg" << "received_KV_KORTR     ";}
-	void received_CMD_ZZT         (const Protocol_RLS_Mini::CMD_ZZT        & msg) {piCout << "rec msg" << "received_CMD_ZZT      ";}
-	void received_ZZT             (const Protocol_RLS_Mini::ZZT            & msg) {piCout << "rec msg" << "received_ZZT          ";}
-	void received_CMD_ZBL         (const Protocol_RLS_Mini::CMD_ZBL        & msg) {piCout << "rec msg" << "received_CMD_ZBL      ";}
-	void received_ZBL             (const Protocol_RLS_Mini::ZBL            & msg) {piCout << "rec msg" << "received_ZBL          ";}
 	void received_AZIMUTH         (const Protocol_RLS_Mini::AZIMUTH        & msg) {piCout << "rec msg" << "received_AZIMUTH      ";}
-	void received_VKL_REG         (const Protocol_RLS_Mini::VKL_REG        & msg) {piCout << "rec msg" << "received_VKL_REG      ";}
-	void received_OTKL_REG        (const Protocol_RLS_Mini::OTKL_REG       & msg) {piCout << "rec msg" << "received_OTKL_REG     ";}
-	void received_ZPR_SOST_REG    (const Protocol_RLS_Mini::ZPR_SOST_REG   & msg) {piCout << "rec msg" << "received_ZPR_SOST_REG ";}
-	void received_SOST_REG        (const Protocol_RLS_Mini::SOST_REG       & msg) {piCout << "rec msg" << "received_SOST_REG     ";}
 	// clang-format on
 
 protected:

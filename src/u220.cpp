@@ -1,8 +1,7 @@
 #include "u220.hpp"
 
-#include "rlso_const.hpp"
-
 #include <pistring_std.h>
+
 // clang-format off
 void print_config(const u220_config_t& config) {
     std::cout << boost::format("       === U220 Configuration ===\n"
@@ -32,8 +31,8 @@ void print_config(const u220_config_t& config) {
 // clang-format on
 
 
-static PIVector<complexf> init_wavetable() {
-	PIVector<complexf> result;
+static VectorComplexF init_wavetable() {
+	VectorComplexF result;
 
 	result.append(wave_table_far);
 	result.insert(result.size() + SAMPLES_WAIT_AFTER_FAR, {0.0f, 0.0f});
@@ -43,8 +42,8 @@ static PIVector<complexf> init_wavetable() {
 	return result;
 }
 
-void U220::fill_buffer_with_wavetable(PIVector<complexf> & buffer) {
-	static const PIVector<complexf> wave_table = init_wavetable();
+void U220::fill_buffer_with_wavetable(VectorComplexF & buffer) {
+	static const VectorComplexF wave_table = init_wavetable();
 
 	if (wave_table.isEmpty()) {
 		throw std::invalid_argument("Wave table cannot be empty");
@@ -163,7 +162,7 @@ void U220::setup_rx_streamer() {
 		board_config.rx_spb = user_config.rx_spb;
 	}
 
-	rx_buffer.resize(2, PIVector<complexf>(board_config.rx_spb));
+	rx_buffer.resize(2, VectorComplexF(board_config.rx_spb));
 	rx_buffer_ptrs.resize(2);
 	for (size_t ch = 0; ch < 2; ch++) {
 		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
@@ -206,7 +205,7 @@ bool U220::check_lo_lock() {
 }
 
 
-PIVector<complexf> U220::take_rx_queue_and_clear(int index) {
+VectorComplexF U220::take_rx_queue_and_clear(int index) {
 	if (index < 0 || index >= 2) return {};
 	auto ref = rx_queue[index].getRef();
 	if (ref->isEmpty()) return {};
@@ -216,7 +215,7 @@ PIVector<complexf> U220::take_rx_queue_and_clear(int index) {
 }
 
 
-PIVector<complexf> U220::take_rx_queue(int index) {
+VectorComplexF U220::take_rx_queue(int index) {
 	if (index < 0 || index >= 2) return {};
 	auto ref = rx_queue[index].getRef();
 	if (ref->isEmpty()) return {};
@@ -224,7 +223,7 @@ PIVector<complexf> U220::take_rx_queue(int index) {
 }
 
 
-PIVector<complexf> U220::get_rx_queue(int index) {
+VectorComplexF U220::get_rx_queue(int index) {
 	if (index < 0 || index >= 2) return {};
 	auto ref = rx_queue[index].getRef();
 	if (ref->isEmpty()) return {};
@@ -315,6 +314,7 @@ void U220::receive() {
 	rx_timeout = 0.1f; // small timeout for subsequent recv
 	rx_errors_worker(rx_metadata.error_code);
 	stats.rx_packet_cnt += num_rx_samps;
+	received();
 }
 
 bool U220::start_transmission(double start_time) {

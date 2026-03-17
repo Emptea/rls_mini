@@ -10,7 +10,9 @@
 #include <pivector.h>
 #include <pimathcomplex.h>
 
-const PIVector<complexf> wave_table_far = {
+typedef PIVector<complexf> VectorComplexF;
+
+const VectorComplexF wave_table_far = {
 	{1.0000f,  0.0000f },
     {-0.9969f, -0.0785f},
     {0.9511f,  0.3090f },
@@ -53,7 +55,7 @@ const PIVector<complexf> wave_table_far = {
     {-0.9969f, -0.0785f},
 };
 
-const PIVector<complexf> wave_table_close = {
+const VectorComplexF wave_table_close = {
 	{1.0000f,  0.0000f },
 	{-0.8660f, -0.5000f},
 	{-0.5000f, 0.8660f },

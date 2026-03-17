@@ -9,6 +9,8 @@
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/thread.hpp>
+#include "rlso_const.hpp"
+
 
 typedef struct u220_config {
 	double rate;
@@ -52,20 +54,21 @@ struct u220_status {
 
 void print_config(const u220_config_t & config);
 
-class U220 {
+class U220 : public PIObject{
+	PIOBJECT(U220) 
 private:
 	uhd::usrp::multi_usrp::sptr usrp;
 
 	uhd::rx_streamer::sptr rx_stream;
-	PIVector<PIVector<complexf>> rx_buffer;
-	PIProtectedVariable<PIQueue<PIVector<complexf>>> rx_queue[2];
+	PIVector<VectorComplexF> rx_buffer;
+	PIProtectedVariable<PIQueue<VectorComplexF>> rx_queue[2];
 	PIVector<complexf *> rx_buffer_ptrs;
 	uhd::rx_metadata_t rx_metadata;
 	double rx_timeout;
 	uhd::stream_cmd_t rx_stream_cmd;
 
 	uhd::tx_streamer::sptr tx_stream;
-	PIVector<complexf> tx_buffer;
+	VectorComplexF tx_buffer;
 	PIVector<complexf *> tx_buffer_ptrs;
 	uhd::tx_metadata_t tx_metadata;
 
@@ -79,14 +82,13 @@ private:
 	u220_stats stats;
 	u220_status status;
 
-	void fill_buffer_with_wavetable(PIVector<complexf> & buffer);
+	void fill_buffer_with_wavetable(VectorComplexF & buffer);
 	void initialize_usrp();
 	void configure_tx_channel(size_t channel);
 	void configure_rx_channel(size_t channel);
 	void setup_tx_streamer();
 	void setup_rx_streamer();
 	void rx_errors_worker(uhd::rx_metadata_t::error_code_t err);
-
 protected:
 	PIThread tx_thread;
 	PIThread rx_thread;
@@ -120,6 +122,7 @@ public:
 
 	void start_reception(double settling_time);
 	void receive();
+	EVENT0(received);
 	void stop_reception();
 
 	void set_pps_source();
@@ -138,9 +141,9 @@ public:
 	double get_rx_rate() const { return usrp ? usrp->get_rx_rate() : 0; };
 	double get_rx_freq_for_ch(size_t channel) const { return usrp ? usrp->get_rx_freq(channel) : 0; };
 	double get_rx_gain_for_ch(size_t channel) const { return usrp ? usrp->get_rx_gain(channel) : 0; };
-	PIVector<complexf> take_rx_queue_and_clear(int index);
-	PIVector<complexf> take_rx_queue(int index);
-	PIVector<complexf> get_rx_queue(int index);
+	VectorComplexF take_rx_queue_and_clear(int index);
+	VectorComplexF take_rx_queue(int index);
+	VectorComplexF get_rx_queue(int index);
 
 	void set_serial(const PIString & ser);
 

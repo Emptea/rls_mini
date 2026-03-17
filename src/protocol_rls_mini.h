@@ -7,6 +7,17 @@ class Protocol_RLS_Mini {
 public:
 #pragma pack(push, 1)
 
+	enum control_point {
+		CTRL = 0x00,
+		ADC  = 0x01,
+		PHD  = 0x02,
+		PLL  = 0x03,
+		OPH  = 0x04,
+		LOU  = 0x05,
+		KN   = 0x06,
+		AD   = 0x07,
+		APU  = 0x08,
+	};
 
 	struct Header PIMETA(no-stream) {
 		Header(uint8_t t = 0, uint8_t c = 0) {
@@ -235,6 +246,24 @@ public:
 		POI_TK_Kvit(): Header(Type, Code) {} // 0 - состояние системы ПОИ, 1 - контрольная точка
 		uint16_t nw = 0;                     // Количество слов данных
 		PIVector<uint16_t> words;
+
+		template<typename T>
+		void setData(const PIVector<T> & d) {
+			setDataInternal(d.data(), d.size());
+		}
+		template<typename T>
+		void setData(const PIDeque<T> & d) {
+			setDataInternal(d.data(), d.size());
+		}
+
+	private:
+		template<typename T>
+		void setDataInternal(const T * d, int cnt) {
+			if (!d || cnt <= 0)
+				words.clear();
+			else
+				words = PIVector<uint16_t>((uint16_t *)d, cnt * sizeof(T) / sizeof(uint16_t));
+		}
 	};
 
 
@@ -295,9 +324,9 @@ public:
 		uint16_t az    = 0; // Азимут, задержанный в обработке
 		uint16_t zona  = 0; // Дальность отметки "Зона"
 		uint16_t nes   = 0; // Количество эхосигналов
-							// Дальность эхосигнала
-							// ...
-							// uint16_t[nes]
+		                    // Дальность эхосигнала
+		                    // ...
+		                    // uint16_t[nes]
 		void setDegreesAzTek(double v) { aztek = v * degLSB; }
 		double getDegreesAzTek() const { return aztek / degLSB; }
 		void setDegreesAz(double v) { az = v * degLSB; }
@@ -374,10 +403,10 @@ public:
 			struct {
 				uint8_t klass: 5; // Класс цели
 				uint8_t sopr : 3; // Признак сопровождения:
-								  // 0 - новая трасса
-								  // 1 - обновление координат
-								  // 2 - экстраполяция (пропуск в обнаружении)
-								  // 3 - сброс с сопровождения
+				                  // 0 - новая трасса
+				                  // 1 - обновление координат
+				                  // 2 - экстраполяция (пропуск в обнаружении)
+				                  // 3 - сброс с сопровождения
 			};
 		};
 		PIVector<uint16_t> KTA;
