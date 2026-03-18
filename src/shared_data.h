@@ -39,13 +39,15 @@ public:
 	static GlobalData * instance();
 
 	void init();
+	bool sync();
 	void start();
 	void stop();
 	void processChannels();
 
 	const PIValueTree & mainConfig() const { return main_config; }
 
-	void received_POI_TK_Zapros   (const Protocol_RLS_Mini::POI_TK_Zapros  & msg);
+	void received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg);
+
 protected:
 
 private:
@@ -58,7 +60,7 @@ private:
 	PIThread process_thread;
 
 	PIMap<int, VectorComplexF> adc_channels;
-	
+
 	PIMap<int, bool> board_statuses;
 };
 

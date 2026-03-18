@@ -4,6 +4,7 @@
 
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
+#include <pisemaphore.h>
 #include <pistring_std.h>
 #include <pivaluetree_conversions.h>
 
@@ -56,9 +57,35 @@ void GlobalData::init() {
 		}
 	}
 
-	for (size_t i = 0; i < active_boards.size(); i++) {
-		u220_ptrs[active_boards[i]]->start_sync();
+	// for (size_t i = 0; i < active_boards.size(); i++) {
+	//	u220_ptrs[active_boards[i]]->start_sync();
+	// }
+}
+
+
+bool GlobalData::sync() {
+	PISemaphore sem;
+	PIVector<PIThread *> sync_threads;
+	PIVector<bool> results(u220_ptrs.size(), false);
+	for (int i = 0; i < u220_ptrs.size_s(); ++i) {
+		auto * u  = u220_ptrs[i];
+		// create thread with this functor
+		// capture "i" and "u" as values, "sem" and "results" as reference (we want modify it)
+		auto * st = new PIThread([i, u, &sem, &results] {
+			sem.acquire();          // wait for 1 resource from semaphore
+			results[i] = u->sync(); // sync and store result to results by index
+		});
+		st->startOnce();    // start thread with up functor
+		st->waitForStart(); // wait for thread actually starts
+		sync_threads << st; // save for future delete
 	}
+	sem.release(sync_threads.size_s()); // release 4 resources (all threads, waits on "sem.acquire()", now go next)
+	for (auto * t: sync_threads)        // wait for all thread to finish their functors
+		t->stopAndWait();
+	piDeleteAll(sync_threads); // delete threads
+
+
+	return results.every([](bool r) { return r == true; }); // shortcut for check all items in "results" ( RTFM :-) )
 }
 
 
