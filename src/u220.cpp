@@ -319,6 +319,7 @@ void U220::receive() {
 }
 
 bool U220::sync() {
+	PISystemTime sync_time = PISystemTime::current();
 	if (!usrp || !tx_stream) {
 		std::cerr << "USRP not properl	y initialized!" << std::endl;
 		return false;
@@ -340,6 +341,7 @@ bool U220::sync() {
 	board_config.pps = StdString2PIString(usrp->get_time_source(0));
 	board_config.ref = StdString2PIString(usrp->get_clock_source(0));
 
+	piCout << "Device" << serial << "sync at" << sync_time; // compare this times on console (should be +- same)
 	std::cout << "Real board configuration for " << serial << std::endl;
 	print_config(board_config);
 	return true;
