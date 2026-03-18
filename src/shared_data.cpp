@@ -4,6 +4,7 @@
 
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
+#include <pitime.h>
 #include <pisemaphore.h>
 #include <pistring_std.h>
 #include <pivaluetree_conversions.h>
@@ -79,6 +80,7 @@ bool GlobalData::sync() {
 		st->waitForStart(); // wait for thread actually starts
 		sync_threads << st; // save for future delete
 	}
+	(100_ms).sleep(); // ensure that all threads waits on "sem.acquire()"
 	sem.release(sync_threads.size_s()); // release 4 resources (all threads, waits on "sem.acquire()", now go next)
 	for (auto * t: sync_threads)        // wait for all thread to finish their functors
 		t->stopAndWait();
