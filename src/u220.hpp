@@ -90,6 +90,7 @@ private:
 	void setup_rx_streamer();
 	void rx_errors_worker(uhd::rx_metadata_t::error_code_t err);
 protected:
+	PIThread sync_thread;
 	PIThread tx_thread;
 	PIThread rx_thread;
 
@@ -115,8 +116,10 @@ public:
 	~U220();
 
 	void init();
-
-	bool start_transmission(double start_time);
+	void start_sync();
+	bool sync();
+	
+	void start_transmission(double start_time);
 	void transmit();
 	void stop_transmission();
 

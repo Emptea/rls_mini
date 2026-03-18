@@ -76,8 +76,7 @@ void U220::initialize_usrp() {
 	std::cout << std::endl;
 	std::cout << boost::format("Creating the usrp device with: %s...") % device_args << std::endl;
 
-	usrp      = uhd::usrp::multi_usrp::make(PIString2StdString(device_args));
-	status.on = true;
+	usrp = uhd::usrp::multi_usrp::make(PIString2StdString(device_args));
 
 	if (!user_config.ref.isEmpty()) {
 		usrp->set_clock_source(PIString2StdString(user_config.ref));
@@ -317,9 +316,9 @@ void U220::receive() {
 	received();
 }
 
-bool U220::start_transmission(double start_time) {
+bool U220::sync() {
 	if (!usrp || !tx_stream) {
-		std::cerr << "USRP not properly initialized!" << std::endl;
+		std::cerr << "USRP not properl	y initialized!" << std::endl;
 		return false;
 	}
 
@@ -333,7 +332,7 @@ bool U220::start_transmission(double start_time) {
 	set_time_sync();
 	if (!check_lo_lock()) {
 		std::cerr << "LO Lock detection failed!" << std::endl;
-		return false;
+		return false;;
 	}
 
 	board_config.pps = StdString2PIString(usrp->get_time_source(0));
@@ -341,7 +340,14 @@ bool U220::start_transmission(double start_time) {
 
 	std::cout << "Real board configuration for " << serial << std::endl;
 	print_config(board_config);
+	return true;
+}
 
+void U220::start_sync() {
+	sync_thread.startOnce([this]() { status.on = sync(); });
+}
+
+void U220::start_transmission(double start_time) {
 	// Setup tx_metadata
 	tx_metadata.start_of_burst = true;
 	tx_metadata.end_of_burst   = false;
@@ -352,7 +358,6 @@ bool U220::start_transmission(double start_time) {
 	status.tx_on[1]            = true;
 	tx_thread.start([this]() { transmit(); });
 	std::cout << std::endl << "Transmission started for " << serial << std::endl;
-	return true;
 }
 
 void U220::start_reception(double settling_time) {

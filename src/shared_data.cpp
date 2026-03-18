@@ -55,6 +55,10 @@ void GlobalData::init() {
 			dit++;
 		}
 	}
+
+	for (size_t i = 0; i < active_boards.size(); i++) {
+		u220_ptrs[active_boards[i]]->start_sync();
+	}
 }
 
 
@@ -109,8 +113,8 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		break;
 	}
 	case Protocol_RLS_Mini::ADC: {
-		VectorComplexF *data = &adc_channels[msg.nkan];
-		ans.nw = data->size();
+		VectorComplexF * data = &adc_channels[msg.nkan];
+		ans.nw                = data->size();
 		ans.setData(adc_channels[msg.nkan]);
 		break;
 	}

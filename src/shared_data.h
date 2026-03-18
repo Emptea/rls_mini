@@ -59,6 +59,7 @@ private:
 
 	PIMap<int, VectorComplexF> adc_channels;
 	
+	PIMap<int, bool> board_statuses;
 };
 
 #endif
