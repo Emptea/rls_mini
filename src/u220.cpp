@@ -35,9 +35,9 @@ static VectorComplexF init_wavetable() {
 	VectorComplexF result;
 
 	result.append(wave_table_far);
-	result.insert(result.size() + SAMPLES_WAIT_AFTER_FAR, {0.0f, 0.0f});
+	result.resize(result.size() + SAMPLES_WAIT_AFTER_FAR, {0.0f, 0.0f});
 	result.append(wave_table_close);
-	result.insert(result.size() + SAMPLES_WAIT_AFTER_CLOSE, {0.0f, 0.0f});
+	result.resize(result.size() + SAMPLES_WAIT_AFTER_CLOSE, {0.0f, 0.0f});
 
 	return result;
 }
