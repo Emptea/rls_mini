@@ -152,6 +152,8 @@ void U220::setup_tx_streamer() {
 
 void U220::setup_rx_streamer() {
 	uhd::stream_args_t stream_args(PIString2StdString(user_config.cpu_format), PIString2StdString(user_config.otw_format));
+	board_config.cpu_format = user_config.cpu_format;
+	board_config.otw_format = user_config.otw_format;
 	stream_args.channels = {0, 1};
 	rx_stream            = usrp->get_rx_stream(stream_args);
 

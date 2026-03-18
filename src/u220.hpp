@@ -1,6 +1,8 @@
 #ifndef U220_HPP
 #define U220_HPP
 
+#include "rlso_const.hpp"
+
 #include <piprotectedvariable.h>
 #include <pithread.h>
 #include <stdint.h>
@@ -9,7 +11,6 @@
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/thread.hpp>
-#include "rlso_const.hpp"
 
 
 typedef struct u220_config {
@@ -54,8 +55,9 @@ struct u220_status {
 
 void print_config(const u220_config_t & config);
 
-class U220 : public PIObject{
-	PIOBJECT(U220) 
+class U220: public PIObject {
+	PIOBJECT(U220)
+
 private:
 	uhd::usrp::multi_usrp::sptr usrp;
 
@@ -89,6 +91,7 @@ private:
 	void setup_tx_streamer();
 	void setup_rx_streamer();
 	void rx_errors_worker(uhd::rx_metadata_t::error_code_t err);
+
 protected:
 	PIThread sync_thread;
 	PIThread tx_thread;
@@ -118,7 +121,7 @@ public:
 	void init();
 	void start_sync();
 	bool sync();
-	
+
 	void start_transmission(double start_time);
 	void transmit();
 	void stop_transmission();
@@ -154,7 +157,8 @@ public:
 	void set_rx_gain(double new_gain);
 	void set_frequency(double new_freq);
 
-	void print_status(const struct u220_status & status) {
+	struct u220_status get_status() { return status; };
+	void print_status() {
 		piCout << serial << " status";
 		piCout << "  on:       " << (status.on ? "true" : "false") << "\n";
 		piCout << "  rx_on:   [" << (status.rx_on[0] ? "true" : "false") << ", " << (status.rx_on[1] ? "true" : "false") << "]\n";
