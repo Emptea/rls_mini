@@ -160,7 +160,7 @@ void U220::setup_rx_streamer() {
 	rx_stream            = usrp->get_rx_stream(stream_args);
 
 	if (user_config.rx_spb == 0) {
-		user_config.rx_spb  = rx_stream->get_max_num_samps();
+		user_config.rx_spb  = rx_stream->get_max_num_samps()*10;
 		user_config.rx_spb  = ((user_config.rx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
 		board_config.rx_spb = user_config.rx_spb;
 	}
