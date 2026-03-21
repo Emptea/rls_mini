@@ -61,7 +61,7 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 	: serial(serial)
 	, device_args(args)
 	, user_config(config)
-	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS
+	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS  
                                      : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE) {}
 
 U220::~U220() {}
@@ -117,6 +117,7 @@ void U220::configure_tx_channel(size_t channel) {
 void U220::configure_rx_channel(size_t channel) {
 	uhd::tune_request_t tune_request(user_config.freq, 0);
 	usrp->set_rx_freq(tune_request, channel);
+	usrp->set_rx_rate(user_config.rate);
 	board_config.freq = usrp->get_rx_freq(channel);
 
 	// Set rx gain if specified
@@ -142,8 +143,8 @@ void U220::setup_tx_streamer() {
 	if (user_config.tx_spb == 0) {
 		user_config.tx_spb  = tx_stream->get_max_num_samps() * 20;
 		user_config.tx_spb  = ((user_config.tx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
-		board_config.tx_spb = user_config.tx_spb;
 	}
+	board_config.tx_spb = user_config.tx_spb;
 
 	tx_buffer.resize(user_config.tx_spb);
 	tx_buffer_ptrs = {&tx_buffer.front(), &tx_buffer.front()};
@@ -160,10 +161,10 @@ void U220::setup_rx_streamer() {
 	rx_stream               = usrp->get_rx_stream(stream_args);
 
 	if (user_config.rx_spb == 0) {
-		user_config.rx_spb  = rx_stream->get_max_num_samps() * 10;
+		user_config.rx_spb  = rx_stream->get_max_num_samps();
 		user_config.rx_spb  = ((user_config.rx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
-		board_config.rx_spb = user_config.rx_spb;
 	}
+	board_config.rx_spb = user_config.rx_spb;
 
 	rx_buffer.resize(2, VectorComplexF(board_config.rx_spb));
 	rx_buffer_ptrs.resize(2);
@@ -278,26 +279,32 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 	switch (err) {
 	case uhd::rx_metadata_t::ERROR_CODE_TIMEOUT: {
 		stats.rx_timeouts++;
+		piCout << "Timeout in recv";
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_LATE_COMMAND: {
 		stats.rx_late_commands++;
+		piCout << "Late command in recv";
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_BROKEN_CHAIN: {
 		stats.rx_broken_chains++;
+		piCout << "Broken chain in recv";
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW: {
 		stats.rx_overflows++;
+		piCout << "Overflow in recv";
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_ALIGNMENT: {
 		stats.rx_alignment_errors++;
+		piCout << "Wrong code aligment in recv";
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_BAD_PACKET: {
 		stats.rx_bad_packets++;
+		piCout << "Bad packet in recv";
 		break;
 	}
 	default: {
@@ -307,7 +314,7 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 }
 
 void U220::receive() {
-	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout);
+	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout, true);
 
 	for (int ch: {0, 1}) {
 		auto ch_ptr = rx_queue[ch].getRef();
@@ -316,6 +323,7 @@ void U220::receive() {
 
 	rx_timeout = 0.1f; // small timeout for subsequent recv
 	rx_errors_worker(rx_metadata.error_code);
+	piCout << "Received " << num_rx_samps;
 	stats.rx_packet_cnt += num_rx_samps;
 	received();
 }
@@ -363,7 +371,7 @@ void U220::start_transmission(double start_time) {
 
 	status.tx_on[0]            = true;
 	status.tx_on[1]            = true;
-	tx_thread.start([this]() { transmit(); }, 10_ms);
+	tx_thread.start([this]() { transmit(); }, 1_ms);
 	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 }
 
@@ -371,14 +379,14 @@ void U220::start_reception(double settling_time) {
 	rx_timeout               = settling_time + 0.1f; // expected settling time + padding for first recv
 
 	// setup streaming
-	rx_stream_cmd.num_samps  = 0;
+	rx_stream_cmd.num_samps  = board_config.rx_spb;
 	rx_stream_cmd.stream_now = false;
 	rx_stream_cmd.time_spec  = uhd::time_spec_t(settling_time);
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
 
 	status.rx_on[0] = true;
 	status.rx_on[1] = true;
-	rx_thread.start([this]() { receive(); });
+	rx_thread.start([this]() { receive(); }, 100_ms);
 	std::cout << std::endl << "Reception started for " << serial << std::endl;
 }
 
