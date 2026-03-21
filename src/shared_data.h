@@ -33,7 +33,7 @@ public:
 		.tx_spb     = 0,
 		.rx_spb     = 0
     };
-	const PIString u220_args = "recv_frame_size=4104,num_recv_frames=128,send_frame_size=8192,num_send_frames=256";
+	const PIString u220_args = "recv_frame_size=4176,num_recv_frames=128,send_frame_size=8192,num_send_frames=256";
 
 	PIVector<size_t> active_boards;
 	static GlobalData * instance();
