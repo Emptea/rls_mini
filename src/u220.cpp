@@ -73,6 +73,8 @@ void U220::init() {
 }
 
 void U220::initialize_usrp() {
+	device_args.append(",serial=");
+	device_args.append(serial);
 	std::cout << std::endl;
 	std::cout << boost::format("Creating the usrp device with: %s...") % device_args << std::endl;
 
@@ -424,7 +426,4 @@ void U220::set_frequency(double new_freq) {
 
 void U220::set_serial(const PIString & ser) {
 	serial = ser;
-	device_args.append(",serial=");
-	device_args.append(ser);
-	std::cout << device_args << std::endl;
 }
