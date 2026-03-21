@@ -23,7 +23,7 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 					 auto ref = current_channels.getRef();
 					 for (int i: {0, 1}) {                            // 0 and 1 - index in U220, doesn`t change!
 						 int global_channel     = u_channels[i];      // 0 - 7
-						 (*ref)[global_channel] = u->get_rx_queue(i); // or something else ... grab your 0/1 channel data
+						 (*ref)[global_channel] = u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
 					 }
 					 notifier_channels.notify();
 				 }));
