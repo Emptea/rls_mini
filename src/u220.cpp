@@ -85,6 +85,7 @@ void U220::initialize_usrp() {
 	}
 
 	usrp->set_tx_rate(user_config.rate);
+	usrp->set_rx_rate(user_config.rate);
 	board_config.rate = usrp->get_tx_rate();
 
 	// Configure both channels (0 and 1)
@@ -117,7 +118,6 @@ void U220::configure_tx_channel(size_t channel) {
 void U220::configure_rx_channel(size_t channel) {
 	uhd::tune_request_t tune_request(user_config.freq, 0);
 	usrp->set_rx_freq(tune_request, channel);
-	usrp->set_rx_rate(user_config.rate);
 	board_config.freq = usrp->get_rx_freq(channel);
 
 	// Set rx gain if specified
@@ -314,14 +314,14 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 }
 
 void U220::receive() {
-	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout, true);
+	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout) * 2;
+	rx_timeout = rx_burst_pkt_time; // small timeout for subsequent recv
 
 	for (int ch: {0, 1}) {
 		auto ch_ptr = rx_queue[ch].getRef();
 		ch_ptr->push_back(rx_buffer[ch]);
 	}
 
-	rx_timeout = 0.1f; // small timeout for subsequent recv
 	rx_errors_worker(rx_metadata.error_code);
 	piCout << "Received " << num_rx_samps;
 	stats.rx_packet_cnt += num_rx_samps;
@@ -376,7 +376,10 @@ void U220::start_transmission(double start_time) {
 }
 
 void U220::start_reception(double settling_time) {
-	rx_timeout               = settling_time + 0.1f; // expected settling time + padding for first recv
+    const double rate = usrp->get_rx_rate();
+	rx_burst_pkt_time =
+	std::max<float>(0.100f, (2 * user_config.rx_spb  / rate));
+	rx_timeout               = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
 
 	// setup streaming
 	rx_stream_cmd.num_samps  = board_config.rx_spb;
@@ -386,7 +389,7 @@ void U220::start_reception(double settling_time) {
 
 	status.rx_on[0] = true;
 	status.rx_on[1] = true;
-	rx_thread.start([this]() { receive(); }, 100_ms);
+	rx_thread.start([this]() { receive(); });
 	std::cout << std::endl << "Reception started for " << serial << std::endl;
 }
 
@@ -429,6 +432,7 @@ void U220::set_frequency(double new_freq) {
 		user_config.freq = new_freq;
 		uhd::tune_request_t tune_request(user_config.freq, 0);
 		usrp->set_tx_freq(tune_request, ch);
+		usrp->set_rx_freq(tune_request, ch);
 		board_config.freq = usrp->get_tx_freq(ch);
 	}
 }

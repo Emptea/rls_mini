@@ -67,6 +67,7 @@ private:
 	PIVector<complexf *> rx_buffer_ptrs;
 	uhd::rx_metadata_t rx_metadata;
 	double rx_timeout;
+	float rx_burst_pkt_time;
 	uhd::stream_cmd_t rx_stream_cmd;
 
 	uhd::tx_streamer::sptr tx_stream;
