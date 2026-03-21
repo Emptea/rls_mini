@@ -156,11 +156,11 @@ void U220::setup_rx_streamer() {
 	uhd::stream_args_t stream_args(PIString2StdString(user_config.cpu_format), PIString2StdString(user_config.otw_format));
 	board_config.cpu_format = user_config.cpu_format;
 	board_config.otw_format = user_config.otw_format;
-	stream_args.channels = {0, 1};
-	rx_stream            = usrp->get_rx_stream(stream_args);
+	stream_args.channels    = {0, 1};
+	rx_stream               = usrp->get_rx_stream(stream_args);
 
 	if (user_config.rx_spb == 0) {
-		user_config.rx_spb  = rx_stream->get_max_num_samps()*10;
+		user_config.rx_spb  = rx_stream->get_max_num_samps() * 10;
 		user_config.rx_spb  = ((user_config.rx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
 		board_config.rx_spb = user_config.rx_spb;
 	}
@@ -269,8 +269,8 @@ void U220::transmit() {
 	fill_buffer_with_wavetable(tx_buffer);
 
 	tx_metadata.start_of_burst = false;
-	tx_metadata.has_time_spec  = false;
-	tx_metadata.time_spec      = usrp->get_time_now() + uhd::time_spec_t(0.05);
+	tx_metadata.has_time_spec  = true;
+	tx_metadata.time_spec      = usrp->get_time_now() + uhd::time_spec_t(0.01);
 	stats.tx_packet_cnt += num_samps;
 }
 
@@ -337,7 +337,8 @@ bool U220::sync() {
 	set_time_sync();
 	if (!check_lo_lock()) {
 		std::cerr << "LO Lock detection failed!" << std::endl;
-		return false;;
+		return false;
+		;
 	}
 
 	board_config.pps = StdString2PIString(usrp->get_time_source(0));
@@ -362,7 +363,7 @@ void U220::start_transmission(double start_time) {
 
 	status.tx_on[0]            = true;
 	status.tx_on[1]            = true;
-	tx_thread.start([this]() { transmit(); });
+	tx_thread.start([this]() { transmit(); }, 10_ms);
 	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 }
 
