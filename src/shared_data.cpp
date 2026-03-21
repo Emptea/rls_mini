@@ -57,19 +57,16 @@ void GlobalData::init() {
 			dit++;
 		}
 	}
-
-	// for (size_t i = 0; i < active_boards.size(); i++) {
-	//	u220_ptrs[active_boards[i]]->start_sync();
-	// }
+	sync();
 }
 
 
 bool GlobalData::sync() {
 	PISemaphore sem;
 	PIVector<PIThread *> sync_threads;
-	PIVector<bool> results(u220_ptrs.size(), false);
-	for (int i = 0; i < u220_ptrs.size_s(); ++i) {
-		auto * u  = u220_ptrs[i];
+	PIVector<bool> results(active_boards.size(), false);
+	for (int i = 0; i < active_boards.size_s(); ++i) {
+		auto * u  = u220_ptrs[active_boards[i]];
 		// create thread with this functor
 		// capture "i" and "u" as values, "sem" and "results" as reference (we want modify it)
 		auto * st = new PIThread([i, u, &sem, &results] {
