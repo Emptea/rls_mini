@@ -28,7 +28,7 @@ public:
 		.rx_bw      = {56e6, 56e6},
 		.ref        = "internal",
 		.cpu_format = "fc32",
-		.otw_format = "sc16",
+		.otw_format = "sc12",
 		.pps        = "external",
 		.tx_spb     = 0,
 		.rx_spb     = 0

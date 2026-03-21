@@ -99,7 +99,7 @@ protected:
 
 public:
 	U220(const PIString & serial = "",
-	     const PIString & args   = "recv_frame_size=4096,num_recv_frames=128,send_frame_size=8192,num_send_frames=512",
+	     const PIString & args   = "recv_frame_size=4104,num_recv_frames=128,send_frame_size=8192,num_send_frames=512",
 	     uint64_t num_samps      = 0,
 	     u220_config_t config    = {
              5e6,
@@ -110,7 +110,7 @@ public:
              {56e6, 56e6},
              "",
              "fc32",
-             "sc16",
+             "sc12",
              "internal",
              0,
              0
