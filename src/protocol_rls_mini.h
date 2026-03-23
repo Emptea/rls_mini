@@ -120,8 +120,8 @@ public:
 				uint8_t ant     : 1;
 				uint8_t izl     : 1;
 				uint8_t kuizl   : 1;
-				uint8_t vr      : 1;
-				uint8_t kuvr    : 1;
+				uint8_t vr      : 2;
+				uint8_t kuvr    : 2;
 			};
 		};
 		uint8_t ispr_kan = 0;

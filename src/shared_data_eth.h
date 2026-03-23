@@ -43,14 +43,6 @@ public:
 
 	// clang-format off
 	/// Удалить ненужные
-	void received_RR_Zapros       (const Protocol_RLS_Mini::RR_Zapros      & msg) {piCout << "rec msg" << "received_RR_Zapros    ";}
-	void received_RR_Vr           (const Protocol_RLS_Mini::RR_Vr          & msg) {piCout << "rec msg" << "received_RR_Vr        ";}
-	void received_RR_Izl          (const Protocol_RLS_Mini::RR_Izl         & msg) {piCout << "rec msg" << "received_RR_Izl       ";}
-	void received_RR_Ant          (const Protocol_RLS_Mini::RR_Ant         & msg) {piCout << "rec msg" << "received_RR_Ant       ";}
-	void received_RR_TTek         (const Protocol_RLS_Mini::RR_TTek        & msg) {piCout << "rec msg" << "received_RR_TTek      ";}
-	void received_RR_AzPopr       (const Protocol_RLS_Mini::RR_AzPopr      & msg) {piCout << "rec msg" << "received_RR_AzPopr    ";}
-	void received_RR_DPopr_POI    (const Protocol_RLS_Mini::RR_DPopr_POI   & msg) {piCout << "rec msg" << "received_RR_DPopr_POI ";}
-	void received_RR_AzPopr_POI   (const Protocol_RLS_Mini::RR_AzPopr_POI  & msg) {piCout << "rec msg" << "received_RR_AzPopr_POI";}
 	void received_POI_Zapros      (const Protocol_RLS_Mini::POI_Zapros     & msg) {piCout << "rec msg" << "received_POI_Zapros   ";}
 	void received_POI_Shtat       (const Protocol_RLS_Mini::POI_Shtat      & msg) {piCout << "rec msg" << "received_POI_Shtat    ";}
 	void received_POI_SDC         (const Protocol_RLS_Mini::POI_SDC        & msg) {piCout << "rec msg" << "received_POI_SDC      ";}
