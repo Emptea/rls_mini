@@ -39,6 +39,7 @@ static VectorComplexF init_wavetable() {
 	result.append(wave_table_close);
 	result.resize(result.size() + SAMPLES_WAIT_AFTER_CLOSE, {0.0f, 0.0f});
 
+	piCout << "Generated waveform of " << result.size() << "samples.";
 	return result;
 }
 
@@ -266,8 +267,8 @@ bool U220::check_ref_lock() {
 
 void U220::transmit() {
 	// Send buffer contents
-	uint64_t num_samps = tx_stream->send(tx_buffer_ptrs, tx_buffer.size(), tx_metadata);
-	fill_buffer_with_wavetable(tx_buffer);
+	uint64_t num_samps = tx_stream->send(tx_buffer_ptrs, tx_buffer.size(), tx_metadata, 1.0);
+	// fill_buffer_with_wavetable(tx_buffer);
 
 	tx_metadata.start_of_burst = false;
 	tx_metadata.has_time_spec  = true;
@@ -323,7 +324,7 @@ void U220::receive() {
 	}
 
 	rx_errors_worker(rx_metadata.error_code);
-	piCout << "Received " << num_rx_samps;
+	// piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "." << rx_metadata.time_spec.get_frac_secs();
 	stats.rx_packet_cnt += num_rx_samps;
 	received();
 }
@@ -371,7 +372,7 @@ void U220::start_transmission(double start_time) {
 
 	status.tx_on[0]            = true;
 	status.tx_on[1]            = true;
-	tx_thread.start([this]() { transmit(); }, 1_ms);
+	tx_thread.start([this]() { transmit(); });
 	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 }
 
