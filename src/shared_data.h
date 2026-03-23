@@ -60,6 +60,7 @@ private:
 	PIThread process_thread;
 
 	PIMap<int, VectorComplexF> adc_channels;
+	PIMap<int, VectorComplexF> zero_vector;
 
 	PIMap<int, bool> board_statuses;
 };

@@ -4,9 +4,9 @@
 
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
-#include <pitime.h>
 #include <pisemaphore.h>
 #include <pistring_std.h>
+#include <pitime.h>
 #include <pivaluetree_conversions.h>
 
 GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220_args)) {
@@ -21,8 +21,8 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 
 		CONNECTL(u, received, ([this, u_channels, u] { // grab local "u" and "u_channels" as copies
 					 auto ref = current_channels.getRef();
-					 for (int i: {0, 1}) {                            // 0 and 1 - index in U220, doesn`t change!
-						 int global_channel     = u_channels[i];      // 0 - 7
+					 for (int i: {0, 1}) {                                       // 0 and 1 - index in U220, doesn`t change!
+						 int global_channel     = u_channels[i];                 // 0 - 7
 						 (*ref)[global_channel] = u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
 					 }
 					 notifier_channels.notify();
@@ -48,6 +48,9 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
+	for (size_t i = 0; i < 8; i++) {
+		zero_vector[i].resize(232 * 6, {0.0f, 0.0f});
+	}
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
@@ -77,7 +80,7 @@ bool GlobalData::sync() {
 		st->waitForStart(); // wait for thread actually starts
 		sync_threads << st; // save for future delete
 	}
-	(100_ms).sleep(); // ensure that all threads waits on "sem.acquire()"
+	(100_ms).sleep();                   // ensure that all threads waits on "sem.acquire()"
 	sem.release(sync_threads.size_s()); // release 4 resources (all threads, waits on "sem.acquire()", now go next)
 	for (auto * t: sync_threads)        // wait for all thread to finish their functors
 		t->stopAndWait();
@@ -115,24 +118,31 @@ void GlobalData::processChannels() {
 	{ // start work with "getRef"
 		auto ref = current_channels.getRef();
 		for (int ch = 0; ch < 8; ++ch) {
-			if ((*ref)[ch].isEmpty()) return; // at least one channel is empty, leave
+			if ((*ref)[ch].isEmpty()) {
+				adc_channels[ch] = zero_vector[ch];
+			} else {
+				adc_channels[ch] = (*ref)[ch];
+			}
 		}
 
 		channels = *ref; // copy data
 
 		for (int ch = 0; ch < 8; ++ch) {
-			(*ref)[ch].clear(); // clear input data
+			if (!(*ref)[ch].isEmpty()) {
+				(*ref)[ch].clear(); // clear input data
+			}
 		}
 	} // desctuct "ref", release current_channels
 
 	// work with your data (channels)
-	adc_channels = channels;
+	// adc_channels = channels;
 }
 
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	piCout << "rec msg" << "received_POI_TK_Zapros";
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
+	piCout << "rec msg kt" << msg.kt;
 
 	switch (msg.kt) {
 	case Protocol_RLS_Mini::CTRL: {
@@ -141,7 +151,9 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	case Protocol_RLS_Mini::ADC: {
 		VectorComplexF * data = &adc_channels[msg.nkan];
 		ans.nw                = data->size();
-		ans.setData(adc_channels[msg.nkan]);
+		piCout << "ans size " << ans.nw;
+		ans.setData(*data);
+		piCout << "ans data" << ans.words;
 		break;
 	}
 	case Protocol_RLS_Mini::PHD: {
