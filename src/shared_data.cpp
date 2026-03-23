@@ -20,10 +20,12 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 
 
 		CONNECTL(u, received, ([this, u_channels, u] { // grab local "u" and "u_channels" as copies
-					 auto ref = current_channels.getRef();
-					 for (int i: {0, 1}) {                                       // 0 and 1 - index in U220, doesn`t change!
-						 int global_channel     = u_channels[i];                 // 0 - 7
-						 (*ref)[global_channel] = u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
+					 auto ref1 = current_channels.getRef();
+					 auto ref2 = adc_channels.getRef();
+					 for (int i: {0, 1}) {                        // 0 and 1 - index in U220, doesn`t change!
+						 int global_channel      = u_channels[i]; // 0 - 7
+						 (*ref1)[global_channel] = (*ref2)[global_channel] =
+							 u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
 					 }
 					 notifier_channels.notify();
 				 }));
@@ -48,9 +50,7 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
-	for (size_t i = 0; i < 8; i++) {
-		zero_vector[i].resize(232 * 6, {0.0f, 0.0f});
-	}
+	zero_vector.resize(232 * 6, {0.0f, 0.0f});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
@@ -118,11 +118,7 @@ void GlobalData::processChannels() {
 	{ // start work with "getRef"
 		auto ref = current_channels.getRef();
 		for (int ch = 0; ch < 8; ++ch) {
-			if ((*ref)[ch].isEmpty()) {
-				adc_channels[ch] = zero_vector[ch];
-			} else {
-				adc_channels[ch] = (*ref)[ch];
-			}
+			if ((*ref)[ch].isEmpty()) return;
 		}
 
 		channels = *ref; // copy data
@@ -149,10 +145,18 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		break;
 	}
 	case Protocol_RLS_Mini::ADC: {
-		VectorComplexF * data = &adc_channels[msg.nkan];
-		ans.nw                = data->size();
+		VectorComplexF data;
+		{
+			auto ref = adc_channels.getRef();
+			data     = (*ref)[msg.nkan];
+		}
+		ans.nw = data.size();
 		piCout << "ans size " << ans.nw;
-		ans.setData(*data);
+		if (data.isEmpty()) {
+			ans.setData(zero_vector);
+		} else {
+			ans.setData(data);
+		}
 		piCout << "ans data" << ans.words;
 		break;
 	}

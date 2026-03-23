@@ -59,8 +59,8 @@ private:
 	PIThreadNotifier notifier_channels;
 	PIThread process_thread;
 
-	PIMap<int, VectorComplexF> adc_channels;
-	PIMap<int, VectorComplexF> zero_vector;
+	PIProtectedVariable<PIMap<int, VectorComplexF>> adc_channels;
+	VectorComplexF zero_vector;
 
 	PIMap<int, bool> board_statuses;
 };
