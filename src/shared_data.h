@@ -27,7 +27,7 @@ public:
 		.tx_bw      = {56e6, 56e6},
 		.rx_bw      = {56e6, 56e6},
 		.ref        = "internal",
-		.cpu_format = "fc32",
+		.cpu_format = "sc16",
 		.otw_format = "sc12",
 		.pps        = "external",
 		.tx_spb     = 0,
@@ -55,12 +55,12 @@ private:
 	~GlobalData();
 
 	PIValueTree main_config;
-	PIProtectedVariable<PIMap<int, VectorComplexF>> current_channels;
+	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
 	PIThreadNotifier notifier_channels;
 	PIThread process_thread;
 
-	PIProtectedVariable<PIMap<int, VectorComplexF>> adc_channels;
-	VectorComplexF zero_vector;
+	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
+	VectorComplexS zero_vector;
 
 	PIMap<int, bool> board_statuses;
 };

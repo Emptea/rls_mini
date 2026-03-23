@@ -50,7 +50,7 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
-	zero_vector.resize(232 * 6, {0.0f, 0.0f});
+	zero_vector.resize(232 * 6, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
@@ -113,7 +113,7 @@ void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 
-	PIMap<int, VectorComplexF> channels;
+	PIMap<int, VectorComplexS> channels;
 
 	{ // start work with "getRef"
 		auto ref = current_channels.getRef();
@@ -145,7 +145,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		break;
 	}
 	case Protocol_RLS_Mini::ADC: {
-		VectorComplexF data;
+		VectorComplexS data;
 		{
 			auto ref = adc_channels.getRef();
 			data     = (*ref)[msg.nkan];

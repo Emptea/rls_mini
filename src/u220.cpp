@@ -31,20 +31,20 @@ void print_config(const u220_config_t& config) {
 // clang-format on
 
 
-static VectorComplexF init_wavetable() {
-	VectorComplexF result;
+static VectorComplexS init_wavetable() {
+	VectorComplexS result;
 
-	result.append(wave_table_far);
-	result.resize(result.size() + SAMPLES_WAIT_AFTER_FAR, {0.0f, 0.0f});
-	result.append(wave_table_close);
-	result.resize(result.size() + SAMPLES_WAIT_AFTER_CLOSE, {0.0f, 0.0f});
+	result.append(wave_table_far_sc16);
+	result.resize(result.size() + SAMPLES_WAIT_AFTER_FAR, {0, 0});
+	result.append(wave_table_close_sc16);
+	result.resize(result.size() + SAMPLES_WAIT_AFTER_CLOSE, {0, 0});
 
 	piCout << "Generated waveform of " << result.size() << "samples.";
 	return result;
 }
 
-void U220::fill_buffer_with_wavetable(VectorComplexF & buffer) {
-	static const VectorComplexF wave_table = init_wavetable();
+void U220::fill_buffer_with_wavetable(VectorComplexS & buffer) {
+	static const VectorComplexS wave_table = init_wavetable();
 
 	if (wave_table.isEmpty()) {
 		throw std::invalid_argument("Wave table cannot be empty");
@@ -136,14 +136,14 @@ void U220::configure_rx_channel(size_t channel) {
 
 void U220::setup_tx_streamer() {
 	// Create transmit streamer
-	uhd::stream_args_t stream_args("fc32", PIString2StdString(user_config.otw_format));
+	uhd::stream_args_t stream_args(PIString2StdString(user_config.cpu_format), PIString2StdString(user_config.otw_format));
 	stream_args.channels = {0, 1};
 	tx_stream            = usrp->get_tx_stream(stream_args);
 
 	// Allocate buffer
 	if (user_config.tx_spb == 0) {
-		user_config.tx_spb  = tx_stream->get_max_num_samps() * 20;
-		user_config.tx_spb  = ((user_config.tx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
+		user_config.tx_spb = tx_stream->get_max_num_samps() * 20;
+		user_config.tx_spb = ((user_config.tx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
 	}
 	board_config.tx_spb = user_config.tx_spb;
 
@@ -162,12 +162,12 @@ void U220::setup_rx_streamer() {
 	rx_stream               = usrp->get_rx_stream(stream_args);
 
 	if (user_config.rx_spb == 0) {
-		user_config.rx_spb  = rx_stream->get_max_num_samps();
-		user_config.rx_spb  = ((user_config.rx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
+		user_config.rx_spb = rx_stream->get_max_num_samps();
+		user_config.rx_spb = ((user_config.rx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
 	}
 	board_config.rx_spb = user_config.rx_spb;
 
-	rx_buffer.resize(2, VectorComplexF(board_config.rx_spb));
+	rx_buffer.resize(2, VectorComplexS(board_config.rx_spb));
 	rx_buffer_ptrs.resize(2);
 	for (size_t ch = 0; ch < 2; ch++) {
 		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
@@ -210,7 +210,7 @@ bool U220::check_lo_lock() {
 }
 
 
-VectorComplexF U220::take_rx_queue_and_clear(int index) {
+VectorComplexS U220::take_rx_queue_and_clear(int index) {
 	if (index < 0 || index >= 2) return {};
 	auto ref = rx_queue[index].getRef();
 	if (ref->isEmpty()) return {};
@@ -220,7 +220,7 @@ VectorComplexF U220::take_rx_queue_and_clear(int index) {
 }
 
 
-VectorComplexF U220::take_rx_queue(int index) {
+VectorComplexS U220::take_rx_queue(int index) {
 	if (index < 0 || index >= 2) return {};
 	auto ref = rx_queue[index].getRef();
 	if (ref->isEmpty()) return {};
@@ -228,7 +228,7 @@ VectorComplexF U220::take_rx_queue(int index) {
 }
 
 
-VectorComplexF U220::get_rx_queue(int index) {
+VectorComplexS U220::get_rx_queue(int index) {
 	if (index < 0 || index >= 2) return {};
 	auto ref = rx_queue[index].getRef();
 	if (ref->isEmpty()) return {};
@@ -267,7 +267,7 @@ bool U220::check_ref_lock() {
 
 void U220::transmit() {
 	// Send buffer contents
-	uint64_t num_samps = tx_stream->send(tx_buffer_ptrs, tx_buffer.size(), tx_metadata, 1.0);
+	uint64_t num_samps         = tx_stream->send(tx_buffer_ptrs, tx_buffer.size(), tx_metadata, 1.0);
 	// fill_buffer_with_wavetable(tx_buffer);
 
 	tx_metadata.start_of_burst = false;
@@ -316,7 +316,7 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 
 void U220::receive() {
 	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout) * 2;
-	rx_timeout = rx_burst_pkt_time; // small timeout for subsequent recv
+	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
 
 	for (int ch: {0, 1}) {
 		auto ch_ptr = rx_queue[ch].getRef();
@@ -377,9 +377,8 @@ void U220::start_transmission(double start_time) {
 }
 
 void U220::start_reception(double settling_time) {
-    const double rate = usrp->get_rx_rate();
-	rx_burst_pkt_time =
-	std::max<float>(0.100f, (2 * user_config.rx_spb  / rate));
+	const double rate        = usrp->get_rx_rate();
+	rx_burst_pkt_time        = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
 	rx_timeout               = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
 
 	// setup streaming

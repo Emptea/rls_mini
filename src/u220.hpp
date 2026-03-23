@@ -62,17 +62,17 @@ private:
 	uhd::usrp::multi_usrp::sptr usrp;
 
 	uhd::rx_streamer::sptr rx_stream;
-	PIVector<VectorComplexF> rx_buffer;
-	PIProtectedVariable<PIQueue<VectorComplexF>> rx_queue[2];
-	PIVector<complexf *> rx_buffer_ptrs;
+	PIVector<VectorComplexS> rx_buffer;
+	PIProtectedVariable<PIQueue<VectorComplexS>> rx_queue[2];
+	PIVector<complexs *> rx_buffer_ptrs;
 	uhd::rx_metadata_t rx_metadata;
 	double rx_timeout;
 	float rx_burst_pkt_time;
 	uhd::stream_cmd_t rx_stream_cmd;
 
 	uhd::tx_streamer::sptr tx_stream;
-	VectorComplexF tx_buffer;
-	PIVector<complexf *> tx_buffer_ptrs;
+	VectorComplexS tx_buffer;
+	PIVector<complexs *> tx_buffer_ptrs;
 	uhd::tx_metadata_t tx_metadata;
 
 	// Configuration parameters
@@ -85,7 +85,7 @@ private:
 	u220_stats stats;
 	u220_status status;
 
-	void fill_buffer_with_wavetable(VectorComplexF & buffer);
+	void fill_buffer_with_wavetable(VectorComplexS & buffer);
 	void initialize_usrp();
 	void configure_tx_channel(size_t channel);
 	void configure_rx_channel(size_t channel);
@@ -110,7 +110,7 @@ public:
              {56e6, 56e6},
              {56e6, 56e6},
              "",
-             "fc32",
+             "sc16",
              "sc12",
              "internal",
              0,
@@ -148,9 +148,9 @@ public:
 	double get_rx_rate() const { return usrp ? usrp->get_rx_rate() : 0; };
 	double get_rx_freq_for_ch(size_t channel) const { return usrp ? usrp->get_rx_freq(channel) : 0; };
 	double get_rx_gain_for_ch(size_t channel) const { return usrp ? usrp->get_rx_gain(channel) : 0; };
-	VectorComplexF take_rx_queue_and_clear(int index);
-	VectorComplexF take_rx_queue(int index);
-	VectorComplexF get_rx_queue(int index);
+	VectorComplexS take_rx_queue_and_clear(int index);
+	VectorComplexS take_rx_queue(int index);
+	VectorComplexS get_rx_queue(int index);
 
 	void set_serial(const PIString & ser);
 
