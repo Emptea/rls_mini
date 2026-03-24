@@ -95,7 +95,7 @@ void GlobalData::start() {
 	startEth();
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		// u220_ptrs[active_boards[i]]->start_reception(4.64+180*0.2e-6);
-		u220_ptrs[active_boards[i]]->start_reception(4.64-52*0.2e-6);
+		u220_ptrs[active_boards[i]]->start_reception(4.64 - 52 * 0.2e-6);
 		u220_ptrs[active_boards[i]]->start_transmission(4.64);
 	}
 }
@@ -115,17 +115,19 @@ void GlobalData::processChannels() {
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 
 	PIMap<int, VectorComplexS> channels;
-
+	bool all_channels = true;
 	{ // start work with "getRef"
 		auto ref = current_channels.getRef();
 		for (int ch = 0; ch < 8; ++ch) {
 			if ((*ref)[ch].isEmpty()) {
 				ispr_kan &= ~(1U << ch);
-				return;
+				all_channels = false;
+			} else {
+				ispr_kan |= (1U << ch);
 			}
-			ispr_kan |= (1U << ch);
 		}
 
+		if (~all_channels) return;
 		channels = *ref; // copy data
 
 		for (int ch = 0; ch < 8; ++ch) {
@@ -190,70 +192,68 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	global->sendMessage(ans);
 }
 
-Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit(){
+Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
 	Protocol_RLS_Mini::RR_Kvit ans;
-	ans.bits = flags.bits;
+	ans.bits     = flags.bits;
 	ans.ispr_kan = ispr_kan;
 	ans.setDegreesDaz(daz);
 	ans.dd_poi = dd_poi;
 	ans.setDegreesDazPOI(daz_poi);
+	piCout << ans.bits;
+	piCout << PICoutManipulators::Bin << ans.ispr_kan;
+	piCout << ans.daz;
+	piCout << ans.dd_poi;
+	piCout << ans.daz_poi;
 	return ans;
 }
 
-void GlobalData::received_RR_Zapros (const Protocol_RLS_Mini::RR_Zapros      & msg) 
-{
+void GlobalData::received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg) {
 	piCout << "rec msg" << "received_RR_Zapros    ";
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
-void GlobalData::received_RR_Vr    (const Protocol_RLS_Mini::RR_Vr          & msg) {
+void GlobalData::received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg) {
 	piCout << "rec msg" << "received_RR_Vr        ";
-	flags.ant = msg.par;
+	flags.ant                      = msg.par;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
-void GlobalData::received_RR_Izl (const Protocol_RLS_Mini::RR_Izl         & msg) 
-{
+void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
 	piCout << "rec msg" << "received_RR_Izl       ";
-	flags.izl = msg.par;
+	flags.izl                      = msg.par;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
-void GlobalData::received_RR_Ant (const Protocol_RLS_Mini::RR_Ant         & msg)
-{
+void GlobalData::received_RR_Ant(const Protocol_RLS_Mini::RR_Ant & msg) {
 	piCout << "rec msg" << "received_RR_Ant       ";
-	flags.ant = msg.par;
+	flags.ant                      = msg.par;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
-void GlobalData::received_RR_TTek (const Protocol_RLS_Mini::RR_TTek        & msg)
-{
+void GlobalData::received_RR_TTek(const Protocol_RLS_Mini::RR_TTek & msg) {
 	piCout << "rec msg" << "received_RR_TTek      ";
-	time= msg.getSeconds() ;
+	time                           = msg.getSeconds();
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
-void GlobalData::received_RR_AzPopr (const Protocol_RLS_Mini::RR_AzPopr      & msg)
-{
+void GlobalData::received_RR_AzPopr(const Protocol_RLS_Mini::RR_AzPopr & msg) {
 	piCout << "rec msg" << "received_RR_AzPopr    ";
-	daz = msg.getDegrees();
+	daz                            = msg.getDegrees();
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
-void GlobalData::received_RR_DPopr_POI (const Protocol_RLS_Mini::RR_DPopr_POI   & msg)
-{
+void GlobalData::received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg) {
 	piCout << "rec msg" << "received_RR_DPopr_POI ";
-	dd_poi = msg.dd;
+	dd_poi                         = msg.dd;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
-void GlobalData::received_RR_AzPopr_POI (const Protocol_RLS_Mini::RR_AzPopr_POI  & msg)
-{
+void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg) {
 	piCout << "rec msg" << "received_RR_AzPopr_POI";
-	daz_poi = msg.getDegrees();
+	daz_poi                        = msg.getDegrees();
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
