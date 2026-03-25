@@ -72,8 +72,8 @@ public:
 		static const int16_t Code = 4;
 		RR_TTek(): Header(Type, Code) {}
 		uint32_t time = 0;
-		void setSeconds(double s) { time = s * timeLSB; }
-		double getSeconds() const { return time / timeLSB; }
+		void setSeconds(double s) { time = s / timeLSB; }
+		double getSeconds() const { return time * timeLSB; }
 	};
 
 
@@ -83,8 +83,8 @@ public:
 		static const int16_t Code = 5;
 		RR_AzPopr(): Header(Type, Code) {}
 		int16_t daz = 0;
-		void setDegrees(double v) { daz = v * degLSB; }
-		double getDegrees() const { return daz / degLSB; }
+		void setDegrees(double v) { daz = v / degLSB; }
+		double getDegrees() const { return daz * degLSB; }
 	};
 
 
@@ -103,8 +103,8 @@ public:
 		static const int16_t Code = 7;
 		RR_AzPopr_POI(): Header(Type, Code) {}
 		int16_t daz = 0;
-		void setDegrees(double v) { daz = v * degLSB; }
-		double getDegrees() const { return daz / degLSB; }
+		void setDegrees(double v) { daz = v / degLSB; }
+		double getDegrees() const { return daz * degLSB; }
 	};
 
 
@@ -128,10 +128,10 @@ public:
 		int16_t daz      = 0;
 		int16_t dd_poi   = 0; // 1 м
 		int16_t daz_poi  = 0;
-		void setDegreesDaz(double v) { daz = v * degLSB; }
-		double getDegreesDaz() const { return daz / degLSB; }
-		void setDegreesDazPOI(double v) { daz_poi = v * degLSB; }
-		double getDegreesDazPOI() const { return daz_poi / degLSB; }
+		void setDegreesDaz(double v) { daz = v / degLSB; }
+		double getDegreesDaz() const { return daz * degLSB; }
+		void setDegreesDazPOI(double v) { daz_poi = v / degLSB; }
+		double getDegreesDazPOI() const { return daz_poi * degLSB; }
 	};
 
 
@@ -285,10 +285,10 @@ public:
 		int16_t um   = 0; // Угол места
 		uint16_t vr  = 0; // Радиальная скорость, 1 м/с
 		uint16_t osl = 0; // Ослабление,  0.5 дБ
-		void setDegreesAz(double v) { az = v * degLSB; }
-		double getDegreesAz() const { return az / degLSB; }
-		void setDegreesUm(double v) { um = v * 0.1; }
-		double getDegreesUm() const { return um / 0.1; }
+		void setDegreesAz(double v) { az = v / degLSB; }
+		double getDegreesAz() const { return az * degLSB; }
+		void setDegreesUm(double v) { um = v / 0.1; }
+		double getDegreesUm() const { return um * 0.1; }
 	};
 
 
@@ -327,12 +327,12 @@ public:
 		                    // Дальность эхосигнала
 		                    // ...
 		                    // uint16_t[nes]
-		void setDegreesAzTek(double v) { aztek = v * degLSB; }
-		double getDegreesAzTek() const { return aztek / degLSB; }
-		void setDegreesAz(double v) { az = v * degLSB; }
-		double getDegreesAz() const { return az / degLSB; }
-		void setSeconds(double s) { T = s * timeLSB; }
-		double getSeconds() const { return T / timeLSB; }
+		void setDegreesAzTek(double v) { aztek = v / degLSB; }
+		double getDegreesAzTek() const { return aztek * degLSB; }
+		void setDegreesAz(double v) { az = v / degLSB; }
+		double getDegreesAz() const { return az * degLSB; }
+		void setSeconds(double s) { T = s / timeLSB; }
+		double getSeconds() const { return T * timeLSB; }
 	};
 
 
@@ -359,12 +359,12 @@ public:
 			};
 		};
 		uint8_t _reserve1 = 0;
-		void setDegreesAz(double v) { az = v * degLSB; }
-		double getDegreesAz() const { return az / degLSB; }
-		void setDegreesUm(double v) { um = v * 0.1; }
-		double getDegreesUm() const { return um / 0.1; }
-		void setSeconds(double s) { T = s * timeLSB; }
-		double getSeconds() const { return T / timeLSB; }
+		void setDegreesAz(double v) { az = v / degLSB; }
+		double getDegreesAz() const { return az * degLSB; }
+		void setDegreesUm(double v) { um = v / 0.1; }
+		double getDegreesUm() const { return um * 0.1; }
+		void setSeconds(double s) { T = s / timeLSB; }
+		double getSeconds() const { return T * timeLSB; }
 	};
 
 
@@ -414,14 +414,14 @@ public:
 		// ...
 		// uint16_t[msg_code]
 
-		void setDegreesAz(double v) { az = v * degLSB; }
-		double getDegreesAz() const { return az / degLSB; }
-		void setDegreesKurs(double v) { K = v * degLSB; }
-		double getDegreesKurs() const { return K / degLSB; }
-		void setDegreesUm(double v) { um = v * 0.1; }
-		double getDegreesUm() const { return um / 0.1; }
-		void setSeconds(double s) { T = s * timeLSB; }
-		double getSeconds() const { return T / timeLSB; }
+		void setDegreesAz(double v) { az = v / degLSB; }
+		double getDegreesAz() const { return az * degLSB; }
+		void setDegreesKurs(double v) { K = v / degLSB; }
+		double getDegreesKurs() const { return K * degLSB; }
+		void setDegreesUm(double v) { um = v / 0.1; }
+		double getDegreesUm() const { return um * 0.1; }
+		void setSeconds(double s) { T = s / timeLSB; }
+		double getSeconds() const { return T * timeLSB; }
 	};
 
 
@@ -458,18 +458,18 @@ public:
 		int16_t DY_big   = 0; // Полуширина по Y строба по маневру
 		int16_t DH_big   = 0; // Полуширина по H строба по маневру
 
-		void setDegreesAz(double v) { az = v * degLSB; }
-		double getDegreesAz() const { return az / degLSB; }
-		void setDegreesUm(double v) { um = v * 0.1; }
-		double getDegreesUm() const { return um / 0.1; }
-		void setDegreesDAz(double v) { Daz = v * degLSB; }
-		double getDegreesDAz() const { return Daz / degLSB; }
-		void setDegreesDUm(double v) { Dum = v * 0.1; }
-		double getDegreesDUm() const { return Dum / 0.1; }
-		void setDegreesDAzBig(double v) { Daz_big = v * degLSB; }
-		double getDegreesDAzBig() const { return Daz_big / degLSB; }
-		void setDegreesDUmBig(double v) { Dum_big = v * 0.1; }
-		double getDegreesDUmBig() const { return Dum_big / 0.1; }
+		void setDegreesAz(double v) { az = v / degLSB; }
+		double getDegreesAz() const { return az * degLSB; }
+		void setDegreesUm(double v) { um = v / 0.1; }
+		double getDegreesUm() const { return um * 0.1; }
+		void setDegreesDAz(double v) { Daz = v / degLSB; }
+		double getDegreesDAz() const { return Daz * degLSB; }
+		void setDegreesDUm(double v) { Dum = v / 0.1; }
+		double getDegreesDUm() const { return Dum * 0.1; }
+		void setDegreesDAzBig(double v) { Daz_big = v / degLSB; }
+		double getDegreesDAzBig() const { return Daz_big * degLSB; }
+		void setDegreesDUmBig(double v) { Dum_big = v / 0.1; }
+		double getDegreesDUmBig() const { return Dum_big * 0.1; }
 	};
 
 
@@ -486,8 +486,8 @@ public:
 		uint16_t az = 0; // Азимут цели
 		uint16_t D  = 0; // Дальность цели, 1 м
 		uint16_t N  = 0; // Номер трассы
-		void setDegreesAz(double v) { az = v * degLSB; }
-		double getDegreesAz() const { return az / degLSB; }
+		void setDegreesAz(double v) { az = v / degLSB; }
+		double getDegreesAz() const { return az * degLSB; }
 	};
 
 
@@ -503,8 +503,8 @@ public:
 		uint16_t D  = 0; // Дальность цели, 1 м
 		PIString message;
 		// char[]
-		void setDegreesAz(double v) { az = v * degLSB; }
-		double getDegreesAz() const { return az / degLSB; }
+		void setDegreesAz(double v) { az = v / degLSB; }
+		double getDegreesAz() const { return az * degLSB; }
 	};
 
 
@@ -513,10 +513,10 @@ public:
 		uint16_t Dn  = 0; // Дальность начала зоны
 		uint16_t azk = 0; // Азимут конца зоны
 		uint16_t Dk  = 0; // Дальность конца зоны
-		void setDegreesAzN(double v) { azn = v * degLSB; }
-		double getDegreesAzN() const { return azn / degLSB; }
-		void setDegreesAzK(double v) { azk = v * degLSB; }
-		double getDegreesAzK() const { return azk / degLSB; }
+		void setDegreesAzN(double v) { azn = v / degLSB; }
+		double getDegreesAzN() const { return azn * degLSB; }
+		void setDegreesAzK(double v) { azk = v / degLSB; }
+		double getDegreesAzK() const { return azk * degLSB; }
 	};
 
 
@@ -580,14 +580,14 @@ public:
 		uint32_t T_poi  = 0; // Время ПОИ
 		uint16_t az_poi = 0; // Азимут выхода системы ПОИ
 		uint16_t az_ant = 0; // Азимут антенны (незадержанный в обработке)
-		void setDegreesAzPOI(double v) { az_poi = v * degLSB; }
-		double getDegreesAzPOI() const { return az_poi / degLSB; }
-		void setDegreesAzANT(double v) { az_ant = v * degLSB; }
-		double getDegreesAzANT() const { return az_ant / degLSB; }
-		void setSecondsVOI(double s) { T_voi = s * timeLSB; }
-		double getSecondsVOI() const { return T_voi / timeLSB; }
-		void setSecondsPOI(double s) { T_poi = s * timeLSB; }
-		double getSecondsPOI() const { return T_poi / timeLSB; }
+		void setDegreesAzPOI(double v) { az_poi = v / degLSB; }
+		double getDegreesAzPOI() const { return az_poi * degLSB; }
+		void setDegreesAzANT(double v) { az_ant = v / degLSB; }
+		double getDegreesAzANT() const { return az_ant * degLSB; }
+		void setSecondsVOI(double s) { T_voi = s / timeLSB; }
+		double getSecondsVOI() const { return T_voi * timeLSB; }
+		void setSecondsPOI(double s) { T_poi = s / timeLSB; }
+		double getSecondsPOI() const { return T_poi * timeLSB; }
 	};
 
 
