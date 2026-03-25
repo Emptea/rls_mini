@@ -142,7 +142,7 @@ void U220::setup_tx_streamer() {
 
 	// Allocate buffer
 	if (user_config.tx_spb == 0) {
-		user_config.tx_spb = tx_stream->get_max_num_samps() * 20;
+		user_config.tx_spb = tx_stream->get_max_num_samps() * 200;
 		user_config.tx_spb = ((user_config.tx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
 	}
 	board_config.tx_spb = user_config.tx_spb;
@@ -269,9 +269,9 @@ void U220::transmit() {
 	// Send buffer contents
 	uint64_t num_samps         = tx_stream->send(tx_buffer_ptrs, tx_buffer.size(), tx_metadata, 1.0);
 	// fill_buffer_with_wavetable(tx_buffer);
-
+	// piCout << PISystemTime::current() << " " << num_samps;
 	tx_metadata.start_of_burst = false;
-	tx_metadata.has_time_spec  = true;
+	tx_metadata.has_time_spec  = false;
 	tx_metadata.time_spec      = usrp->get_time_now() + uhd::time_spec_t(0.01);
 	stats.tx_packet_cnt += num_samps;
 }
@@ -396,9 +396,9 @@ void U220::start_reception(double settling_time) {
 void U220::stop_transmission() {
 	tx_thread.stopAndWait();
 	if (tx_stream) {
-		tx_metadata.end_of_burst = true;
+		tx_metadata.end_of_burst = true;		
 		tx_stream->send("", 0, tx_metadata);
-		std::cout << "Stream stopped." << std::endl;
+		std::cout << "Stream tx stopped." << std::endl;
 	} else {
 		std::cout << "No stream to stop." << std::endl << std::endl;
 	}
@@ -408,6 +408,8 @@ void U220::stop_reception() {
 	rx_thread.stopAndWait();
 	rx_stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
+	piCout << "Stream rx stopped";
+
 }
 
 void U220::set_tx_gain(double new_gain) {

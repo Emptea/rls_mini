@@ -50,7 +50,7 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
-	zero_vector.resize(232 * 6, {0, 0});
+	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
@@ -95,8 +95,9 @@ void GlobalData::start() {
 	startEth();
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		// u220_ptrs[active_boards[i]]->start_reception(4.64+180*0.2e-6);
-		u220_ptrs[active_boards[i]]->start_reception(4.64 - 50 * 0.2e-6 - 46.4e-5);
-		u220_ptrs[active_boards[i]]->start_transmission(4.64);
+		double start_time = 4.64 + 5;
+		u220_ptrs[active_boards[i]]->start_reception(start_time - 60 * 0.2e-6 - 46.4e-5);
+		u220_ptrs[active_boards[i]]->start_transmission(start_time);
 	}
 }
 
@@ -158,13 +159,11 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 			data     = (*ref)[msg.nkan];
 		}
 		ans.nw = data.size();
-		piCout << "ans size " << ans.nw;
 		if (data.isEmpty()) {
 			ans.setData(zero_vector);
 		} else {
-			ans.setData(data);
+			ans.setData(data, 232 * 3);
 		}
-		piCout << "ans data" << ans.words;
 		break;
 	}
 	case Protocol_RLS_Mini::PHD: {

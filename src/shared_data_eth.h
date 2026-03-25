@@ -37,7 +37,7 @@ public:
 
 		auto addr = eth_rlso_send->sendAddress();
 		addr.setPort(T::Port);
-		piCout << "send msg" << data;
+		// piCout << "send msg" << data;
 		eth_rlso_send->send(addr, data);
 	}
 

@@ -252,6 +252,10 @@ public:
 			setDataInternal(d.data(), d.size());
 		}
 		template<typename T>
+		void setData(const PIVector<T> & d, int cnt) {
+			setDataInternal(d.data(), cnt);
+		}
+		template<typename T>
 		void setData(const PIDeque<T> & d) {
 			setDataInternal(d.data(), d.size());
 		}
