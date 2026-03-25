@@ -12,6 +12,9 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/thread.hpp>
 
+#define PRINT_U220_STATS(s) piCout << "Cycles:" << s.cycles_completed \
+    << " RX:" << s.rx_packet_cnt << "(" << s.rx_bad_packets << "err)" \
+    << " TX:" << s.tx_packet_cnt << " TX - RX:" << (int64_t)(s.tx_packet_cnt - s.rx_packet_cnt);
 
 typedef struct u220_config {
 	double rate;

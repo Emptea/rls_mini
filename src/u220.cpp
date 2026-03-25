@@ -267,7 +267,7 @@ bool U220::check_ref_lock() {
 
 void U220::transmit() {
 	// Send buffer contents
-	uint64_t num_samps         = tx_stream->send(tx_buffer_ptrs, tx_buffer.size(), tx_metadata, 1.0);
+	uint64_t num_samps         = tx_stream->send(tx_buffer_ptrs, tx_buffer.size(), tx_metadata, 1.0) * 2;
 	// fill_buffer_with_wavetable(tx_buffer);
 	// piCout << PISystemTime::current() << " " << num_samps;
 	tx_metadata.start_of_burst = false;
@@ -326,7 +326,11 @@ void U220::receive() {
 	rx_errors_worker(rx_metadata.error_code);
 	// piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "." << rx_metadata.time_spec.get_frac_secs();
 	stats.rx_packet_cnt += num_rx_samps;
-	received();
+	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0)
+	{
+		received();
+		PRINT_U220_STATS(stats);
+	}
 }
 
 bool U220::sync() {
