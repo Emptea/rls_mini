@@ -30,8 +30,8 @@ public:
 		.cpu_format = "sc16",
 		.otw_format = "sc12",
 		.pps        = "external",
-		.tx_spb     = 5452000,
-		.rx_spb     = 54520
+		.tx_spb     = 545200,
+		.rx_spb     = 4640
     };
 	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,send_frame_size=8192,num_send_frames=256";
 
