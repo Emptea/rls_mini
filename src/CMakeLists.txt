@@ -30,7 +30,7 @@ set_version(${PROJECT_NAME}
 	OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_version.h")
 set_deploy_property(${PROJECT_NAME}
 	LABEL "${PROJECT_NAME}"
-	FULLNAME "rat"
+	FULLNAME "rls_mini"
 	COMPANY "SM5"
 	INFO "")
 make_rc(${PROJECT_NAME} out_RC)

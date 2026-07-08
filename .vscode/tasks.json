@@ -1,0 +1,65 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build rls-mini",
+            "type": "shell",
+            "command": "/usr/bin/cmake --build /home/a/rls_mini/build --config Debug --target install -j 4",
+            "options": {
+                "cwd": "${workspaceFolder}/build"
+            },
+            "group": "build"
+        },
+        {
+            "label": "copy rls-mini to target",
+            "type": "shell",
+            "command": "scp ~/rls_mini/bin/rls_mini ubuntu@172.16.0.123:~/rls_mini/bin",
+            "group": "build"
+        },
+        {
+            "label": "CMake: configure",
+            "type": "shell",
+            "command": "/usr/bin/cmake",
+            "group": "build",
+            "args": [
+                "-DCMAKE_TOOLCHAIN_FILE=~/rls_mini/toolchain.cmake",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+                "-B",
+                "./build/",
+                "-S",
+                "./src/"
+            ]
+        },
+        {
+            "label": "Debug environment",
+            "type": "shell",
+            "command": "env",
+            "group": "build"
+        },
+        {
+            "type": "cmake",
+            "label": "CMake: configure",
+            "command": "configure",
+            "problemMatcher": [],
+        },
+        {
+            "type": "cmake",
+            "label": "CMake: clean rebuild",
+            "command": "cleanRebuild",
+            "targets": [
+                "all"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+        },
+        {
+            "type": "cmake",
+            "label": "CMake: install",
+            "command": "install",
+            "group": "build",
+            "problemMatcher": [],
+        }
+    ]
+}
