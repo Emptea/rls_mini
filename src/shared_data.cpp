@@ -1,7 +1,10 @@
 #include "shared_data.h"
 
+#include "axi_dsp.h"
+#include "dma_channel.hpp"
 #include "protocol_rls_mini.h"
 
+#include <cstdint>
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
 #include <pisemaphore.h>
@@ -10,7 +13,12 @@
 #include <pivaluetree_conversions.h>
 
 GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220_args)) {
-	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
+	main_config = PIValueTreeConversions::fromTextFile("rls_mini.conf");
+
+	dma_channels.resize(NUM_CHANNELS_TX + NUM_CHANNELS_RX);
+	for (int i = 0; i < NUM_CHANNELS_TX + NUM_CHANNELS_RX; i++) {
+		dma_channels[i] = new dma_channel();
+	}
 
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
 	for (int i = 0; i < serial_list.size(); i++) {
@@ -19,13 +27,14 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 		int u_channels[2] = {2 * i, 2 * i + 1};
 
 
-		CONNECTL(u, received, ([this, u_channels, u] { // grab local "u" and "u_channels" as copies
-					 auto ref1 = current_channels.getRef();
-					 auto ref2 = adc_channels.getRef();
-					 for (int i: {0, 1}) {                        // 0 and 1 - index in U220, doesn`t change!
-						 int global_channel      = u_channels[i]; // 0 - 7
-						 (*ref1)[global_channel] = (*ref2)[global_channel] =
-							 u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
+		CONNECTL(u, received, ([this, u_channels, u] {       // grab local "u" and "u_channels" as copies
+			                                                 //  auto ref1 = current_channels.getRef();
+			                                                 //  auto ref2 = adc_channels.getRef();
+					 for (int i: {0, 1}) {                   // 0 and 1 - index in U220, doesn`t change!
+						 int global_channel = u_channels[i]; // 0 - 7
+						 dma_channels[global_channel + 1]->start_transfer();
+						 //  (*ref1)[global_channel] = (*ref2)[global_channel] =
+				         // 	 u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
 					 }
 					 notifier_channels.notify();
 				 }));
@@ -47,15 +56,43 @@ GlobalData * GlobalData::instance() {
 	return &ret;
 }
 
+void GlobalData::initDMAs() {
+	dma_channels[0]->init(rx_config);
+	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
+		dma_rx_buffers[i] = dma_channels[0]->get_buffer(i);
+	}
+
+	piCout << "Rx buffers adresses are:";
+	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
+		piCout << "num " << i << " " << PICoutManipulators::PICoutFormat::Hex << dma_rx_buffers[i];
+	}
+
+	for (size_t i = 0; i < NUM_CHANNELS_TX; i++) {
+		tx_config.devnode = PIString2StdString(tx_devnodes[i]);
+		dma_channels[i + 1]->init(tx_config);
+		dma_channels[i + 1]->get_all_buffers(dma_tx_buffers[i]);
+		for (size_t k = 0; k < TX_BUFFER_COUNT; k++) {
+			piCout << "ch" << i << " buf" << k << " " << PICoutManipulators::PICoutFormat::Hex << dma_tx_buffers[i][k];
+		}
+	}
+}
 
 void GlobalData::init() {
 	initEth();
-	zero_vector.resize(232 * 3, {0, 0});
+	axi_dsp_init();
+	initDMAs();
+
+	zero_vector.resize(U220_SPB, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
 		if (StdString2PIString(dit->first) == u220_ptrs[i]->get_serial() & dit != devices.end()) {
-			u220_ptrs[i]->init();
+			void * buffer_ptrs[2 * TX_BUFFER_COUNT];
+			for (int buf_num: {0, 1}) {
+				buffer_ptrs[2 * buf_num]     = dma_tx_buffers[i][buf_num];
+				buffer_ptrs[2 * buf_num + 1] = dma_tx_buffers[i + 1][buf_num];
+			}
+			u220_ptrs[i]->init(buffer_ptrs);
 			active_boards.push_back(i);
 			dit++;
 		}
@@ -109,34 +146,47 @@ void GlobalData::stop() {
 		u220_ptrs[active_boards[i]]->stop_transmission();
 	}
 	piDeleteAllAndClear(u220_ptrs);
+	axi_dsp_deinit();
 }
 
 void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 
-	PIMap<int, VectorComplexS> channels;
-	bool all_channels = true;
-	{ // start work with "getRef"
-		auto ref = current_channels.getRef();
-		for (int ch = 0; ch < 8; ++ch) {
-			if ((*ref)[ch].isEmpty()) {
-				ispr_kan &= ~(1U << ch);
-				all_channels = false;
-			} else {
-				ispr_kan |= (1U << ch);
-			}
+	for (int ch: active_boards) {
+		if (dma_channels[ch + 1]->wait_for_transfer() == dma_channel::channel_buffer::proxy_status::PROXY_NO_ERROR) {
+			ispr_kan |= (1U << ch);
+		} else {
+			ispr_kan &= ~(1U << ch);
 		}
 
-		if (~all_channels) return;
-		channels = *ref; // copy data
-
-		for (int ch = 0; ch < 8; ++ch) {
-			if (!(*ref)[ch].isEmpty()) {
-				(*ref)[ch].clear(); // clear input data
-			}
+		if (ch == req_test_channel) {
+			req_test_point = false;
 		}
-	} // desctuct "ref", release current_channels
+	}
+
+	// PIMap<int, VectorComplexS> channels;
+	// bool all_channels = true;
+	// { // start work with "getRef"
+	// 	auto ref = current_channels.getRef();
+	// 	for (int ch = 0; ch < 8; ++ch) {
+	// 		if ((*ref)[ch].isEmpty()) {
+	// 			ispr_kan &= ~(1U << ch);
+	// 			all_channels = false;
+	// 		} else {
+	// 			ispr_kan |= (1U << ch);
+	// 		}
+	// 	}
+
+	// 	if (~all_channels) return;
+	// 	channels = *ref; // copy data
+
+	// 	for (int ch = 0; ch < 8; ++ch) {
+	// 		if (!(*ref)[ch].isEmpty()) {
+	// 			(*ref)[ch].clear(); // clear input data
+	// 		}
+	// 	}
+	// } // desctuct "ref", release current_channels
 
 	// work with your data (channels)
 	// adc_channels = channels;
@@ -144,38 +194,28 @@ void GlobalData::processChannels() {
 
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
-	piCout << "rec msg" << "received_POI_TK_Zapros";
+	piCout << "rec msg"
+		   << "received_POI_TK_Zapros";
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	piCout << "rec msg kt" << msg.kt;
+	axi_dsp_set_test_point(msg.kt);
+	axi_dsp_apply();
+	req_test_channel = msg.kt;
+	req_test_point = true;
 
 	switch (msg.kt) {
 	case Protocol_RLS_Mini::CTRL: {
 		break;
 	}
 	case Protocol_RLS_Mini::ADC: {
-		VectorComplexS data;
-		{
-			auto ref = adc_channels.getRef();
-			data     = (*ref)[msg.nkan];
-		}
-		ans.nw = data.size();
-		if (data.isEmpty()) {
-			ans.setData(zero_vector);
-		} else {
-			ans.setData(data, 232 * 3);
-		}
+		ans.nw = 232;
 		break;
 	}
-	case Protocol_RLS_Mini::PHD: {
-		break;
-	}
-	case Protocol_RLS_Mini::PLL: {
-		break;
-	}
-	case Protocol_RLS_Mini::OPH: {
-		break;
-	}
+	case Protocol_RLS_Mini::CUT:
+	case Protocol_RLS_Mini::PLL:
+	case Protocol_RLS_Mini::OPH:
 	case Protocol_RLS_Mini::LOU: {
+		ans.nw = 141;
 		break;
 	}
 	case Protocol_RLS_Mini::KN: {
@@ -187,6 +227,13 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	case Protocol_RLS_Mini::APU: {
 		break;
 	}
+	}
+
+	if ((1 << msg.nkan) * ispr_kan) {
+		while (req_test_point) {}
+		ans.setData((uint32_t *)dma_rx_buffers[dma_channels[0]->get_buffer_id()], ans.nw);
+	} else {
+		ans.setData(zero_vector);
 	}
 	global->sendMessage(ans);
 }
@@ -207,51 +254,59 @@ Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
 }
 
 void GlobalData::received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg) {
-	piCout << "rec msg" << "received_RR_Zapros    ";
+	piCout << "rec msg"
+		   << "received_RR_Zapros    ";
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg) {
-	piCout << "rec msg" << "received_RR_Vr        ";
+	piCout << "rec msg"
+		   << "received_RR_Vr        ";
 	flags.ant                      = msg.par;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
-	piCout << "rec msg" << "received_RR_Izl       ";
+	piCout << "rec msg"
+		   << "received_RR_Izl       ";
 	flags.izl                      = msg.par;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_Ant(const Protocol_RLS_Mini::RR_Ant & msg) {
-	piCout << "rec msg" << "received_RR_Ant       ";
+	piCout << "rec msg"
+		   << "received_RR_Ant       ";
 	flags.ant                      = msg.par;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_TTek(const Protocol_RLS_Mini::RR_TTek & msg) {
-	piCout << "rec msg" << "received_RR_TTek      ";
+	piCout << "rec msg"
+		   << "received_RR_TTek      ";
 	time                           = msg.getSeconds();
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_AzPopr(const Protocol_RLS_Mini::RR_AzPopr & msg) {
-	piCout << "rec msg" << "received_RR_AzPopr    ";
+	piCout << "rec msg"
+		   << "received_RR_AzPopr    ";
 	daz                            = msg.getDegrees();
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg) {
-	piCout << "rec msg" << "received_RR_DPopr_POI ";
+	piCout << "rec msg"
+		   << "received_RR_DPopr_POI ";
 	dd_poi                         = msg.dd;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg) {
-	piCout << "rec msg" << "received_RR_AzPopr_POI";
+	piCout << "rec msg"
+		   << "received_RR_AzPopr_POI";
 	daz_poi                        = msg.getDegrees();
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);

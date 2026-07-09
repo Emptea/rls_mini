@@ -1,6 +1,7 @@
 #ifndef protocol_rls_mini_H
 #define protocol_rls_mini_H
 
+#include <cstdint>
 #include <piethernet.h>
 
 class Protocol_RLS_Mini {
@@ -10,10 +11,10 @@ public:
 	enum control_point {
 		CTRL = 0x00,
 		ADC  = 0x01,
-		PHD  = 0x02,
+		CUT  = 0x02,
 		PLL  = 0x03,
-		OPH  = 0x04,
-		LOU  = 0x05,
+		LOU  = 0x04,
+		OPH  = 0x05,
 		KN   = 0x06,
 		AD   = 0x07,
 		APU  = 0x08,
@@ -233,8 +234,8 @@ public:
 		static const int16_t Type = 3;
 		static const int16_t Code = 0;
 		POI_TK_Zapros(): Header(Type, Code) {} // 0 - запрос состояния системы ПОИ, 1 - запрос контрольной точки
-		uint16_t kt       = 0;                 // Код контрольной точки
-		uint16_t nkan     = 0;                 // Номер канала
+		uint16_t kt   = 0;                     // Код контрольной точки
+		uint16_t nkan = 0;                     // Номер канала
 		uint16_t reg_takt = 0; // Количество регистрируемых тактов: 0 - запрос состояния системы ПОИ, 1 - запрос контрольной точки
 	};
 
@@ -258,6 +259,10 @@ public:
 		template<typename T>
 		void setData(const PIDeque<T> & d) {
 			setDataInternal(d.data(), d.size());
+		}
+		template<typename T>
+		void setData(const T * d, int cnt) {
+			setDataInternal(d, cnt);
 		}
 
 	private:
@@ -397,9 +402,9 @@ public:
 				uint8_t _reserve0: 3;
 				uint8_t mh       : 1; // Признак наличия маневра по высоте
 				uint8_t mk       : 1; // Признак наличия маневра по курсу
-				uint8_t pv       : 1; // Признак выдачи координат и времени: 0 - на момент выдачи, 1 - на момент локации
-				uint8_t tn       : 1; // Признак тренажной цели
-				uint8_t dum      : 1; // Признак достоверности измерения угла места цели
+				uint8_t pv: 1; // Признак выдачи координат и времени: 0 - на момент выдачи, 1 - на момент локации
+				uint8_t tn : 1; // Признак тренажной цели
+				uint8_t dum: 1; // Признак достоверности измерения угла места цели
 			};
 		};
 		union {

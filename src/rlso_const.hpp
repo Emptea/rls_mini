@@ -1,11 +1,12 @@
 #ifndef RLSO_CONST_HPP
 #define RLSO_CONST_HPP
 
-#define SAMPLES_FAR              40
-#define SAMPLES_CLOSE            6
+#define SAMPLES_FAR              (40)
+#define SAMPLES_CLOSE            (6)
 #define SAMPLES_WAIT_AFTER_FAR   (101)
 #define SAMPLES_WAIT_AFTER_CLOSE (85)
 #define SAMPLES_PER_CYCLE        (232)
+#define U220_SPB                 (SAMPLES_PER_CYCLE * 20)
 
 #include <pivector.h>
 #include <pimathcomplex.h>

@@ -4,7 +4,9 @@
 #include "shared_data_eth.h"
 #include "u220.hpp"
 #include "uhd_utils.hpp"
+#include "dma_channel.hpp"
 
+#include <cstdint>
 #include <pivaluetree.h>
 
 
@@ -31,19 +33,23 @@ public:
 		.otw_format = "sc12",
 		.pps        = "external",
 		.tx_spb     = 545200,
-		.rx_spb     = 4640
+		.rx_spb     = U220_SPB // 4640
     };
 	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,send_frame_size=8192,num_send_frames=256";
 
 	PIVector<size_t> active_boards;
-	static GlobalData * instance();
 
+	dma_channel::ch_config rx_config = {.devnode = rx_devnode.data(), .buffer_size = BUFFER_SIZE, .buffer_count = RX_BUFFER_COUNT};
+	dma_channel::ch_config tx_config = {.buffer_size = BUFFER_SIZE, .buffer_count = TX_BUFFER_COUNT};
+	
+	static GlobalData * instance();
+	
 	void init();
 	bool sync();
 	void start();
 	void stop();
 	void processChannels();
-
+	
 	const PIValueTree & mainConfig() const { return main_config; }
 	Protocol_RLS_Mini::RR_Kvit set_RR_Kvit();
 	void received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg);
@@ -55,20 +61,22 @@ public:
 	void received_RR_AzPopr       (const Protocol_RLS_Mini::RR_AzPopr      & msg);
 	void received_RR_DPopr_POI    (const Protocol_RLS_Mini::RR_DPopr_POI   & msg);
 	void received_RR_AzPopr_POI   (const Protocol_RLS_Mini::RR_AzPopr_POI  & msg);
-protected:
-
-private:
+	protected:
+	
+	private:
 	GlobalData();
 	~GlobalData();
 
+	void initDMAs();
+	
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
 	PIThreadNotifier notifier_channels;
 	PIThread process_thread;
-
+	
 	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
 	VectorComplexS zero_vector;
-
+	
 	PIMap<int, bool> board_statuses;
 	union {
 		uint8_t bits = 0;
@@ -86,6 +94,12 @@ private:
 	int16_t dd_poi   = 0; // 1 м
 	double daz_poi  = 0;
 	double time;
+	bool req_test_point = false;
+	uint16_t req_test_channel = 0;
+
+	PIVector<dma_channel *> dma_channels;
+	void * dma_rx_buffers[RX_BUFFER_COUNT];
+	void * dma_tx_buffers[NUM_CHANNELS_TX][TX_BUFFER_COUNT];
 };
 
 #endif

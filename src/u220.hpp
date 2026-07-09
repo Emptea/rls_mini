@@ -65,9 +65,9 @@ private:
 	uhd::usrp::multi_usrp::sptr usrp;
 
 	uhd::rx_streamer::sptr rx_stream;
-	PIVector<VectorComplexS> rx_buffer;
 	PIProtectedVariable<PIQueue<VectorComplexS>> rx_queue[2];
 	PIVector<complexs *> rx_buffer_ptrs;
+	int active_buffer_idx = 0;
 	uhd::rx_metadata_t rx_metadata;
 	double rx_timeout;
 	float rx_burst_pkt_time;
@@ -122,7 +122,7 @@ public:
 
 	~U220();
 
-	void init();
+	void init(void * buffers[2]);
 	void start_sync();
 	bool sync();
 
@@ -162,6 +162,7 @@ public:
 	void set_frequency(double new_freq);
 
 	struct u220_status get_status() { return status; };
+	int get_active_buffer_idx() { return active_buffer_idx; }
 	void print_status() {
 		piCout << serial << " status";
 		piCout << "  on:       " << (status.on ? "true" : "false") << "\n";

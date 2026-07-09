@@ -1,5 +1,8 @@
 #include "u220.hpp"
 
+#include "dma_channel.hpp"
+
+#include <cstdint>
 #include <pistring_std.h>
 
 // clang-format off
@@ -62,12 +65,17 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 	: serial(serial)
 	, device_args(args)
 	, user_config(config)
-	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS  
+	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS
                                      : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE) {}
 
 U220::~U220() {}
 
-void U220::init() {
+void U220::init(void * buffers[2 * TX_BUFFER_COUNT]) {
+	rx_buffer_ptrs.resize(2 * TX_BUFFER_COUNT);
+	for (size_t ch = 0; ch < 2; ch++) {
+		rx_buffer_ptrs[ch]     = (complexs *)buffers[ch];
+		rx_buffer_ptrs[ch + 2] = (complexs *)buffers[ch + 2];
+	}
 	initialize_usrp();
 	setup_tx_streamer();
 	setup_rx_streamer();
@@ -166,12 +174,6 @@ void U220::setup_rx_streamer() {
 		user_config.rx_spb = ((user_config.rx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
 	}
 	board_config.rx_spb = user_config.rx_spb;
-
-	rx_buffer.resize(2, VectorComplexS(board_config.rx_spb));
-	rx_buffer_ptrs.resize(2);
-	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
-	}
 }
 
 void U220::set_pps_source() {
@@ -315,19 +317,19 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 }
 
 void U220::receive() {
-	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout) * 2;
+	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs[2 * active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
-
-	for (int ch: {0, 1}) {
-		auto ch_ptr = rx_queue[ch].getRef();
-		ch_ptr->push_back(rx_buffer[ch]);
-	}
+	active_buffer_idx ^= 1;                                // 0 or 1
+	// for (int ch: {0, 1}) {
+	// 	auto ch_ptr = rx_queue[ch].getRef();
+	// 	ch_ptr->push_back(rx_buffer[ch]);
+	// }
 
 	rx_errors_worker(rx_metadata.error_code);
-	// piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "." << rx_metadata.time_spec.get_frac_secs();
+	// piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "." <<
+	// rx_metadata.time_spec.get_frac_secs();
 	stats.rx_packet_cnt += num_rx_samps;
-	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0)
-	{
+	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
 		received();
 		PRINT_U220_STATS(stats);
 	}
@@ -400,7 +402,7 @@ void U220::start_reception(double settling_time) {
 void U220::stop_transmission() {
 	tx_thread.stopAndWait();
 	if (tx_stream) {
-		tx_metadata.end_of_burst = true;		
+		tx_metadata.end_of_burst = true;
 		tx_stream->send("", 0, tx_metadata);
 		std::cout << "Stream tx stopped." << std::endl;
 	} else {
@@ -413,7 +415,6 @@ void U220::stop_reception() {
 	rx_stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
 	piCout << "Stream rx stopped";
-
 }
 
 void U220::set_tx_gain(double new_gain) {
