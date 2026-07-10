@@ -153,6 +153,7 @@ void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 
+	piCout << "Start wait for transfer";
 	for (int ch: active_boards) {
 		if (dma_channels[ch + 1]->wait_for_transfer() == dma_channel::channel_buffer::proxy_status::PROXY_NO_ERROR) {
 			ispr_kan |= (1U << ch);

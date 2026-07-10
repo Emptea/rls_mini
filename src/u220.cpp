@@ -317,6 +317,7 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 }
 
 void U220::receive() {
+	piCout << "Enter receive thread fcn";
 	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs[2 * active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
 	active_buffer_idx ^= 1;                                // 0 or 1
