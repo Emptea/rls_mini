@@ -3,6 +3,7 @@
 #include "axi_dsp.h"
 #include "dma_channel.hpp"
 #include "protocol_rls_mini.h"
+#include "misc.h"
 
 #include <cstdint>
 #include <piliterals_bytes.h>
@@ -84,6 +85,12 @@ void GlobalData::initDMAs() {
 			piCout << "ch" << i << " buf" << k << " " << PICoutManipulators::PICoutFormat::Hex << dma_tx_buffers[i][k];
 		}
 	}
+	uint8_t * current_buffers[TX_BUFFER_COUNT];
+	for (size_t k = 0; k < NUM_CHANNELS_TX; k++) {
+		current_buffers[k] = (uint8_t *)dma_tx_buffers[k][0];
+	}
+	misc_read_8chs_from_file("hex_50000_lines_overflow_counter.txt", current_buffers, BUFFER_SIZE*TX_BUFFER_COUNT,  0);
+
 }
 
 void GlobalData::initDSP() {

@@ -71,10 +71,18 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 U220::~U220() {}
 
 void U220::init(void * buffers[2 * TX_BUFFER_COUNT]) {
+
+	rx_buffer.resize(2, VectorComplexS(board_config.rx_spb));
+	rx_buffer_ptrs[0].resize(2);
+	rx_buffer_ptrs[1].resize(2);
 	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[0].push_back((complexs *)buffers[ch]);
-		rx_buffer_ptrs[1].push_back((complexs *)buffers[ch + 2]);
+		rx_buffer_ptrs[0][ch] = &rx_buffer[ch].front();
+		rx_buffer_ptrs[1][ch] = &rx_buffer[ch].front();
 	}
+	// for (size_t ch = 0; ch < 2; ch++) {
+	// 	rx_buffer_ptrs[0].push_back((complexs *)buffers[ch]);
+	// 	rx_buffer_ptrs[1].push_back((complexs *)buffers[ch + 2]);
+	// }
 	initialize_usrp();
 	setup_tx_streamer();
 	setup_rx_streamer();

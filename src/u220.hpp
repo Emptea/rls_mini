@@ -66,6 +66,7 @@ private:
 
 	uhd::rx_streamer::sptr rx_stream;
 	PIProtectedVariable<PIQueue<VectorComplexS>> rx_queue[2];
+	PIVector<VectorComplexS> rx_buffer;
 	PIVector<complexs *> rx_buffer_ptrs [2];
 	std::atomic_int active_buffer_idx{0};
 	uhd::rx_metadata_t rx_metadata;
