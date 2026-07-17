@@ -62,14 +62,15 @@ int main(int argc, char * argv[]) {
 	piCout << "started";
 
 	/*
-	250_ms .sleep();
 	Protocol_RLS_Mini::POI_TK_Kvit msg;
 	msg.words << 1 << 2 << 3;
 	GLOBAL->sendMessage(msg);
 	*/
+	11_s .sleep();
+	// 500_ms .sleep();
 
-	kbd->start();
-	WAIT_FOR_EXIT;
+	// kbd->start();
+	// WAIT_FOR_EXIT;
 
 	GLOBAL->stop();
 	piCout << "stop done";
