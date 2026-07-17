@@ -71,10 +71,9 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 U220::~U220() {}
 
 void U220::init(void * buffers[2 * TX_BUFFER_COUNT]) {
-	rx_buffer_ptrs.resize(2 * TX_BUFFER_COUNT);
 	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[ch]     = (complexs *)buffers[ch];
-		rx_buffer_ptrs[ch + 2] = (complexs *)buffers[ch + 2];
+		rx_buffer_ptrs[0].push_back((complexs *)buffers[ch]);
+		rx_buffer_ptrs[1].push_back((complexs *)buffers[ch + 2]);
 	}
 	initialize_usrp();
 	setup_tx_streamer();
@@ -320,19 +319,22 @@ void U220::receive() {
 	piCout << "Enter receive thread fcn";
 	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs[2 * active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
-	active_buffer_idx ^= 1;                                // 0 or 1
+	if (num_rx_samps) received();
+	if (num_rx_samps) {
+		active_buffer_idx = 1 - active_buffer_idx;
+		first_transfer    = false;
+	} // 0 or 1
 	// for (int ch: {0, 1}) {
 	// 	auto ch_ptr = rx_queue[ch].getRef();
 	// 	ch_ptr->push_back(rx_buffer[ch]);
 	// }
 
 	rx_errors_worker(rx_metadata.error_code);
-	// piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "." <<
-	// rx_metadata.time_spec.get_frac_secs();
-	stats.rx_packet_cnt += num_rx_samps;
+	piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "."
+		   << rx_metadata.time_spec.get_frac_secs();
+	stats.rx_packet_cnt += num_rx_samps;	
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
-		received();
-		PRINT_U220_STATS(stats);
+		// PRINT_U220_STATS(stats);
 	}
 }
 

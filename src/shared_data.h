@@ -67,6 +67,7 @@ public:
 	GlobalData();
 	~GlobalData();
 
+	void initDSP();
 	void initDMAs();
 	
 	PIValueTree main_config;

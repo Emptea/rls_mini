@@ -66,8 +66,8 @@ private:
 
 	uhd::rx_streamer::sptr rx_stream;
 	PIProtectedVariable<PIQueue<VectorComplexS>> rx_queue[2];
-	PIVector<complexs *> rx_buffer_ptrs;
-	int active_buffer_idx = 0;
+	PIVector<complexs *> rx_buffer_ptrs [2];
+	std::atomic_int active_buffer_idx{0};
 	uhd::rx_metadata_t rx_metadata;
 	double rx_timeout;
 	float rx_burst_pkt_time;
@@ -96,6 +96,7 @@ private:
 	void setup_rx_streamer();
 	void rx_errors_worker(uhd::rx_metadata_t::error_code_t err);
 
+	std::atomic_bool first_transfer{true};
 protected:
 	PIThread sync_thread;
 	PIThread tx_thread;

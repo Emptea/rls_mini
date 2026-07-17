@@ -27,14 +27,23 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 		int u_channels[2] = {2 * i, 2 * i + 1};
 
 
-		CONNECTL(u, received, ([this, u_channels, u] {       // grab local "u" and "u_channels" as copies
-			                                                 //  auto ref1 = current_channels.getRef();
-			                                                 //  auto ref2 = adc_channels.getRef();
-					 for (int i: {0, 1}) {                   // 0 and 1 - index in U220, doesn`t change!
-						 int global_channel = u_channels[i]; // 0 - 7
-						 dma_channels[global_channel + 1]->start_transfer();
-						 //  (*ref1)[global_channel] = (*ref2)[global_channel] =
+		CONNECTL(u, received, ([this, u_channels, u] { // grab local "u" and "u_channels" as copies
+			                                           //  auto ref1 = current_channels.getRef();
+			                                           //  auto ref2 = adc_channels.getRef();
+					 for (int i: {0, 1}) {             // 0 and 1 - index in U220, doesn`t change!
+						 int ch = u_channels[i];       // 0 - 7
+						 dma_channels[ch + 1]->start_transfer();
+						 //  (*ref1)[ch] = (*ref2)[ch] =
 				         // 	 u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
+					 }
+					 1_ms .sleep();
+					 for (int i: {0, 1}) {       // 0 and 1 - index in U220, doesn`t change!
+						 int ch = u_channels[i]; // 0 - 7
+						 if (dma_channels[ch + 1]->wait_for_transfer() == dma_channel::channel_buffer::proxy_status::PROXY_NO_ERROR) {
+							 ispr_kan |= (1U << ch);
+						 } else {
+							 ispr_kan &= ~(1U << ch);
+						 }
 					 }
 					 notifier_channels.notify();
 				 }));
@@ -61,7 +70,6 @@ void GlobalData::initDMAs() {
 	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
 		dma_rx_buffers[i] = dma_channels[0]->get_buffer(i);
 	}
-
 	piCout << "Rx buffers adresses are:";
 	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
 		piCout << "num " << i << " " << PICoutManipulators::PICoutFormat::Hex << dma_rx_buffers[i];
@@ -71,15 +79,40 @@ void GlobalData::initDMAs() {
 		tx_config.devnode = PIString2StdString(tx_devnodes[i]);
 		dma_channels[i + 1]->init(tx_config);
 		dma_channels[i + 1]->get_all_buffers(dma_tx_buffers[i]);
+		dma_channels[i + 1]->set_num_transfers(0);
 		for (size_t k = 0; k < TX_BUFFER_COUNT; k++) {
 			piCout << "ch" << i << " buf" << k << " " << PICoutManipulators::PICoutFormat::Hex << dma_tx_buffers[i][k];
 		}
 	}
 }
 
+void GlobalData::initDSP() {
+	axi_dsp_init();
+	axi_dsp_set_output_source(1, 0);
+	auto v = axi_dsp_get_output_source();
+	piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << "\n";
+	cmplx_f64 manual_comp   = {.real = 1, .imag = 0};
+	cmplx_f64 diagrams_even = {.real = 1, .imag = 0};
+	cmplx_f64 diagrams_odd  = {.real = 0, .imag = 1};
+	for (size_t i = 0; i < NUM_CHANNELS_TX; i++) {
+		axi_dsp_set_manual_compensation(manual_comp, i);
+		axi_dsp_set_diagram_0(diagrams_even, i);
+		axi_dsp_set_diagram_1(diagrams_odd, i);
+		axi_dsp_set_diagram_2(diagrams_even, i);
+		axi_dsp_set_diagram_3(diagrams_odd, i);
+		axi_dsp_set_diagram_4(diagrams_even, i);
+		axi_dsp_set_diagram_5(diagrams_odd, i);
+		axi_dsp_set_diagram_6(diagrams_even, i);
+		axi_dsp_set_diagram_7(diagrams_odd, i);
+	}
+	axi_dsp_set_compensation_mode(1);
+	axi_dsp_apply();
+}
+
+
 void GlobalData::init() {
 	initEth();
-	axi_dsp_init();
+	initDSP();
 	initDMAs();
 
 	zero_vector.resize(U220_SPB, {0, 0});
@@ -145,6 +178,11 @@ void GlobalData::stop() {
 		u220_ptrs[active_boards[i]]->stop_reception();
 		u220_ptrs[active_boards[i]]->stop_transmission();
 	}
+	for (int k = dma_channels.size() - 1; k >= 0; k--) {
+		dma_channels[k]->cleanup();
+		delete dma_channels[k];
+		dma_channels[k] = nullptr;
+	}
 	piDeleteAllAndClear(u220_ptrs);
 	axi_dsp_deinit();
 }
@@ -152,14 +190,15 @@ void GlobalData::stop() {
 void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
+	piCout << "Start wait for transfer";
 
 	piCout << "Start wait for transfer";
 	for (int ch: active_boards) {
-		if (dma_channels[ch + 1]->wait_for_transfer() == dma_channel::channel_buffer::proxy_status::PROXY_NO_ERROR) {
-			ispr_kan |= (1U << ch);
-		} else {
-			ispr_kan &= ~(1U << ch);
-		}
+		// if (dma_channels[ch + 1]->wait_for_transfer() == dma_channel::channel_buffer::proxy_status::PROXY_NO_ERROR) {
+		// 	ispr_kan |= (1U << ch);
+		// } else {
+		// 	ispr_kan &= ~(1U << ch);
+		// }
 
 		if (ch == req_test_channel) {
 			req_test_point = false;
@@ -202,7 +241,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	axi_dsp_set_test_point(msg.kt);
 	axi_dsp_apply();
 	req_test_channel = msg.kt;
-	req_test_point = true;
+	req_test_point   = true;
 
 	switch (msg.kt) {
 	case Protocol_RLS_Mini::CTRL: {
