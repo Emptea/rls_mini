@@ -26,27 +26,26 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
 		u220_ptrs << u;
 		int u_channels[2] = {2 * i, 2 * i + 1};
-
+	
 
 		CONNECTL(u, received, ([this, u_channels, u] { // grab local "u" and "u_channels" as copies
-			                                           //  auto ref1 = current_channels.getRef();
-			                                           //  auto ref2 = adc_channels.getRef();
-					 for (int i: {0, 1}) {             // 0 and 1 - index in U220, doesn`t change!
-						 int ch = u_channels[i];       // 0 - 7
-						 dma_channels[ch + 1]->start_transfer();
-						 //  (*ref1)[ch] = (*ref2)[ch] =
-				         // 	 u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
-					 }
-					 1_ms .sleep();
-					 for (int i: {0, 1}) {       // 0 and 1 - index in U220, doesn`t change!
-						 int ch = u_channels[i]; // 0 - 7
-						 if (dma_channels[ch + 1]->wait_for_transfer() == dma_channel::channel_buffer::proxy_status::PROXY_NO_ERROR) {
-							 ispr_kan |= (1U << ch);
-						 } else {
-							 ispr_kan &= ~(1U << ch);
-						 }
-					 }
-					 notifier_channels.notify();
+					if(!dma_send_counter) {
+					// dma_channels[0]->start();
+					}		
+					dma_send_counter++;	
+					for (int i: {0, 1}) {             // 0 and 1 - index in U220, doesn`t change!
+						int ch = u_channels[i];       // 0 - 7
+						dma_channels[ch + 1]->start_transfer();
+						if (dma_channels[ch + 1]->wait_for_transfer() == proxy_status::PROXY_NO_ERROR) {
+						ispr_kan |= (1U << ch);
+						} else {
+						ispr_kan &= ~(1U << ch);
+						}
+						//  (*ref1)[ch] = (*ref2)[ch] =
+						// 	 u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
+					}
+
+					notifier_channels.notify();
 				 }));
 	}
 
@@ -85,12 +84,12 @@ void GlobalData::initDMAs() {
 			piCout << "ch" << i << " buf" << k << " " << PICoutManipulators::PICoutFormat::Hex << dma_tx_buffers[i][k];
 		}
 	}
-	uint8_t * current_buffers[TX_BUFFER_COUNT];
+	uint8_t * current_buffers[NUM_CHANNELS_TX];
 	for (size_t k = 0; k < NUM_CHANNELS_TX; k++) {
 		current_buffers[k] = (uint8_t *)dma_tx_buffers[k][0];
+		piCout << "current tx buffer" << k << " " << PICoutManipulators::PICoutFormat::Hex << current_buffers[k];
 	}
-	misc_read_8chs_from_file("hex_50000_lines_overflow_counter.txt", current_buffers, BUFFER_SIZE*TX_BUFFER_COUNT,  0);
-
+	misc_read_8chs_from_file("hex_50000_lines_overflow_counter.txt", current_buffers, BUFFER_SIZE,  0);
 }
 
 void GlobalData::initDSP() {
@@ -122,6 +121,7 @@ void GlobalData::init() {
 	initDSP();
 	initDMAs();
 
+	piCout << "Start U220 init";
 	zero_vector.resize(U220_SPB, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
@@ -185,6 +185,7 @@ void GlobalData::stop() {
 		u220_ptrs[active_boards[i]]->stop_reception();
 		u220_ptrs[active_boards[i]]->stop_transmission();
 	}
+	// dma_channels[0]->waitForFinish();
 	for (int k = dma_channels.size() - 1; k >= 0; k--) {
 		dma_channels[k]->cleanup();
 		delete dma_channels[k];
@@ -197,11 +198,9 @@ void GlobalData::stop() {
 void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
-	piCout << "Start wait for transfer";
 
-	piCout << "Start wait for transfer";
 	for (int ch: active_boards) {
-		// if (dma_channels[ch + 1]->wait_for_transfer() == dma_channel::channel_buffer::proxy_status::PROXY_NO_ERROR) {
+		// if (dma_channels[ch + 1]->wait_for_transfer() == proxy_status::PROXY_NO_ERROR) {
 		// 	ispr_kan |= (1U << ch);
 		// } else {
 		// 	ispr_kan &= ~(1U << ch);

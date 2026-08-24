@@ -71,14 +71,6 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 U220::~U220() {}
 
 void U220::init(void * buffers[2 * TX_BUFFER_COUNT]) {
-
-	rx_buffer.resize(2, VectorComplexS(board_config.rx_spb));
-	rx_buffer_ptrs[0].resize(2);
-	rx_buffer_ptrs[1].resize(2);
-	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[0][ch] = &rx_buffer[ch].front();
-		rx_buffer_ptrs[1][ch] = &rx_buffer[ch].front();
-	}
 	// for (size_t ch = 0; ch < 2; ch++) {
 	// 	rx_buffer_ptrs[0].push_back((complexs *)buffers[ch]);
 	// 	rx_buffer_ptrs[1].push_back((complexs *)buffers[ch + 2]);
@@ -181,6 +173,14 @@ void U220::setup_rx_streamer() {
 		user_config.rx_spb = ((user_config.rx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
 	}
 	board_config.rx_spb = user_config.rx_spb;
+
+	rx_buffer.resize(4, VectorComplexS(board_config.rx_spb));
+	rx_buffer_ptrs[0].resize(2);
+	rx_buffer_ptrs[1].resize(2);
+	for (size_t ch = 0; ch < 2; ch++) {
+		rx_buffer_ptrs[0][ch] = &rx_buffer[ch].front();
+		rx_buffer_ptrs[1][ch] = &rx_buffer[ch + 2].front();
+	}
 }
 
 void U220::set_pps_source() {
@@ -324,9 +324,11 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 }
 
 void U220::receive() {
-	piCout << "Enter receive thread fcn";
-	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs[2 * active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
+	// piCout << "Enter receive thread fcn";
+	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
+	piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "."
+		   << rx_metadata.time_spec.get_frac_secs();
 	if (num_rx_samps) received();
 	if (num_rx_samps) {
 		active_buffer_idx = 1 - active_buffer_idx;
@@ -338,8 +340,6 @@ void U220::receive() {
 	// }
 
 	rx_errors_worker(rx_metadata.error_code);
-	piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "."
-		   << rx_metadata.time_spec.get_frac_secs();
 	stats.rx_packet_cnt += num_rx_samps;	
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
 		// PRINT_U220_STATS(stats);

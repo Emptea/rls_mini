@@ -66,7 +66,7 @@ int main(int argc, char * argv[]) {
 	msg.words << 1 << 2 << 3;
 	GLOBAL->sendMessage(msg);
 	*/
-	11_s .sleep();
+	9_s .sleep();
 	// 500_ms .sleep();
 
 	// kbd->start();

@@ -8,6 +8,10 @@
 #define SAMPLES_PER_CYCLE        (232)
 #define U220_SPB                 (SAMPLES_PER_CYCLE * 20)
 
+#define NUM_CHANNELS_TX 8
+#define NUM_CHANNELS_RX 1
+
+
 #include <pivector.h>
 #include <pimathcomplex.h>
 

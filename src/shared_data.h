@@ -5,6 +5,7 @@
 #include "u220.hpp"
 #include "uhd_utils.hpp"
 #include "dma_channel.hpp"
+#include "rlso_const.hpp"
 
 #include <cstdint>
 #include <pivaluetree.h>
@@ -79,6 +80,8 @@ public:
 	VectorComplexS zero_vector;
 	
 	PIMap<int, bool> board_statuses;
+	std::atomic_int dma_send_counter{0};
+
 	union {
 		uint8_t bits = 0;
 		struct {
