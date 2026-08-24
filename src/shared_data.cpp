@@ -277,7 +277,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 
 	if ((1 << msg.nkan) * ispr_kan) {
 		while (req_test_point) {}
-		ans.setData((uint32_t *)dma_rx_buffers[dma_channels[0]->get_buffer_id()], ans.nw);
+		ans.setData((uint32_t *)dma_channels[0]->get_info_buffer(), ans.nw);
 	} else {
 		ans.setData(zero_vector);
 	}

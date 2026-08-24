@@ -30,6 +30,7 @@ private:
 	} ch;
 
 	int num_transfers  = 0;
+	int info_buf_num = 0;
 	bool flag_save_buf = false;
 	FILE * dump_file;
 	int n_samps_per_buf = 232;
@@ -80,6 +81,8 @@ public:
 
 
 	void * get_buffer(size_t num) const { return (void *)&ch.buf_ptr->buffers[num].buffer; }
+
+	void * get_info_buffer() const { return (void *)&ch.buf_ptr->buffers[(ch.counter - 1) % ch.buffer_count].buffer; }
 
 	void get_all_buffers(void ** buffer_array) const {
 		for (size_t i = 0; i < ch.buffer_count; ++i) {
