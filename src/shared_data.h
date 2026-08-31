@@ -1,6 +1,7 @@
 #ifndef shared_data_H
 #define shared_data_H
 
+#include "dma_channel.hpp"
 #include "shared_data_eth.h"
 #include "u220.hpp"
 #include "uhd_utils.hpp"
@@ -39,6 +40,8 @@ public:
 	static GlobalData * instance();
 
 	void init();
+	void initDSP();
+	void initDMAs();
 	bool sync();
 	void start();
 	void stop();
@@ -47,14 +50,15 @@ public:
 	const PIValueTree & mainConfig() const { return main_config; }
 	Protocol_RLS_Mini::RR_Kvit set_RR_Kvit();
 	void received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg);
-	void received_RR_Zapros       (const Protocol_RLS_Mini::RR_Zapros      & msg);
-	void received_RR_Vr           (const Protocol_RLS_Mini::RR_Vr          & msg);
-	void received_RR_Izl          (const Protocol_RLS_Mini::RR_Izl         & msg);
-	void received_RR_Ant          (const Protocol_RLS_Mini::RR_Ant         & msg);
-	void received_RR_TTek         (const Protocol_RLS_Mini::RR_TTek        & msg);
-	void received_RR_AzPopr       (const Protocol_RLS_Mini::RR_AzPopr      & msg);
-	void received_RR_DPopr_POI    (const Protocol_RLS_Mini::RR_DPopr_POI   & msg);
-	void received_RR_AzPopr_POI   (const Protocol_RLS_Mini::RR_AzPopr_POI  & msg);
+	void received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg);
+	void received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg);
+	void received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg);
+	void received_RR_Ant(const Protocol_RLS_Mini::RR_Ant & msg);
+	void received_RR_TTek(const Protocol_RLS_Mini::RR_TTek & msg);
+	void received_RR_AzPopr(const Protocol_RLS_Mini::RR_AzPopr & msg);
+	void received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg);
+	void received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg);
+
 protected:
 
 private:
@@ -80,12 +84,34 @@ private:
 			uint8_t vr      : 2;
 			uint8_t kuvr    : 2;
 		};
-	} flags = {0};
+	} flags          = {0};
 	uint8_t ispr_kan = 0;
-	double daz      = 0;
+	double daz       = 0;
 	int16_t dd_poi   = 0; // 1 м
-	double daz_poi  = 0;
+	double daz_poi   = 0;
 	double time;
+
+	PIString tx_devnodes[NUM_CHANNELS_TX] = {
+		"/dev/dma_proxy_tx_ch0",
+		"/dev/dma_proxy_tx_ch1",
+		"/dev/dma_proxy_tx_ch2",
+		"/dev/dma_proxy_tx_ch3",
+		"/dev/dma_proxy_tx_ch4",
+		"/dev/dma_proxy_tx_ch5",
+		"/dev/dma_proxy_tx_ch6",
+		"/dev/dma_proxy_tx_ch7",
+	};
+
+	dma_channel * dma_channels[NUM_CHANNELS_TX + NUM_CHANNELS_RX];
+	dma_channel::ch_config rx_config = {.devnode = "/dev/dma_proxy_rx", .buffer_size = BUFFER_SIZE, .buffer_count = RX_BUFFER_COUNT};
+	dma_channel::ch_config tx_config = {.buffer_size = BUFFER_SIZE, .buffer_count = TX_BUFFER_COUNT};
+
+	uint32_t test_point              = 1;
+	uint32_t channel                 = 0;
+	uint32_t range_gate              = 0;
+
+	void * dma_rx_buffers[RX_BUFFER_COUNT];
+	void * dma_tx_buffers[NUM_CHANNELS_TX][TX_BUFFER_COUNT];
 };
 
 #endif

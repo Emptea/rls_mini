@@ -1,5 +1,6 @@
 #include "shared_data.h"
 
+#include "axi_dsp.h"
 #include "protocol_rls_mini.h"
 
 #include <piliterals_bytes.h>
@@ -47,9 +48,60 @@ GlobalData * GlobalData::instance() {
 	return &ret;
 }
 
+void GlobalData::initDSP() {
+	axi_dsp_init();
+	axi_dsp_kill();
+	axi_dsp_set_output_source(test_point, channel, range_gate);
+	auto v = axi_dsp_get_output_source();
+	piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE << "\n";
+
+	for (size_t i = 0; i < NUM_CHANNELS_TX; i++) {
+		axi_dsp_set_diagram_0(diagrams_7_all[i], i);
+		axi_dsp_set_diagram_1(diagrams_6_all[i], i);
+		axi_dsp_set_diagram_2(diagrams_5_all[i], i);
+		axi_dsp_set_diagram_3(diagrams_4_all[i], i);
+		axi_dsp_set_diagram_4(diagrams_3_all[i], i);
+		axi_dsp_set_diagram_5(diagrams_2_all[i], i);
+		axi_dsp_set_diagram_6(diagrams_1_all[i], i);
+		axi_dsp_set_diagram_7(diagrams_0_all[i], i);
+	}
+	axi_dsp_set_compensation_mode(0);
+	axi_dsp_set_compensation_ref((float)0.0157);
+	axi_dsp_apply();
+}
+
+void GlobalData::initDMAs() {
+	piCout << "Wait for DMA init";
+	dma_channels[0]->init(rx_config);
+	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
+		dma_rx_buffers[i] = dma_channels[0]->get_buffer(i);
+	}
+	piCout << "Rx buffers adresses are:";
+	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
+		piCout << "num " << i << " " << PICoutManipulators::PICoutFormat::Hex << dma_rx_buffers[i];
+	}
+
+	piCout << "Tx buffer adresses are:";
+	for (size_t i = 0; i < NUM_CHANNELS_TX; i++) {
+		tx_config.devnode = PIString2StdString(tx_devnodes[i]);
+		dma_channels[i + 1]->init(tx_config);
+		dma_channels[i + 1]->get_all_buffers(dma_tx_buffers[i]);
+		for (size_t k = 0; k < TX_BUFFER_COUNT; k++) {
+			piCout << "ch" << i << " buf" << k << " " << PICoutManipulators::PICoutFormat::Hex << dma_tx_buffers[i][k];
+		}
+	}
+
+	uint8_t * current_buffers[NUM_CHANNELS_TX];
+	for (size_t k = 0; k < NUM_CHANNELS_TX; k++) {
+		// dma_channels[k + 1]->get_all_buffers(tx_buffers[k]);
+		current_buffers[k] = (uint8_t *)dma_tx_buffers[k][0];
+	}
+}
 
 void GlobalData::init() {
 	initEth();
+	initDSP();
+	initDMAs();
 	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
@@ -109,6 +161,14 @@ void GlobalData::stop() {
 		u220_ptrs[active_boards[i]]->stop_transmission();
 	}
 	piDeleteAllAndClear(u220_ptrs);
+
+	// dma_channels[0]->waitForFinish();
+	for (int k = NUM_CHANNELS_TX + NUM_CHANNELS_RX - 1; k >= 0; k--) {
+		dma_channels[k]->cleanup();
+		delete dma_channels[k];
+		dma_channels[k] = nullptr;
+	}
+	axi_dsp_deinit();
 }
 
 void GlobalData::processChannels() {

@@ -68,8 +68,12 @@ int main(int argc, char * argv[]) {
 	GLOBAL->sendMessage(msg);
 	*/
 
-	kbd->start();
-	WAIT_FOR_EXIT;
+	9_s .sleep();
+	// 500_ms .sleep();
+
+	// kbd->start();
+	// WAIT_FOR_EXIT;
+
 
 	GLOBAL->stop();
 	piCout << "stop done";
