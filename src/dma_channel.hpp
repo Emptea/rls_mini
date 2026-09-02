@@ -42,6 +42,7 @@ public:
 		std::string devnode;
 		int buffer_size;
 		int buffer_count;
+		size_t channel_number;
 	} config;
 
 	int init(ch_config cfg);
