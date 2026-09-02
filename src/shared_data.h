@@ -40,8 +40,10 @@ public:
 
 	PIVector<size_t> active_boards;
 
-	dma_channel::ch_config rx_config = {.devnode = rx_devnode.data(), .buffer_size = BUFFER_SIZE, .buffer_count = RX_BUFFER_COUNT};
-	dma_channel::ch_config tx_config = {.buffer_size = BUFFER_SIZE, .buffer_count = TX_BUFFER_COUNT};
+	dma_channel::ch_config rx_config = {.devnode        = dma_rx_devnode.data(),
+	                                    .buffer_size    = BUFFER_SIZE,
+	                                    .buffer_count   = RX_BUFFER_COUNT,
+	                                    .channel_number = 0};
 
 	static GlobalData * instance();
 
@@ -102,19 +104,19 @@ private:
 	bool req_test_point       = false;
 	uint16_t req_test_channel = 0;
 
-	PIVector<dma_channel *> dma_channels;
+	dma_channel * dma_rx;
 	void * dma_rx_buffers[RX_BUFFER_COUNT];
-	void * dma_tx_buffers[NUM_CHANNELS_TX][TX_BUFFER_COUNT];
 
-	const PIString rx_devnode                   = "/dev/dma_proxy_rx";
-	const PIString tx_devnodes[NUM_CHANNELS_TX] = {"/dev/dma_proxy_tx_ch0",
-	                                               "/dev/dma_proxy_tx_ch1",
-	                                               "/dev/dma_proxy_tx_ch2",
-	                                               "/dev/dma_proxy_tx_ch3",
-	                                               "/dev/dma_proxy_tx_ch4",
-	                                               "/dev/dma_proxy_tx_ch5",
-	                                               "/dev/dma_proxy_tx_ch6",
-	                                               "/dev/dma_proxy_tx_ch7"};
+	const PIString dma_rx_devnode                   = "/dev/dma_proxy_rx";
+	const PIString dma_tx_devnodes[NUM_CHANNELS_TX] = {"/dev/dma_proxy_tx_ch0",
+	                                                   "/dev/dma_proxy_tx_ch1",
+	                                                   "/dev/dma_proxy_tx_ch2",
+	                                                   "/dev/dma_proxy_tx_ch3",
+	                                                   "/dev/dma_proxy_tx_ch4",
+	                                                   "/dev/dma_proxy_tx_ch5",
+	                                                   "/dev/dma_proxy_tx_ch6",
+	                                                   "/dev/dma_proxy_tx_ch7"};
+	dma_channel::ch_config tx_config                = {.buffer_size = BUFFER_SIZE, .buffer_count = TX_BUFFER_COUNT};
 };
 
 #endif

@@ -2,8 +2,8 @@
 
 #include "axi_dsp.h"
 #include "dma_channel.hpp"
-#include "protocol_rls_mini.h"
 #include "misc.h"
+#include "protocol_rls_mini.h"
 
 #include <cstdint>
 #include <piliterals_bytes.h>
@@ -14,38 +14,33 @@
 #include <pivaluetree_conversions.h>
 
 GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220_args)) {
-	main_config = PIValueTreeConversions::fromTextFile("rls_mini.conf");
-
-	dma_channels.resize(NUM_CHANNELS_TX + NUM_CHANNELS_RX);
-	for (int i = 0; i < NUM_CHANNELS_TX + NUM_CHANNELS_RX; i++) {
-		dma_channels[i] = new dma_channel();
-	}
+	dma_rx                         = new dma_channel();
 
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
 	for (int i = 0; i < serial_list.size(); i++) {
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
 		u220_ptrs << u;
 		int u_channels[2] = {2 * i, 2 * i + 1};
-	
+
 
 		CONNECTL(u, received, ([this, u_channels, u] { // grab local "u" and "u_channels" as copies
-					if(!dma_send_counter) {
-					// dma_channels[0]->start();
-					}		
-					dma_send_counter++;	
-					for (int i: {0, 1}) {             // 0 and 1 - index in U220, doesn`t change!
-						int ch = u_channels[i];       // 0 - 7
-						dma_channels[ch + 1]->start_transfer();
-						if (dma_channels[ch + 1]->wait_for_transfer() == proxy_status::PROXY_NO_ERROR) {
-						ispr_kan |= (1U << ch);
-						} else {
-						ispr_kan &= ~(1U << ch);
-						}
-						//  (*ref1)[ch] = (*ref2)[ch] =
-						// 	 u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
-					}
+			                                           //  if (!dma_send_counter) {
+			                                           // 	 // dma_channels[0]->start();
+			                                           //  }
+			                                           //  dma_send_counter++;
+			                                           //  for (int i: {0, 1}) {       // 0 and 1 - index in U220, doesn`t change!
+			                                           // 	 int ch = u_channels[i]; // 0 - 7
+			                                           // 	 //  dma_channels[ch + 1]->start_transfer();
+					 //      //  if (dma_channels[ch + 1]->wait_for_transfer() == proxy_status::PROXY_NO_ERROR) {
+			         //      // 	 ispr_kan |= (1U << ch);
+			         //      //  } else {
+			         //      // 	 ispr_kan &= ~(1U << ch);
+			         //      //  }
+			         //      //   (*ref1)[ch] = (*ref2)[ch] =
+			         //      //  u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
+			         //  }
 
-					notifier_channels.notify();
+					 notifier_channels.notify();
 				 }));
 	}
 
@@ -66,30 +61,14 @@ GlobalData * GlobalData::instance() {
 }
 
 void GlobalData::initDMAs() {
-	dma_channels[0]->init(rx_config);
+	dma_rx->init(rx_config);
 	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
-		dma_rx_buffers[i] = dma_channels[0]->get_buffer(i);
+		dma_rx_buffers[i] = dma_rx->get_buffer(i);
 	}
 	piCout << "Rx buffers adresses are:";
 	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
 		piCout << "num " << i << " " << PICoutManipulators::PICoutFormat::Hex << dma_rx_buffers[i];
 	}
-
-	for (size_t i = 0; i < NUM_CHANNELS_TX; i++) {
-		tx_config.devnode = PIString2StdString(tx_devnodes[i]);
-		dma_channels[i + 1]->init(tx_config);
-		dma_channels[i + 1]->get_all_buffers(dma_tx_buffers[i]);
-		dma_channels[i + 1]->set_num_transfers(0);
-		for (size_t k = 0; k < TX_BUFFER_COUNT; k++) {
-			piCout << "ch" << i << " buf" << k << " " << PICoutManipulators::PICoutFormat::Hex << dma_tx_buffers[i][k];
-		}
-	}
-	uint8_t * current_buffers[NUM_CHANNELS_TX];
-	for (size_t k = 0; k < NUM_CHANNELS_TX; k++) {
-		current_buffers[k] = (uint8_t *)dma_tx_buffers[k][0];
-		piCout << "current tx buffer" << k << " " << PICoutManipulators::PICoutFormat::Hex << current_buffers[k];
-	}
-	misc_read_8chs_from_file("hex_50000_lines_overflow_counter.txt", current_buffers, BUFFER_SIZE,  0);
 }
 
 void GlobalData::initDSP() {
@@ -127,12 +106,21 @@ void GlobalData::init() {
 	auto dit                        = devices.begin();
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
 		if (StdString2PIString(dit->first) == u220_ptrs[i]->get_serial() & dit != devices.end()) {
-			void * buffer_ptrs[2 * TX_BUFFER_COUNT];
-			for (int buf_num: {0, 1}) {
-				buffer_ptrs[2 * buf_num]     = dma_tx_buffers[i][buf_num];
-				buffer_ptrs[2 * buf_num + 1] = dma_tx_buffers[i + 1][buf_num];
-			}
-			u220_ptrs[i]->init(buffer_ptrs);
+			dma_channel::ch_config dma_tx_configs[2] = {
+				{
+                 .devnode        = PIString2StdString(dma_tx_devnodes[2 * i]),
+                 .buffer_size    = BUFFER_SIZE,
+                 .buffer_count   = TX_BUFFER_COUNT,
+                 .channel_number = 2 * i,
+				 },
+				{
+                 .devnode        = PIString2StdString(dma_tx_devnodes[2 * i + 1]),
+                 .buffer_size    = BUFFER_SIZE,
+                 .buffer_count   = TX_BUFFER_COUNT,
+                 .channel_number = 2 * i + 1,
+				 },
+			};
+			u220_ptrs[i]->init(dma_tx_configs);
 			active_boards.push_back(i);
 			dit++;
 		}
@@ -185,12 +173,7 @@ void GlobalData::stop() {
 		u220_ptrs[active_boards[i]]->stop_reception();
 		u220_ptrs[active_boards[i]]->stop_transmission();
 	}
-	// dma_channels[0]->waitForFinish();
-	for (int k = dma_channels.size() - 1; k >= 0; k--) {
-		dma_channels[k]->cleanup();
-		delete dma_channels[k];
-		dma_channels[k] = nullptr;
-	}
+	// dma_rx->waitForFinish();
 	piDeleteAllAndClear(u220_ptrs);
 	axi_dsp_deinit();
 }
@@ -277,7 +260,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 
 	if ((1 << msg.nkan) * ispr_kan) {
 		while (req_test_point) {}
-		ans.setData((uint32_t *)dma_channels[0]->get_info_buffer(), ans.nw);
+		// ans.setData((uint32_t *)dma_rx->get_info_buffer(), ans.nw);
 	} else {
 		ans.setData(zero_vector);
 	}

@@ -1,6 +1,7 @@
 #ifndef U220_HPP
 #define U220_HPP
 
+#include "dma_channel.hpp"
 #include "rlso_const.hpp"
 
 #include <piprotectedvariable.h>
@@ -91,6 +92,8 @@ private:
 
 	void fill_buffer_with_wavetable(VectorComplexS & buffer);
 	void initialize_usrp();
+	void initialize_dma(dma_channel::ch_config dma_configs[2]);
+	void deinitialize_dma();
 	void configure_tx_channel(size_t channel);
 	void configure_rx_channel(size_t channel);
 	void setup_tx_streamer();
@@ -98,6 +101,10 @@ private:
 	void rx_errors_worker(uhd::rx_metadata_t::error_code_t err);
 
 	std::atomic_bool first_transfer{true};
+
+	PIVector<dma_channel *> dma_channels;
+	void * dma_tx_buffers[2][TX_BUFFER_COUNT];
+
 protected:
 	PIThread sync_thread;
 	PIThread tx_thread;
@@ -124,7 +131,7 @@ public:
 
 	~U220();
 
-	void init(void * buffers[2]);
+	void init(dma_channel::ch_config dma_configs[2]);
 	void start_sync();
 	bool sync();
 

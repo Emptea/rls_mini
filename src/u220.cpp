@@ -1,6 +1,6 @@
 #include "u220.hpp"
 
-#include "dma_channel.hpp"
+#include "misc.h"
 
 #include <cstdint>
 #include <pistring_std.h>
@@ -70,12 +70,13 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 
 U220::~U220() {}
 
-void U220::init(void * buffers[2 * TX_BUFFER_COUNT]) {
+void U220::init(dma_channel::ch_config dma_configs[2]) {
 	// for (size_t ch = 0; ch < 2; ch++) {
 	// 	rx_buffer_ptrs[0].push_back((complexs *)buffers[ch]);
 	// 	rx_buffer_ptrs[1].push_back((complexs *)buffers[ch + 2]);
 	// }
 	initialize_usrp();
+	initialize_dma(dma_configs);
 	setup_tx_streamer();
 	setup_rx_streamer();
 }
@@ -103,6 +104,29 @@ void U220::initialize_usrp() {
 	}
 
 	std::this_thread::sleep_for(std::chrono::seconds(1));
+}
+
+void U220::initialize_dma(dma_channel::ch_config dma_configs[2]) {
+	dma_channels.resize(2);
+	for (size_t i = 0; i < 2; i++) {
+		dma_channels[i] = new dma_channel();
+		dma_channels[i]->init(dma_configs[i]);
+		dma_channels[i]->get_all_buffers(dma_tx_buffers[i]);
+		dma_channels[i]->set_num_transfers(0);
+
+		for (size_t k = 0; k < TX_BUFFER_COUNT; k++) {
+			piCout << "ch" << i << " buf" << k << " " << PICoutManipulators::PICoutFormat::Hex << dma_tx_buffers[i][k];
+		}
+	}
+
+	uint8_t * current_buffers[NUM_CHANNELS_TX];
+	for (size_t k = 0; k < 2; k++) {
+		misc_read_channel_from_file("hex_50000_lines_overflow_counter.txt",
+		                            (uint8_t *)dma_tx_buffers[k][0],
+		                            dma_configs[k].channel_number,
+		                            BUFFER_SIZE,
+		                            0);
+	}
 }
 
 void U220::configure_tx_channel(size_t channel) {
@@ -327,23 +351,30 @@ void U220::receive() {
 	// piCout << "Enter receive thread fcn";
 	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
+
 	piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "."
 		   << rx_metadata.time_spec.get_frac_secs();
-	if (num_rx_samps) received();
 	if (num_rx_samps) {
 		active_buffer_idx = 1 - active_buffer_idx;
 		first_transfer    = false;
+		dma_channels[0]->start_transfer();
+		dma_channels[1]->start_transfer();
+
+		dma_channels[0]->wait_for_transfer();
+		dma_channels[1]->wait_for_transfer();
 	} // 0 or 1
+
 	// for (int ch: {0, 1}) {
 	// 	auto ch_ptr = rx_queue[ch].getRef();
 	// 	ch_ptr->push_back(rx_buffer[ch]);
 	// }
 
 	rx_errors_worker(rx_metadata.error_code);
-	stats.rx_packet_cnt += num_rx_samps;	
-	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
-		// PRINT_U220_STATS(stats);
-	}
+	stats.rx_packet_cnt += num_rx_samps;
+	// if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
+	// 	PRINT_U220_STATS(stats);
+	// 	received();
+	// }
 }
 
 bool U220::sync() {
@@ -427,6 +458,15 @@ void U220::stop_reception() {
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
 	piCout << "Stream rx stopped";
 }
+
+void U220::deinitialize_dma() {
+	for (int k = dma_channels.size() - 1; k >= 0; k--) {
+		dma_channels[k]->cleanup();
+		delete dma_channels[k];
+		dma_channels[k] = nullptr;
+	}
+}
+
 
 void U220::set_tx_gain(double new_gain) {
 	for (size_t ch = 0; ch < 2; ch++) {
