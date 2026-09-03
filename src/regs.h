@@ -1750,6 +1750,48 @@ typedef struct {
 #define CSR_APPLY_APPLY_MASK 0x1
 #define CSR_APPLY_APPLY_RESET 0x0
 
+// compensation_reference -
+#define CSR_COMPENSATION_REFERENCE_ADDR  0x170
+#define CSR_COMPENSATION_REFERENCE_RESET 0x0
+typedef struct {
+	uint32_t REAL: 16; // Real part, signed 2s complement, 2**14 = 1.0
+	uint32_t     : 16; // reserved
+} csr_compensation_reference_t;
+
+// compensation_reference.real - Real part, signed 2s complement, 2**14 = 1.0
+#define CSR_COMPENSATION_REFERENCE_REAL_WIDTH 16
+#define CSR_COMPENSATION_REFERENCE_REAL_LSB   0
+#define CSR_COMPENSATION_REFERENCE_REAL_MASK  0xffff
+#define CSR_COMPENSATION_REFERENCE_REAL_RESET 0x0
+
+// channel_mask -
+#define CSR_CHANNEL_MASK_ADDR                 0x174
+#define CSR_CHANNEL_MASK_RESET                0xff
+typedef struct {
+	uint32_t CHANNEL_MASK_ENABLE: 8;  // enable channels by mask, "1" - enabled, lsb - channel 1
+	uint32_t                    : 24; // reserved
+} csr_channel_mask_t;
+
+// channel_mask.channel_mask_enable - enable channels by mask, "1" - enabled, lsb - channel 1
+#define CSR_CHANNEL_MASK_CHANNEL_MASK_ENABLE_WIDTH 8
+#define CSR_CHANNEL_MASK_CHANNEL_MASK_ENABLE_LSB   0
+#define CSR_CHANNEL_MASK_CHANNEL_MASK_ENABLE_MASK  0xff
+#define CSR_CHANNEL_MASK_CHANNEL_MASK_ENABLE_RESET 0xff
+
+// reset -
+#define CSR_RESET_ADDR                             0x178
+#define CSR_RESET_RESET                            0x0
+typedef struct {
+	uint32_t RESET: 16; // Sends reset pulse on access
+	uint32_t      : 16; // reserved
+} csr_reset_t;
+
+// reset.reset - Sends reset pulse on access
+#define CSR_RESET_RESET_WIDTH 16
+#define CSR_RESET_RESET_LSB   0
+#define CSR_RESET_RESET_MASK  0xffff
+#define CSR_RESET_RESET_RESET 0x0
+
 
 // Register map structure
 typedef struct {
@@ -2121,6 +2163,18 @@ typedef struct {
         __IO uint32_t APPLY; // 
         __IO csr_apply_t APPLY_bf; // Bit access for APPLY register
     };
+	union {
+		__IO uint32_t COMPENSATION_REFERENCE;                        //
+		__IO csr_compensation_reference_t COMPENSATION_REFERENCE_bf; // Bit access for COMPENSATION_REFERENCE register
+	};
+	union {
+		__IO uint32_t CHANNEL_MASK;              //
+		__IO csr_channel_mask_t CHANNEL_MASK_bf; // Bit access for CHANNEL_MASK register
+	};
+	union {
+		__IO uint32_t RESET;       //
+		__IO csr_reset_t RESET_bf; // Bit access for RESET register
+	};
 } csr_t;
 
 #define CSR ((csr_t*)(CSR_BASE_ADDR))
