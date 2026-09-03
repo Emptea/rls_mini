@@ -6,8 +6,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define MANUAL_COMPENSATION_ORD 14
-#define ANGLE_ORD               32
+#define MANUAL_COMPENSATION_ORD    14
+#define ANGLE_ORD                  32
+#define COMPENSATION_REFERENCE_ORD 14
 static int fd;
 
 static uint32_t axi_write(uint32_t val, uint32_t regmap_offset)
@@ -250,6 +251,25 @@ uint32_t axi_dsp_get_apply()
     return read_u32(CSR_APPLY_ADDR);
 }
 
+float axi_dsp_get_compensation_ref() {
+	uint32_t raw;
+	float ref;
+
+	axi_read(&raw, CSR_COMPENSATION_REFERENCE_ADDR);
+	ref = (raw & CSR_COMPENSATION_REFERENCE_REAL_MASK) >> CSR_COMPENSATION_REFERENCE_REAL_LSB;
+	return ref;
+}
+
+uint32_t axi_dsp_get_channel_mask() {
+	uint32_t raw = read_u32(CSR_CHANNEL_MASK_ADDR);
+	return (raw & CSR_CHANNEL_MASK_CHANNEL_MASK_ENABLE_MASK) >> CSR_CHANNEL_MASK_CHANNEL_MASK_ENABLE_LSB;
+}
+
+uint32_t axi_dsp_get_reset() {
+	uint32_t raw = read_u32(CSR_RESET_ADDR);
+	return (raw & CSR_RESET_RESET_MASK) >> CSR_RESET_RESET_LSB;
+}
+
 /* Setters */
 void axi_dsp_set_test_point(uint32_t tp)
 {
@@ -362,6 +382,15 @@ void axi_dsp_set_azimuth_angle(float angle)
     write_angle(angle, CSR_AZIMUTH_ANGLE_ADDR);
 }
 
+void axi_dsp_set_compensation_ref(float ref) {
+	uint32_t ref_i16 = float_to_fix(ref, COMPENSATION_REFERENCE_ORD);
+	axi_write(ref_i16, CSR_COMPENSATION_REFERENCE_ADDR);
+}
+
+void axi_dsp_set_channel_mask(uint32_t channel_mask) {
+	axi_write(channel_mask & CSR_CHANNEL_MASK_CHANNEL_MASK_ENABLE_MASK, CSR_CHANNEL_MASK_ADDR);
+}
+
 void axi_dsp_kill()
 {
     axi_write(1, CSR_KILL_ADDR);
@@ -371,4 +400,8 @@ void axi_dsp_apply()
 {
     uint32_t prev_apply = (!axi_dsp_get_apply()) & 0x01;
     axi_write(prev_apply, CSR_APPLY_ADDR);
+}
+
+void axi_dsp_reset(uint32_t reset) {
+	axi_write(reset & CSR_RESET_RESET_MASK, CSR_RESET_ADDR);
 }
