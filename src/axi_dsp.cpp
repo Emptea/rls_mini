@@ -228,7 +228,7 @@ csr_apu_rank_t axi_dsp_get_apu_rank()
     uint32_t raw;
     csr_apu_rank_t apu_rank;
 
-    axi_read(&raw, CSR_OUTPUT_SOURCE_ADDR);
+    axi_read(&raw, CSR_APU_RANK_ADDR);
     apu_rank.RANK = (raw & CSR_APU_RANK_RANK_MASK) >> CSR_APU_RANK_RANK_LSB;
     apu_rank.WINDOW = (raw & CSR_APU_RANK_WINDOW_MASK) >> CSR_APU_RANK_WINDOW_LSB;
 
@@ -237,7 +237,7 @@ csr_apu_rank_t axi_dsp_get_apu_rank()
 
 uint32_t axi_dsp_get_detector_level(uint32_t num)
 {
-    return read_u32(CSR_OUTPUT_SOURCE_ADDR + (num * 4));
+    return read_u32(CSR_DETECTOR_LEVEL_0_ADDR + (num * 4));
 }
 
 float axi_dsp_get_azimuth_angle()
