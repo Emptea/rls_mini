@@ -73,7 +73,7 @@ void GlobalData::initDMAs() {
 
 void GlobalData::initDSP() {
 	axi_dsp_init();
-	axi_dsp_set_output_source(1, 0);
+	axi_dsp_set_output_source(1, 7);
 	auto v = axi_dsp_get_output_source();
 	piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << "\n";
 	cmplx_f64 manual_comp   = {.real = 1, .imag = 0};
@@ -122,9 +122,13 @@ void GlobalData::init() {
 			};
 			u220_ptrs[i]->init(dma_tx_configs);
 			active_boards.push_back(i);
+			ispr_kan |= (1 << 2 * i);
+			ispr_kan |= (1 << 2 * i + 1);
 			dit++;
 		}
 	}
+	axi_dsp_set_channel_mask((uint32_t)ispr_kan);
+	piCout << "Active channels mask:" << PICoutManipulators::Bin << ispr_kan;
 	sync();
 }
 
@@ -158,12 +162,14 @@ bool GlobalData::sync() {
 
 void GlobalData::start() {
 	startEth();
+	double start_time = 4.64 + 5;
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		// u220_ptrs[active_boards[i]]->start_reception(4.64+180*0.2e-6);
-		double start_time = 4.64 + 5;
 		u220_ptrs[active_boards[i]]->start_reception(start_time - 60 * 0.2e-6 - 46.4e-5);
 		u220_ptrs[active_boards[i]]->start_transmission(start_time);
 	}
+	piSleep(PISystemTime::fromSeconds(start_time + 1));
+	dma_rx->start(928_us);
 }
 
 
@@ -173,7 +179,9 @@ void GlobalData::stop() {
 		u220_ptrs[active_boards[i]]->stop_reception();
 		u220_ptrs[active_boards[i]]->stop_transmission();
 	}
-	// dma_rx->waitForFinish();
+	piCout << "U220 stopped";
+	dma_rx->waitForFinish(10_ms);
+	// piCout << "DMA RX stopped";
 	piDeleteAllAndClear(u220_ptrs);
 	axi_dsp_deinit();
 }

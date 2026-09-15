@@ -40,11 +40,6 @@ public:
 
 	PIVector<size_t> active_boards;
 
-	dma_channel::ch_config rx_config = {.devnode        = dma_rx_devnode.data(),
-	                                    .buffer_size    = BUFFER_SIZE,
-	                                    .buffer_count   = RX_BUFFER_COUNT,
-	                                    .channel_number = 0};
-
 	static GlobalData * instance();
 
 	void init();
@@ -107,7 +102,7 @@ private:
 	dma_channel * dma_rx;
 	void * dma_rx_buffers[RX_BUFFER_COUNT];
 
-	const PIString dma_rx_devnode                   = "/dev/dma_proxy_rx";
+	// const PIString dma_rx_devnode                   = "/dev/dma_proxy_rx";
 	const PIString dma_tx_devnodes[NUM_CHANNELS_TX] = {"/dev/dma_proxy_tx_ch0",
 	                                                   "/dev/dma_proxy_tx_ch1",
 	                                                   "/dev/dma_proxy_tx_ch2",
@@ -116,6 +111,10 @@ private:
 	                                                   "/dev/dma_proxy_tx_ch5",
 	                                                   "/dev/dma_proxy_tx_ch6",
 	                                                   "/dev/dma_proxy_tx_ch7"};
+	dma_channel::ch_config rx_config                = {.devnode        = "/dev/dma_proxy_rx",
+	                                                   .buffer_size    = BUFFER_SIZE,
+	                                                   .buffer_count   = RX_BUFFER_COUNT,
+	                                                   .channel_number = 0};
 	dma_channel::ch_config tx_config                = {.buffer_size = BUFFER_SIZE, .buffer_count = TX_BUFFER_COUNT};
 };
 
