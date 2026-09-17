@@ -162,14 +162,15 @@ bool GlobalData::sync() {
 
 void GlobalData::start() {
 	startEth();
-	double start_time = 4.64 + 5;
+	// double start_time = 4.64 + 5;
+	double start_time = 3;
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		// u220_ptrs[active_boards[i]]->start_reception(4.64+180*0.2e-6);
 		u220_ptrs[active_boards[i]]->start_reception(start_time - 60 * 0.2e-6 - 46.4e-5);
-		u220_ptrs[active_boards[i]]->start_transmission(start_time);
+		// u220_ptrs[active_boards[i]]->start_transmission(start_time);
 	}
 	piSleep(PISystemTime::fromSeconds(start_time + 1));
-	dma_rx->start(928_us);
+	// dma_rx->start(928_us);
 }
 
 
@@ -180,7 +181,7 @@ void GlobalData::stop() {
 		u220_ptrs[active_boards[i]]->stop_transmission();
 	}
 	piCout << "U220 stopped";
-	dma_rx->waitForFinish(10_ms);
+	// dma_rx->waitForFinish(10_ms);
 	// piCout << "DMA RX stopped";
 	piDeleteAllAndClear(u220_ptrs);
 	axi_dsp_deinit();

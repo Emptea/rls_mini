@@ -126,7 +126,13 @@ void U220::initialize_dma(dma_channel::ch_config dma_configs[2]) {
 		                            dma_configs[k].channel_number,
 		                            BUFFER_SIZE,
 		                            0);
+		const uint32_t * buffer_words = static_cast<const uint32_t *>(dma_tx_buffers[k][0]);
+		piCout << "ch" << k << " last loaded DMA TX value " << PICoutManipulators::PICoutFormat::Hex
+			   << buffer_words[BUFFER_SIZE / sizeof(uint32_t) - 1];
+		// dma_channels[k]->start_transfer();
 	}
+	// dma_channels[0]->start_transfer();
+	// dma_channels[1]->start_transfer();
 }
 
 void U220::configure_tx_channel(size_t channel) {
@@ -352,16 +358,16 @@ void U220::receive() {
 	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
 
-	piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "."
-		   << rx_metadata.time_spec.get_frac_secs();
+	// piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "."
+	// 	   << rx_metadata.time_spec.get_frac_secs();
 	if (num_rx_samps) {
 		active_buffer_idx = 1 - active_buffer_idx;
 		first_transfer    = false;
 		dma_channels[0]->start_transfer();
 		dma_channels[1]->start_transfer();
-
 		dma_channels[0]->wait_for_transfer();
 		dma_channels[1]->wait_for_transfer();
+
 	} // 0 or 1
 
 	// for (int ch: {0, 1}) {
@@ -456,6 +462,7 @@ void U220::stop_reception() {
 	rx_thread.stopAndWait();
 	rx_stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
+	deinitialize_dma();
 	piCout << "Stream rx stopped";
 }
 
