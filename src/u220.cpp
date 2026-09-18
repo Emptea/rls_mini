@@ -74,10 +74,6 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 U220::~U220() {}
 
 void U220::init(dma_channel::ch_config dma_configs[2]) {
-	// for (size_t ch = 0; ch < 2; ch++) {
-	// 	rx_buffer_ptrs[0].push_back((complexs *)buffers[ch]);
-	// 	rx_buffer_ptrs[1].push_back((complexs *)buffers[ch + 2]);
-	// }
 	initialize_usrp();
 	initialize_dma(dma_configs);
 	setup_tx_streamer();
@@ -132,10 +128,7 @@ void U220::initialize_dma(dma_channel::ch_config dma_configs[2]) {
 		const uint32_t * buffer_words = static_cast<const uint32_t *>(dma_tx_buffers[k][0]);
 		piCout << "ch" << k << " last loaded DMA TX value " << PICoutManipulators::PICoutFormat::Hex
 			   << buffer_words[BUFFER_SIZE / sizeof(uint32_t) - 1];
-		// dma_channels[k]->start_transfer();
 	}
-	// dma_channels[0]->start_transfer();
-	// dma_channels[1]->start_transfer();
 }
 
 void U220::configure_tx_channel(size_t channel) {
