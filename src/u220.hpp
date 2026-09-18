@@ -3,7 +3,10 @@
 
 #include "dma_channel.hpp"
 #include "rlso_const.hpp"
+#include "rx_order.hpp"
 
+#include <chrono>
+#include <memory>
 #include <piprotectedvariable.h>
 #include <pithread.h>
 #include <stdint.h>
@@ -13,9 +16,9 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/thread.hpp>
 
-#define PRINT_U220_STATS(s) piCout << "Cycles:" << s.cycles_completed \
-    << " RX:" << s.rx_packet_cnt << "(" << s.rx_bad_packets << "err)" \
-    << " TX:" << s.tx_packet_cnt << " TX - RX:" << (int64_t)(s.tx_packet_cnt - s.rx_packet_cnt);
+#define PRINT_U220_STATS(s)                                                                                     \
+	piCout << "Cycles:" << s.cycles_completed << " RX:" << s.rx_packet_cnt << "(" << s.rx_bad_packets << "err)" \
+		   << " TX:" << s.tx_packet_cnt << " TX - RX:" << (int64_t)(s.tx_packet_cnt - s.rx_packet_cnt);
 
 typedef struct u220_config {
 	double rate;
@@ -68,10 +71,11 @@ private:
 	uhd::rx_streamer::sptr rx_stream;
 	PIProtectedVariable<PIQueue<VectorComplexS>> rx_queue[2];
 	PIVector<VectorComplexS> rx_buffer;
-	PIVector<complexs *> rx_buffer_ptrs [2];
+	PIVector<complexs *> rx_buffer_ptrs[2];
 	std::atomic_int active_buffer_idx{0};
 	uhd::rx_metadata_t rx_metadata;
 	double rx_timeout;
+	std::chrono::steady_clock::time_point rx_deadline;
 	float rx_burst_pkt_time;
 	uhd::stream_cmd_t rx_stream_cmd;
 
@@ -150,7 +154,10 @@ public:
 	void transmit();
 	void stop_transmission();
 
-	void start_reception(double settling_time);
+	void start_reception(double start_time, double acquisition_seconds, std::shared_ptr<RxOrder> order = nullptr, size_t order_index = 0);
+	uhd::time_spec_t get_time_now() const { return usrp->get_time_now(); }
+	uhd::time_spec_t get_time_last_pps() const { return usrp->get_time_last_pps(); }
+	void reset_time_next_pps() { usrp->set_time_next_pps(uhd::time_spec_t(0.0)); }
 	void receive();
 	EVENT0(received);
 	void stop_reception();

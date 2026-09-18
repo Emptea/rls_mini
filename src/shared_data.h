@@ -44,7 +44,7 @@ public:
 
 	void init();
 	bool sync();
-	void start();
+	void start(double acquisition_seconds = 10.0);
 	void stop();
 	void processChannels();
 

@@ -2,8 +2,10 @@
 
 #include "misc.h"
 
+#include <cmath>
 #include <cstdint>
 #include <pistring_std.h>
+#include <stdexcept>
 
 // clang-format off
 void print_config(const u220_config_t& config) {
@@ -408,6 +410,15 @@ void U220::receive() {
 
 	rx_errors_worker(rx_metadata.error_code);
 	stats.rx_packet_cnt += num_rx_samps;
+	if (rx_metadata.end_of_burst) {
+		const auto end_time = rx_metadata.time_spec + uhd::time_spec_t::from_ticks(num_rx_samps / 2, usrp->get_rx_rate());
+		std::cout << boost::format("RX %s end timestamp (exclusive): %.9f, samples/channel: %llu\n") % serial % end_time.get_real_secs() %
+						 (stats.rx_packet_cnt / 2);
+		rx_thread.stop();
+	} else if (Clock::now() >= rx_deadline) {
+		std::cerr << "RX " << serial << ": acquisition incomplete; no end-of-burst before drain deadline" << std::endl;
+		rx_thread.stop();
+	}
 	// if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
 	// 	PRINT_U220_STATS(stats);
 	// 	received();
@@ -428,7 +439,7 @@ bool U220::sync() {
 		return false;
 	}
 
-	set_time_sync();
+	// GlobalData resets every board on one shared PPS edge after these checks.
 	if (!check_lo_lock()) {
 		std::cerr << "LO Lock detection failed!" << std::endl;
 		return false;
@@ -461,22 +472,58 @@ void U220::start_transmission(double start_time) {
 	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 }
 
-void U220::start_reception(double settling_time) {
-	const double rate        = usrp->get_rx_rate();
-	rx_burst_pkt_time        = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
-	rx_timeout               = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
-	rx_timing                = {};
-	first_transfer           = true;
+void U220::start_reception(double start_time, double acquisition_seconds, std::shared_ptr<RxOrder> order, size_t order_index) {
+	const double rate    = usrp->get_rx_rate();
+	const double samples = acquisition_seconds * rate;
+	// The legacy RX command has a 28-bit sample count, per channel.
+	if (!std::isfinite(samples) || samples < 1 || samples > 0x0fffffff || std::abs(samples - std::round(samples)) > 1e-6) {
+		throw std::invalid_argument("Acquisition duration must specify 1..268435455 whole samples per channel");
+	}
+	const double settling_time = start_time - usrp->get_time_now().get_real_secs();
+	if (settling_time < 0.1) {
+		throw std::runtime_error("RX start timestamp is too close or already past");
+	}
+	rx_deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+														 std::chrono::duration<double>(settling_time + acquisition_seconds + 5.0));
+	rx_burst_pkt_time         = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
+	rx_timeout                = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
+	rx_timing                 = {};
+	stats.rx_packet_cnt       = 0;
+	first_transfer            = true;
 
 	// setup streaming
-	rx_stream_cmd.num_samps  = board_config.rx_spb;
-	rx_stream_cmd.stream_now = false;
-	rx_stream_cmd.time_spec  = uhd::time_spec_t(settling_time);
+	rx_stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE;
+	rx_stream_cmd.num_samps   = static_cast<uint64_t>(std::llround(samples));
+	rx_stream_cmd.stream_now  = false;
+	rx_stream_cmd.time_spec   = uhd::time_spec_t(start_time);
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
 
-	status.rx_on[0] = true;
-	status.rx_on[1] = true;
-	rx_thread.start([this]() { receive(); });
+	status.rx_on[0]    = true;
+	status.rx_on[1]    = true;
+	const bool started = rx_thread.start([this, order, order_index]() {
+		if (order && !order->wait(order_index)) {
+			rx_thread.stop();
+			return;
+		}
+		try {
+			receive();
+		} catch (const std::exception & error) {
+			if (order) order->cancel();
+			rx_thread.stop();
+			std::cerr << "RX " << serial << ": " << error.what() << std::endl;
+			return;
+		} catch (...) {
+			if (order) order->cancel();
+			rx_thread.stop();
+			std::cerr << "RX " << serial << ": unknown receive failure" << std::endl;
+			return;
+		}
+		if (order) order->finish(order_index, rx_thread.isStopping());
+	});
+	if (!started) {
+		if (order) order->cancel();
+		throw std::runtime_error("Failed to start receive thread");
+	}
 	std::cout << std::endl << "Reception started for " << serial << std::endl;
 }
 
@@ -492,9 +539,13 @@ void U220::stop_transmission() {
 }
 
 void U220::stop_reception() {
-	rx_thread.stopAndWait();
-	rx_stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
-	rx_stream->issue_stream_cmd(rx_stream_cmd);
+	// The FPGA ends acquisition after the scheduled sample count. Drain through EOB
+	// before freeing DMA resources; host thread completion need not be simultaneous.
+	rx_thread.waitForFinish();
+	uhd::stream_cmd_t stop_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+	stop_cmd.stream_now = true;
+	rx_stream->issue_stream_cmd(stop_cmd);
+	status.rx_on[0] = status.rx_on[1] = false;
 	deinitialize_dma();
 	std::cout << "Stream rx stopped for device " << serial << std::endl;
 	if (rx_timing.count) {

@@ -5,6 +5,7 @@
 #include "misc.h"
 #include "protocol_rls_mini.h"
 
+#include <cmath>
 #include <cstdint>
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
@@ -12,6 +13,7 @@
 #include <pistring_std.h>
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
+#include <stdexcept>
 
 GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220_args)) {
 	dma_rx                         = new dma_channel();
@@ -129,7 +131,9 @@ void GlobalData::init() {
 	}
 	axi_dsp_set_channel_mask((uint32_t)ispr_kan);
 	piCout << "Active channels mask:" << PICoutManipulators::Bin << ispr_kan;
-	sync();
+	if (!sync()) {
+		throw std::runtime_error("U220 synchronization failed");
+	}
 }
 
 
@@ -156,18 +160,57 @@ bool GlobalData::sync() {
 	piDeleteAll(sync_threads); // delete threads
 
 
-	return results.every([](bool r) { return r == true; }); // shortcut for check all items in "results" ( RTFM :-) )
+	if (!results.every([](bool r) { return r; })) return false;
+	if (active_boards.isEmpty()) return true;
+
+	// Observe one PPS edge, then arm all boards for the following edge.
+	auto * reference    = u220_ptrs[active_boards[0]];
+	const auto last_pps = reference->get_time_last_pps();
+	const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+	while (reference->get_time_last_pps() == last_pps) {
+		if (std::chrono::steady_clock::now() >= deadline) return false;
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	const auto edge = std::chrono::steady_clock::now();
+	for (auto index: active_boards)
+		u220_ptrs[index]->reset_time_next_pps();
+	// Reject a slow command sequence that could have crossed another PPS edge.
+	if (std::chrono::steady_clock::now() - edge > std::chrono::milliseconds(500)) return false;
+	std::this_thread::sleep_until(edge + std::chrono::milliseconds(1100));
+	for (auto index: active_boards) {
+		if (u220_ptrs[index]->get_time_last_pps() != uhd::time_spec_t(0.0)) return false;
+	}
+	return true;
 }
 
 
-void GlobalData::start() {
+void GlobalData::start(double acquisition_seconds) {
 	startEth();
 	// double start_time = 4.64 + 5;
 	double start_time = 3;
-	for (size_t i = 0; i < active_boards.size(); i++) {
-		// u220_ptrs[active_boards[i]]->start_reception(4.64+180*0.2e-6);
-		u220_ptrs[active_boards[i]]->start_reception(start_time - 60 * 0.2e-6 - 46.4e-5);
-		// u220_ptrs[active_boards[i]]->start_transmission(start_time);
+	// Validate all boards before issuing any acquisition command.
+	for (auto index: active_boards) {
+		auto * board         = u220_ptrs[index];
+		const double rate    = board->get_rx_rate();
+		const double samples = acquisition_seconds * rate;
+		if (rate != u220_ptrs[active_boards[0]]->get_rx_rate() || !std::isfinite(samples) || samples < 1 || samples > 0x0fffffff ||
+		    std::abs(samples - std::round(samples)) > 1e-6) {
+			throw std::invalid_argument("Synchronized acquisition requires equal rates and a valid finite sample count");
+		}
+		start_time = std::max(start_time, board->get_time_now().get_real_secs() + 2.0);
+	}
+	std::cout << boost::format("Scheduled RX interval: [%.9f, %.9f) device seconds\n") % (start_time - 60 * 0.2e-6 - 46.4e-5) %
+					 (start_time - 60 * 0.2e-6 - 46.4e-5 + acquisition_seconds);
+	// Release the first turn only after every board has its timed command and worker.
+	const auto order = std::make_shared<RxOrder>(active_boards.size());
+	try {
+		for (size_t i = 0; i < active_boards.size(); i++) {
+			u220_ptrs[active_boards[i]]->start_reception(start_time - 60 * 0.2e-6 - 46.4e-5, acquisition_seconds, order, i);
+		}
+		order->start();
+	} catch (...) {
+		order->cancel(); // Wake already-started workers if a later board fails to start.
+		throw;
 	}
 	piSleep(PISystemTime::fromSeconds(start_time + 1));
 	// dma_rx->start(928_us);
@@ -178,7 +221,12 @@ void GlobalData::stop() {
 	stopEth();
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		u220_ptrs[active_boards[i]]->stop_reception();
-		u220_ptrs[active_boards[i]]->stop_transmission();
+		ispr_kan &= (1 << 2 * active_boards[i]);
+		ispr_kan &= (1 << 2 * active_boards[i] + 1);
+		axi_dsp_set_channel_mask((uint32_t)ispr_kan);
+		piCout << "Active channels mask:" << PICoutManipulators::Bin << ispr_kan;
+
+		// u220_ptrs[active_boards[i]]->stop_transmission();
 	}
 	piCout << "U220 stopped";
 	// dma_rx->waitForFinish(10_ms);
