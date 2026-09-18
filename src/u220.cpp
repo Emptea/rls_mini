@@ -355,9 +355,15 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 
 void U220::receive() {
 	// piCout << "Enter receive thread fcn";
-	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
-	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
+	using Clock           = std::chrono::steady_clock;
+	const auto loop_start = Clock::now();
+	const auto recv_start = Clock::now();
+	size_t num_rx_samps   = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
+	const auto recv_end   = Clock::now();
+	rx_timeout            = rx_burst_pkt_time; // small timeout for subsequent recv
 
+	const auto dma_start  = Clock::now();
+	bool dma_ok           = true;
 	// piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "."
 	// 	   << rx_metadata.time_spec.get_frac_secs();
 	if (num_rx_samps) {
@@ -365,10 +371,35 @@ void U220::receive() {
 		first_transfer    = false;
 		dma_channels[0]->start_transfer();
 		dma_channels[1]->start_transfer();
-		dma_channels[0]->wait_for_transfer();
-		dma_channels[1]->wait_for_transfer();
+		const int dma_status_0 = dma_channels[0]->wait_for_transfer();
+		const int dma_status_1 = dma_channels[1]->wait_for_transfer();
+		dma_ok                 = dma_status_0 == proxy_status::PROXY_NO_ERROR && dma_status_1 == proxy_status::PROXY_NO_ERROR;
+		// if (dma_ok) {
+		// 	dma_channels[1]->start_transfer();
+		// 	dma_channels[1]->start_transfer();
+		// 	const int dma_status_0 = dma_channels[0]->wait_for_transfer();
+		// 	const int dma_status_1 = dma_channels[1]->wait_for_transfer();
+		// }
 
 	} // 0 or 1
+	const auto next_recv_start = Clock::now();
+
+	if (dma_ok && !first_transfer) {
+		const uint64_t recv_us = std::chrono::duration_cast<std::chrono::microseconds>(recv_end - recv_start).count();
+		const uint64_t dma_us  = std::chrono::duration_cast<std::chrono::microseconds>(next_recv_start - dma_start).count();
+		const uint64_t gap_us  = std::chrono::duration_cast<std::chrono::microseconds>(next_recv_start - recv_end).count();
+		const uint64_t loop_us = std::chrono::duration_cast<std::chrono::microseconds>(next_recv_start - loop_start).count();
+
+		rx_timing.recv_max_us  = std::max(rx_timing.recv_max_us, recv_us);
+		rx_timing.dma_max_us   = std::max(rx_timing.dma_max_us, dma_us);
+		rx_timing.gap_max_us   = std::max(rx_timing.gap_max_us, gap_us);
+		rx_timing.loop_max_us  = std::max(rx_timing.loop_max_us, loop_us);
+		rx_timing.recv_sum_us += recv_us;
+		rx_timing.dma_sum_us += dma_us;
+		rx_timing.gap_sum_us += gap_us;
+		rx_timing.loop_sum_us += loop_us;
+		rx_timing.count++;
+	}
 
 	// for (int ch: {0, 1}) {
 	// 	auto ch_ptr = rx_queue[ch].getRef();
@@ -434,6 +465,8 @@ void U220::start_reception(double settling_time) {
 	const double rate        = usrp->get_rx_rate();
 	rx_burst_pkt_time        = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
 	rx_timeout               = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
+	rx_timing                = {};
+	first_transfer           = true;
 
 	// setup streaming
 	rx_stream_cmd.num_samps  = board_config.rx_spb;
@@ -463,7 +496,17 @@ void U220::stop_reception() {
 	rx_stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
 	deinitialize_dma();
-	piCout << "Stream rx stopped";
+	std::cout << "Stream rx stopped for device " << serial << std::endl;
+	if (rx_timing.count) {
+		std::cout << "RX " << serial << ": recv avg/max = " << rx_timing.recv_sum_us / rx_timing.count << "/" << rx_timing.recv_max_us
+				  << " us, DMA avg/max = " << rx_timing.dma_sum_us / rx_timing.count << "/" << rx_timing.dma_max_us
+				  << " us, gap avg/max = " << rx_timing.gap_sum_us / rx_timing.count << "/" << rx_timing.gap_max_us
+				  << " us, loop avg/max = " << rx_timing.loop_sum_us / rx_timing.count << "/" << rx_timing.loop_max_us
+				  << " us, loops = " << rx_timing.count << std::endl;
+	} else {
+		std::cout << "RX " << serial << ": no timing samples collected" << std::endl;
+	}
+	PRINT_U220_STATS(stats);
 }
 
 void U220::deinitialize_dma() {

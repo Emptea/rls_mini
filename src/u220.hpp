@@ -89,6 +89,17 @@ private:
 
 	u220_stats stats;
 	u220_status status;
+	struct rx_timing_stats {
+		uint64_t recv_max_us = 0;
+		uint64_t dma_max_us  = 0;
+		uint64_t gap_max_us  = 0;
+		uint64_t loop_max_us = 0;
+		uint64_t recv_sum_us = 0;
+		uint64_t dma_sum_us  = 0;
+		uint64_t gap_sum_us  = 0;
+		uint64_t loop_sum_us = 0;
+		uint64_t count       = 0;
+	} rx_timing;
 
 	void fill_buffer_with_wavetable(VectorComplexS & buffer);
 	void initialize_usrp();
