@@ -3,6 +3,7 @@
 
 #include "dma_channel.hpp"
 #include "rlso_const.hpp"
+#include "rx_acquisition.hpp"
 #include "rx_order.hpp"
 
 #include <chrono>
@@ -78,6 +79,9 @@ private:
 	std::chrono::steady_clock::time_point rx_deadline;
 	float rx_burst_pkt_time;
 	uhd::stream_cmd_t rx_stream_cmd;
+	RxAcquisition rx_acquisition;
+	uhd::time_spec_t rx_start_time;
+	void queue_rx_command();
 
 	uhd::tx_streamer::sptr tx_stream;
 	VectorComplexS tx_buffer;
@@ -94,15 +98,22 @@ private:
 	u220_stats stats;
 	u220_status status;
 	struct rx_timing_stats {
-		uint64_t recv_max_us = 0;
-		uint64_t dma_max_us  = 0;
-		uint64_t gap_max_us  = 0;
-		uint64_t loop_max_us = 0;
-		uint64_t recv_sum_us = 0;
-		uint64_t dma_sum_us  = 0;
-		uint64_t gap_sum_us  = 0;
-		uint64_t loop_sum_us = 0;
-		uint64_t count       = 0;
+		uint64_t startup_recv_us    = 0;
+		uint64_t startup_recv_count = 0;
+		uint64_t recv_max_us        = 0;
+		uint64_t dma_max_us         = 0;
+		uint64_t gap_max_us         = 0;
+		uint64_t loop_max_us        = 0;
+		uint64_t recv_sum_us        = 0;
+		uint64_t dma_sum_us         = 0;
+		uint64_t gap_sum_us         = 0;
+		uint64_t loop_sum_us        = 0;
+		uint64_t count              = 0;
+		std::chrono::steady_clock::time_point previous_entry;
+		bool have_previous_entry = false;
+		uint64_t period_sum_ns   = 0;
+		uint64_t period_max_ns   = 0;
+		uint64_t period_count    = 0;
 	} rx_timing;
 
 	void fill_buffer_with_wavetable(VectorComplexS & buffer);

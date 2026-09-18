@@ -1,6 +1,7 @@
 #include "u220.hpp"
 
 #include "misc.h"
+#include "rx_stream_command.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -357,15 +358,44 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 
 void U220::receive() {
 	// piCout << "Enter receive thread fcn";
-	using Clock           = std::chrono::steady_clock;
-	const auto loop_start = Clock::now();
+	// Snapshot before receiving: the first successful receive clears first_transfer below.
+	const bool startup_receive = first_transfer.load();
+	using Clock                = std::chrono::steady_clock;
+	const auto loop_start      = Clock::now();
+	if (!startup_receive) {
+		// Entry-to-entry includes the other boards' turns and scheduling overhead.
+		// Start with the first post-startup entry so the scheduled-start wait is excluded.
+		if (rx_timing.have_previous_entry) {
+			const uint64_t period_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(loop_start - rx_timing.previous_entry).count();
+			rx_timing.period_sum_ns += period_ns;
+			rx_timing.period_max_ns = std::max(rx_timing.period_max_ns, period_ns);
+			rx_timing.period_count++;
+		}
+		rx_timing.previous_entry      = loop_start;
+		rx_timing.have_previous_entry = true;
+	}
 	const auto recv_start = Clock::now();
 	size_t num_rx_samps   = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	const auto recv_end   = Clock::now();
 	rx_timeout            = rx_burst_pkt_time; // small timeout for subsequent recv
 
-	const auto dma_start  = Clock::now();
-	bool dma_ok           = true;
+	if (startup_receive) {
+		// The first board waits here for the timed start; the other boards wait for their turn.
+		// Keep this visible without mixing it into steady-state receive latency.
+		rx_timing.startup_recv_us += std::chrono::duration_cast<std::chrono::microseconds>(recv_end - recv_start).count();
+		rx_timing.startup_recv_count++;
+	}
+
+	if (num_rx_samps && rx_metadata.has_time_spec && rx_acquisition.has_more()) {
+		// Use device time so lost samples do not postpone refilling the command queue.
+		const auto elapsed = (rx_metadata.time_spec - rx_start_time).to_ticks(usrp->get_rx_rate());
+		if (elapsed >= 0 && rx_acquisition.needs_refill(static_cast<uint64_t>(elapsed) + num_rx_samps / 2)) {
+			queue_rx_command();
+		}
+	}
+
+	const auto dma_start = Clock::now();
+	bool dma_ok          = true;
 	// piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "."
 	// 	   << rx_metadata.time_spec.get_frac_secs();
 	if (num_rx_samps) {
@@ -386,7 +416,7 @@ void U220::receive() {
 	} // 0 or 1
 	const auto next_recv_start = Clock::now();
 
-	if (dma_ok && !first_transfer) {
+	if (dma_ok && !startup_receive) {
 		const uint64_t recv_us = std::chrono::duration_cast<std::chrono::microseconds>(recv_end - recv_start).count();
 		const uint64_t dma_us  = std::chrono::duration_cast<std::chrono::microseconds>(next_recv_start - dma_start).count();
 		const uint64_t gap_us  = std::chrono::duration_cast<std::chrono::microseconds>(next_recv_start - recv_end).count();
@@ -472,31 +502,32 @@ void U220::start_transmission(double start_time) {
 	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 }
 
+void U220::queue_rx_command() {
+	rx_stream_cmd = next_rx_stream_command(rx_acquisition, rx_start_time, usrp->get_rx_rate());
+	rx_stream->issue_stream_cmd(rx_stream_cmd);
+}
+
 void U220::start_reception(double start_time, double acquisition_seconds, std::shared_ptr<RxOrder> order, size_t order_index) {
-	const double rate    = usrp->get_rx_rate();
-	const double samples = acquisition_seconds * rate;
-	// The legacy RX command has a 28-bit sample count, per channel.
-	if (!std::isfinite(samples) || samples < 1 || samples > 0x0fffffff || std::abs(samples - std::round(samples)) > 1e-6) {
-		throw std::invalid_argument("Acquisition duration must specify 1..268435455 whole samples per channel");
-	}
+	const double rate          = usrp->get_rx_rate();
+	const uint64_t samples     = RxAcquisition::sample_count(acquisition_seconds, rate);
 	const double settling_time = start_time - usrp->get_time_now().get_real_secs();
 	if (settling_time < 0.1) {
 		throw std::runtime_error("RX start timestamp is too close or already past");
 	}
 	rx_deadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
 														 std::chrono::duration<double>(settling_time + acquisition_seconds + 5.0));
-	rx_burst_pkt_time         = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
-	rx_timeout                = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
-	rx_timing                 = {};
-	stats.rx_packet_cnt       = 0;
-	first_transfer            = true;
+	rx_burst_pkt_time   = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
+	rx_timeout          = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
+	rx_timing           = {};
+	stats.rx_packet_cnt = 0;
+	first_transfer      = true;
 
-	// setup streaming
-	rx_stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE;
-	rx_stream_cmd.num_samps   = static_cast<uint64_t>(std::llround(samples));
-	rx_stream_cmd.stream_now  = false;
-	rx_stream_cmd.time_spec   = uhd::time_spec_t(start_time);
-	rx_stream->issue_stream_cmd(rx_stream_cmd);
+	// Keep at most two finite commands queued: the current chunk and its successor.
+	// Only the last chunk ends the burst; continuations start immediately after the previous chunk.
+	rx_acquisition.reset(samples);
+	rx_start_time = uhd::time_spec_t(start_time);
+	queue_rx_command();
+	if (rx_acquisition.has_more()) queue_rx_command();
 
 	status.rx_on[0]    = true;
 	status.rx_on[1]    = true;
@@ -548,14 +579,25 @@ void U220::stop_reception() {
 	status.rx_on[0] = status.rx_on[1] = false;
 	deinitialize_dma();
 	std::cout << "Stream rx stopped for device " << serial << std::endl;
+	if (rx_timing.startup_recv_count) {
+		std::cout << "RX " << serial << ": startup recv total = " << rx_timing.startup_recv_us
+				  << " us (includes scheduled-start wait), calls = " << rx_timing.startup_recv_count << std::endl;
+	}
 	if (rx_timing.count) {
-		std::cout << "RX " << serial << ": recv avg/max = " << rx_timing.recv_sum_us / rx_timing.count << "/" << rx_timing.recv_max_us
-				  << " us, DMA avg/max = " << rx_timing.dma_sum_us / rx_timing.count << "/" << rx_timing.dma_max_us
+		std::cout << "RX " << serial << ": steady-state recv avg/max = " << rx_timing.recv_sum_us / rx_timing.count << "/"
+				  << rx_timing.recv_max_us << " us, DMA avg/max = " << rx_timing.dma_sum_us / rx_timing.count << "/" << rx_timing.dma_max_us
 				  << " us, gap avg/max = " << rx_timing.gap_sum_us / rx_timing.count << "/" << rx_timing.gap_max_us
-				  << " us, loop avg/max = " << rx_timing.loop_sum_us / rx_timing.count << "/" << rx_timing.loop_max_us
+				  << " us, receive/DMA duration avg/max = " << rx_timing.loop_sum_us / rx_timing.count << "/" << rx_timing.loop_max_us
 				  << " us, loops = " << rx_timing.count << std::endl;
 	} else {
-		std::cout << "RX " << serial << ": no timing samples collected" << std::endl;
+		std::cout << "RX " << serial << ": no steady-state timing samples collected" << std::endl;
+	}
+	if (rx_timing.period_count) {
+		std::cout << "RX " << serial << ": iteration period avg/max = " << rx_timing.period_sum_ns / rx_timing.period_count / 1000.0 << "/"
+				  << rx_timing.period_max_ns / 1000.0 << " us, intervals = " << rx_timing.period_count
+				  << " (entry-to-entry, excludes startup)" << std::endl;
+	} else {
+		std::cout << "RX " << serial << ": no steady-state iteration periods collected" << std::endl;
 	}
 	PRINT_U220_STATS(stats);
 }

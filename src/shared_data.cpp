@@ -190,12 +190,11 @@ void GlobalData::start(double acquisition_seconds) {
 	double start_time = 3;
 	// Validate all boards before issuing any acquisition command.
 	for (auto index: active_boards) {
-		auto * board         = u220_ptrs[index];
-		const double rate    = board->get_rx_rate();
-		const double samples = acquisition_seconds * rate;
-		if (rate != u220_ptrs[active_boards[0]]->get_rx_rate() || !std::isfinite(samples) || samples < 1 || samples > 0x0fffffff ||
-		    std::abs(samples - std::round(samples)) > 1e-6) {
-			throw std::invalid_argument("Synchronized acquisition requires equal rates and a valid finite sample count");
+		auto * board      = u220_ptrs[index];
+		const double rate = board->get_rx_rate();
+		RxAcquisition::sample_count(acquisition_seconds, rate);
+		if (rate != u220_ptrs[active_boards[0]]->get_rx_rate()) {
+			throw std::invalid_argument("Synchronized acquisition requires equal sample rates");
 		}
 		start_time = std::max(start_time, board->get_time_now().get_real_secs() + 2.0);
 	}
