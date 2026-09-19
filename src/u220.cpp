@@ -399,12 +399,6 @@ void U220::receive() {
 		const int dma_status_0 = dma_channels[0]->wait_for_transfer();
 		const int dma_status_1 = dma_channels[1]->wait_for_transfer();
 		dma_ok                 = dma_status_0 == proxy_status::PROXY_NO_ERROR && dma_status_1 == proxy_status::PROXY_NO_ERROR;
-		// if (dma_ok) {
-		// 	dma_channels[1]->start_transfer();
-		// 	dma_channels[1]->start_transfer();
-		// 	const int dma_status_0 = dma_channels[0]->wait_for_transfer();
-		// 	const int dma_status_1 = dma_channels[1]->wait_for_transfer();
-		// }
 
 	} // 0 or 1
 	const auto next_recv_start = Clock::now();
@@ -426,11 +420,6 @@ void U220::receive() {
 		rx_timing.count++;
 	}
 
-	// for (int ch: {0, 1}) {
-	// 	auto ch_ptr = rx_queue[ch].getRef();
-	// 	ch_ptr->push_back(rx_buffer[ch]);
-	// }
-
 	rx_errors_worker(rx_metadata.error_code);
 	stats.rx_packet_cnt += num_rx_samps;
 	if (rx_metadata.end_of_burst) {
@@ -442,10 +431,6 @@ void U220::receive() {
 		std::cerr << "RX " << serial << ": acquisition incomplete; no end-of-burst before drain deadline" << std::endl;
 		rx_thread.stop();
 	}
-	// if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
-	// 	PRINT_U220_STATS(stats);
-	// 	received();
-	// }
 }
 
 bool U220::sync() {

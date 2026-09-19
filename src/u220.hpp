@@ -170,7 +170,6 @@ public:
 	uhd::time_spec_t get_time_last_pps() const { return usrp->get_time_last_pps(); }
 	void reset_time_next_pps() { usrp->set_time_next_pps(uhd::time_spec_t(0.0)); }
 	void receive();
-	EVENT0(received);
 	void stop_reception();
 
 	void set_pps_source();
