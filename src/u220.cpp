@@ -204,8 +204,8 @@ void U220::setup_rx_streamer() {
 	rx_buffer_ptrs[0].resize(2);
 	rx_buffer_ptrs[1].resize(2);
 	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[0][ch] = &rx_buffer[ch].front();
-		rx_buffer_ptrs[1][ch] = &rx_buffer[ch + 2].front();
+		rx_buffer_ptrs[0][ch] = static_cast<complexs *>(dma_tx_buffers[ch][0]);
+		rx_buffer_ptrs[1][ch] = static_cast<complexs *>(dma_tx_buffers[ch][1]);
 	}
 }
 
