@@ -1,5 +1,7 @@
 #include "dma_channel.hpp"
 
+#include "rlso_const.hpp"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -108,6 +110,11 @@ int dma_channel::wait_for_transfer() {
 		if (flag_save_buf) {
 			save_buf_to_file(ch.buf_ptr->buffers[ch.buffer_id].buffer, n_samps_per_buf);
 		}
+		auto * buffer = ch.buf_ptr->buffers[ch.buffer_id].buffer;
+		rx_queue.emplace(buffer, BUFFER_SIZE);
+		if (ch.buffer_count % RX_BUFFER_COUNT == 0) {
+			received();
+		}
 		ch.in_progress_count--;
 		ch.counter++;
 		// printf("Finish transfer for DMA buffer %d devnode %s # completed transfers %d\n", ch.buffer_id, config.devnode.c_str(), ch.counter);
@@ -127,4 +134,12 @@ void dma_channel::cleanup() {
 	       num_transfers,
 	       ch.counter,
 	       ch.in_progress_count);
+}
+
+bool dma_channel::take_rx_queue_and_clear(VectorUint & output) {
+	if (rx_queue.empty()) return false;
+
+	output = std::move(rx_queue.front());
+	rx_queue.pop();
+	return true;
 }

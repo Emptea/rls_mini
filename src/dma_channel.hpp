@@ -1,19 +1,25 @@
 #pragma once
 
 #include "dma-proxy.h"
+#include "rlso_const.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <piprotectedvariable.h>
 #include <pisemaphore.h>
 #include <pithread.h>
+#include <queue>
 #include <string>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <vector>
 
 
-#define N_SAMPS_IN_TX_BUF 232
-#define N_PACKS_IN_TX_BUF 4
-#define HDR_SIZE 6
+#define N_SAMPS_IN_PACK   232
+#define N_PACKS_IN_TX_BUF 20
+#define N_SAMPS_IN_TX_BUF (N_SAMPS_IN_PACK * N_PACKS_IN_TX_BUF)
+#define TX_BUF_SIZE       (sizeof(unsigned int) * N_SAMPS_IN_TX_BUF)
+#define HDR_SIZE          6
 
 class dma_channel: public PIThread {
 	PIOBJECT_SUBCLASS(dma_channel, PIThread)
@@ -36,6 +42,8 @@ private:
 	int n_samps_per_buf = 232;
 
 	void save_buf_to_file(void * buffer, int N);
+
+	std::queue<VectorUint> rx_queue;
 
 public:
 	struct ch_config {
@@ -71,7 +79,7 @@ public:
 			return;
 		}
 
-		if (num_transfers && ((ch.counter + ch.in_progress_count) < num_transfers)) {
+		if (!num_transfers || (num_transfers && ((ch.counter + ch.in_progress_count) < num_transfers))) {
 			start_transfer_for_buf(ch.buffer_id);
 			// piCout << "Started transfer for buffer " << ch.buffer_id << "global cnt is " << ch.buffer_count;
 		}
@@ -98,4 +106,7 @@ public:
 		n_samps_per_buf  = n_samps;
 		dump_file = fopen(f_name.data(), "w");
 	}
+	EVENT0(received);
+
+	bool take_rx_queue_and_clear(VectorUint & output);
 };

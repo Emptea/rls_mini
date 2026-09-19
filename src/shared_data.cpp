@@ -16,35 +16,23 @@
 #include <stdexcept>
 
 GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220_args)) {
-	dma_rx                         = new dma_channel();
+	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
+
+	dma_channel * rx               = new dma_channel();
+	dma_rx                         = rx;
 
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
 	for (int i = 0; i < serial_list.size(); i++) {
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
 		u220_ptrs << u;
 		int u_channels[2] = {2 * i, 2 * i + 1};
-
-
-		CONNECTL(u, received, ([this, u_channels, u] { // grab local "u" and "u_channels" as copies
-			                                           //  if (!dma_send_counter) {
-			                                           // 	 // dma_channels[0]->start();
-			                                           //  }
-			                                           //  dma_send_counter++;
-			                                           //  for (int i: {0, 1}) {       // 0 and 1 - index in U220, doesn`t change!
-			                                           // 	 int ch = u_channels[i]; // 0 - 7
-			                                           // 	 //  dma_channels[ch + 1]->start_transfer();
-					 //      //  if (dma_channels[ch + 1]->wait_for_transfer() == proxy_status::PROXY_NO_ERROR) {
-			         //      // 	 ispr_kan |= (1U << ch);
-			         //      //  } else {
-			         //      // 	 ispr_kan &= ~(1U << ch);
-			         //      //  }
-			         //      //   (*ref1)[ch] = (*ref2)[ch] =
-			         //      //  u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
-			         //  }
-
-					 notifier_channels.notify();
-				 }));
 	}
+
+	CONNECTL(rx, received, ([this, rx] { // grab local "u" and "u_channels" as copies
+				 auto ref1 = dma_channel_buf.getRef();
+				 rx->take_rx_queue_and_clear(*ref1); // or something else ... grab your 0/1 channel data
+				 notifier_channels.notify();
+			 }));
 
 	process_thread.start([this] { processChannels(); });
 }
@@ -75,7 +63,7 @@ void GlobalData::initDMAs() {
 
 void GlobalData::initDSP() {
 	axi_dsp_init();
-	axi_dsp_set_output_source(1, 7);
+	axi_dsp_set_output_source(1, 7, 0);
 	auto v = axi_dsp_get_output_source();
 	piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << "\n";
 	cmplx_f64 manual_comp   = {.real = 1, .imag = 0};
@@ -111,13 +99,13 @@ void GlobalData::init() {
 			dma_channel::ch_config dma_tx_configs[2] = {
 				{
                  .devnode        = PIString2StdString(dma_tx_devnodes[2 * i]),
-                 .buffer_size    = BUFFER_SIZE,
+                 .buffer_size    = TX_BUF_SIZE,
                  .buffer_count   = TX_BUFFER_COUNT,
                  .channel_number = 2 * i,
 				 },
 				{
                  .devnode        = PIString2StdString(dma_tx_devnodes[2 * i + 1]),
-                 .buffer_size    = BUFFER_SIZE,
+                 .buffer_size    = TX_BUF_SIZE,
                  .buffer_count   = TX_BUFFER_COUNT,
                  .channel_number = 2 * i + 1,
 				 },
@@ -211,8 +199,8 @@ void GlobalData::start(double acquisition_seconds) {
 		order->cancel(); // Wake already-started workers if a later board fails to start.
 		throw;
 	}
-	piSleep(PISystemTime::fromSeconds(start_time + 1));
-	// dma_rx->start(928_us);
+	piSleep(PISystemTime::fromSeconds(start_time - 0.5));
+	dma_rx->start();
 }
 
 
@@ -228,8 +216,10 @@ void GlobalData::stop() {
 		// u220_ptrs[active_boards[i]]->stop_transmission();
 	}
 	piCout << "U220 stopped";
-	// dma_rx->waitForFinish(10_ms);
-	// piCout << "DMA RX stopped";
+	dma_rx->set_num_transfers(1);
+	dma_rx->stop();
+	dma_rx->waitForFinish(10_ms);
+	piCout << "DMA RX stopped";
 	piDeleteAllAndClear(u220_ptrs);
 	axi_dsp_deinit();
 }
@@ -238,43 +228,20 @@ void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 
-	for (int ch: active_boards) {
-		// if (dma_channels[ch + 1]->wait_for_transfer() == proxy_status::PROXY_NO_ERROR) {
-		// 	ispr_kan |= (1U << ch);
-		// } else {
-		// 	ispr_kan &= ~(1U << ch);
-		// }
 
-		if (ch == req_test_channel) {
-			req_test_point = false;
-		}
-	}
+	// 	PIMap<int, VectorComplexS> channels;
+	// 	bool all_channels = true;
+	// 	{ // start work with "getRef"
+	// 		auto ref = dma_channel_buf.getRef();
 
-	// PIMap<int, VectorComplexS> channels;
-	// bool all_channels = true;
-	// { // start work with "getRef"
-	// 	auto ref = current_channels.getRef();
-	// 	for (int ch = 0; ch < 8; ++ch) {
-	// 		if ((*ref)[ch].isEmpty()) {
-	// 			ispr_kan &= ~(1U << ch);
-	// 			all_channels = false;
-	// 		} else {
-	// 			ispr_kan |= (1U << ch);
+	// 		channels = *ref; // copy data
+
+	// 		for (int ch = 0; ch < 8; ++ch) {
+	// 			if (!(*ref)[ch].isEmpty()) {
+	// 				(*ref)[ch].clear(); // clear input data
+	// 			}
 	// 		}
-	// 	}
-
-	// 	if (~all_channels) return;
-	// 	channels = *ref; // copy data
-
-	// 	for (int ch = 0; ch < 8; ++ch) {
-	// 		if (!(*ref)[ch].isEmpty()) {
-	// 			(*ref)[ch].clear(); // clear input data
-	// 		}
-	// 	}
-	// } // desctuct "ref", release current_channels
-
-	// work with your data (channels)
-	// adc_channels = channels;
+	// 	} // desctuct "ref", release current_channels
 }
 
 
@@ -283,43 +250,63 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		   << "received_POI_TK_Zapros";
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	piCout << "rec msg kt" << msg.kt;
-	axi_dsp_set_test_point(msg.kt);
+	axi_dsp_set_output_source(msg.kt, msg.nkan, msg.reg_takt);
 	axi_dsp_apply();
 	req_test_channel = msg.kt;
 	req_test_point   = true;
 
+	int data_cnt;
 	switch (msg.kt) {
-	case Protocol_RLS_Mini::CTRL: {
+	case TP_WORK: {
+		data_cnt = sizeof(work_posthdr) + HDR_SIZE;
 		break;
 	}
-	case Protocol_RLS_Mini::ADC: {
-		ans.nw = 232;
+	case TP_BYPASS: {
+		data_cnt = (N_SAMPS_IN_PACK + HDR_SIZE) * N_PACKS_IN_TX_BUF;
 		break;
 	}
-	case Protocol_RLS_Mini::CUT:
-	case Protocol_RLS_Mini::PLL:
-	case Protocol_RLS_Mini::OPH:
-	case Protocol_RLS_Mini::LOU: {
-		ans.nw = 141;
+	case TP_CUT:
+	case TP_FAPCH:
+	case TP_LOU: {
+		data_cnt = (164 + HDR_SIZE) * N_PACKS_IN_TX_BUF;
 		break;
 	}
-	case Protocol_RLS_Mini::KN: {
+	case TP_SF:
+	case TP_MAX:
+	case TP_RANK:
+	case TP_APU: {
+		data_cnt = (141 + HDR_SIZE) * N_PACKS_IN_TX_BUF;
 		break;
 	}
-	case Protocol_RLS_Mini::AD: {
+	case TP_DDR:
+	case TP_FFT:
+	case TP_WEIGHT_OUT: {
+		data_cnt = 512 + HDR_SIZE;
 		break;
 	}
-	case Protocol_RLS_Mini::APU: {
+	case TP_FIND: {
+		data_cnt = 141 * 5 + HDR_SIZE;
+		break;
+	}
+	case TP_FAPCH_COEFFS: {
+		data_cnt = (8 + HDR_SIZE) * N_PACKS_IN_TX_BUF;
+		break;
+	}
+	default: {
 		break;
 	}
 	}
 
+	VectorUint data;
+	auto ref = dma_channel_buf.getRef();
+	data     = (*ref);
+
 	if ((1 << msg.nkan) * ispr_kan) {
-		while (req_test_point) {}
-		// ans.setData((uint32_t *)dma_rx->get_info_buffer(), ans.nw);
+		ans.setData(data, data_cnt);
 	} else {
 		ans.setData(zero_vector);
 	}
+	ans.nw = static_cast<uint16_t>(data_cnt);
 	global->sendMessage(ans);
 }
 

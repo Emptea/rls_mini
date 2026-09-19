@@ -17,6 +17,7 @@
 
 typedef PIVector<complexs> VectorComplexS;
 typedef PIVector<complexf> VectorComplexF;
+typedef PIVector<unsigned int> VectorUint;
 
 const VectorComplexF wave_table_far = {
 	{1.0000f,  0.0000f },

@@ -22,10 +22,10 @@
  * Note: the buffer in the data structure should be 1st in the channel interface so that the buffer is cached aligned,
  * otherwise there may be issues when using cached memory.
  */
-#define BUFFER_SIZE      (sizeof(unsigned int) * 232 * 4 * 5) /* must match driver exactly */
-#define BUFFER_COUNT     32                               /* driver only */
+#define BUFFER_SIZE      (sizeof(unsigned int) * (232 + 6) * 20) /* must match driver exactly */
+#define BUFFER_COUNT     32                                      /* driver only */
 
-#define TX_BUFFER_COUNT  1 /* app only, must be <= to the number in the driver */
+#define TX_BUFFER_COUNT  2 /* app only, must be <= to the number in the driver */
 #define RX_BUFFER_COUNT  8 /* app only, must be <= to the number in the driver */
 #define BUFFER_INCREMENT 1 /* normally 1, but skipping buffers (2) defeats prefetching in the CPU */
 

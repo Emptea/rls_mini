@@ -75,6 +75,7 @@ private:
 	PIThread process_thread;
 
 	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
+	PIProtectedVariable<VectorUint> dma_channel_buf;
 	VectorComplexS zero_vector;
 
 	PIMap<int, bool> board_statuses;
