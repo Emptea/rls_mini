@@ -258,38 +258,38 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	int data_cnt;
 	switch (msg.kt) {
 	case TP_WORK: {
-		data_cnt = sizeof(work_posthdr) + HDR_SIZE;
+		data_cnt = sizeof(work_posthdr);
 		break;
 	}
 	case TP_BYPASS: {
-		data_cnt = (N_SAMPS_IN_PACK + HDR_SIZE) * N_PACKS_IN_TX_BUF;
+		data_cnt = (N_SAMPS_IN_PACK);
 		break;
 	}
 	case TP_CUT:
 	case TP_FAPCH:
 	case TP_LOU: {
-		data_cnt = (164 + HDR_SIZE) * N_PACKS_IN_TX_BUF;
+		data_cnt = (164);
 		break;
 	}
 	case TP_SF:
 	case TP_MAX:
 	case TP_RANK:
 	case TP_APU: {
-		data_cnt = (141 + HDR_SIZE) * N_PACKS_IN_TX_BUF;
+		data_cnt = (141);
 		break;
 	}
 	case TP_DDR:
 	case TP_FFT:
 	case TP_WEIGHT_OUT: {
-		data_cnt = 512 + HDR_SIZE;
+		data_cnt = 512;
 		break;
 	}
 	case TP_FIND: {
-		data_cnt = 141 * 5 + HDR_SIZE;
+		data_cnt = 141 * 5;
 		break;
 	}
 	case TP_FAPCH_COEFFS: {
-		data_cnt = (8 + HDR_SIZE) * N_PACKS_IN_TX_BUF;
+		data_cnt = (8);
 		break;
 	}
 	default: {
@@ -301,8 +301,8 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	auto ref = dma_channel_buf.getRef();
 	data     = (*ref);
 
-	if ((1 << msg.nkan) * ispr_kan) {
-		ans.setData(data, data_cnt);
+	if (((1u << msg.nkan) & ispr_kan) && !ref->isEmpty()) {
+		ans.setData(&data[HDR_SIZE], data_cnt);
 	} else {
 		ans.setData(zero_vector);
 	}
