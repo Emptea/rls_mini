@@ -215,6 +215,9 @@ void GlobalData::stop() {
 		u220_ptrs[index]->set_dma_num_transfers(num_transfers);
 	piCout << "Stopping all DMA channels after" << num_transfers << "transfers";
 
+	// Workers stop the USRPs and drain USB independently of DMA RX completion.
+	for (auto index: active_boards)
+		u220_ptrs[index]->wait_for_reception();
 	dma_rx->waitForFinish();
 	piCout << "DMA RX stopped";
 	for (size_t i = 0; i < active_boards.size(); i++) {

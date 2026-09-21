@@ -448,6 +448,7 @@ void U220::start_continuous_reception(double start_time, std::shared_ptr<RxOrder
 	rx_timing           = {};
 	stats.rx_packet_cnt = 0;
 	first_transfer      = true;
+	rx_shutdown_done    = false;
 	rx_acquisition.reset(0);
 	rx_start_time = uhd::time_spec_t(start_time);
 
@@ -461,6 +462,7 @@ void U220::start_continuous_reception(double start_time, std::shared_ptr<RxOrder
 	const bool started = rx_thread.start([this, order, order_index]() {
 		if (order && !order->wait(order_index)) {
 			rx_thread.stop();
+			stop_and_drain_rx();
 			return;
 		}
 		try {
@@ -475,9 +477,11 @@ void U220::start_continuous_reception(double start_time, std::shared_ptr<RxOrder
 			std::cerr << "RX " << serial << ": unknown receive failure" << std::endl;
 		}
 		if (order) order->finish(order_index, rx_thread.isStopping());
+		if (rx_thread.isStopping()) stop_and_drain_rx();
 	});
 	if (!started) {
 		if (order) order->cancel();
+		stop_and_drain_rx();
 		throw std::runtime_error("Failed to start receive thread");
 	}
 	std::cout << std::endl << "Continuous reception started for " << serial << std::endl;
@@ -549,6 +553,7 @@ void U220::start_reception(double start_time, double acquisition_seconds, std::s
 	rx_timing           = {};
 	stats.rx_packet_cnt = 0;
 	first_transfer      = true;
+	rx_shutdown_done    = false;
 
 	// Keep at most two finite commands queued: the current chunk and its successor.
 	// Only the last chunk ends the burst; continuations start immediately after the previous chunk.
@@ -562,6 +567,7 @@ void U220::start_reception(double start_time, double acquisition_seconds, std::s
 	const bool started = rx_thread.start([this, order, order_index]() {
 		if (order && !order->wait(order_index)) {
 			rx_thread.stop();
+			stop_and_drain_rx();
 			return;
 		}
 		try {
@@ -570,17 +576,17 @@ void U220::start_reception(double start_time, double acquisition_seconds, std::s
 			if (order) order->cancel();
 			rx_thread.stop();
 			std::cerr << "RX " << serial << ": " << error.what() << std::endl;
-			return;
 		} catch (...) {
 			if (order) order->cancel();
 			rx_thread.stop();
 			std::cerr << "RX " << serial << ": unknown receive failure" << std::endl;
-			return;
 		}
 		if (order) order->finish(order_index, rx_thread.isStopping());
+		if (rx_thread.isStopping()) stop_and_drain_rx();
 	});
 	if (!started) {
 		if (order) order->cancel();
+		stop_and_drain_rx();
 		throw std::runtime_error("Failed to start receive thread");
 	}
 	std::cout << std::endl << "Reception started for " << serial << std::endl;
@@ -597,14 +603,55 @@ void U220::stop_transmission() {
 	}
 }
 
+// Called by the receive worker on exit, or by shutdown after joining it.
+void U220::stop_and_drain_rx() {
+	if (rx_shutdown_done || !rx_stream) return;
+	rx_shutdown_done = true;
+	try {
+		uhd::stream_cmd_t stop_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+		stop_cmd.stream_now = true;
+		rx_stream->issue_stream_cmd(stop_cmd);
+
+		// Discard trailing USB samples without touching or submitting DMA buffers.
+		const size_t count = rx_stream->get_max_num_samps();
+		std::vector<std::vector<complexs>> buffers(2, std::vector<complexs>(count));
+		std::vector<void *> pointers{buffers[0].data(), buffers[1].data()};
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+		size_t discarded    = 0;
+		while (std::chrono::steady_clock::now() < deadline) {
+			uhd::rx_metadata_t metadata;
+			// One packet limits each recv; a nonzero timeout also surfaces pending errors.
+			discarded += rx_stream->recv(pointers, count, metadata, 0.05, true);
+			if (metadata.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+				std::cout << "RX " << serial << ": shutdown drained " << discarded << " samples/channel" << std::endl;
+				return;
+			}
+			if (metadata.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE &&
+			    metadata.error_code != uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
+				std::cerr << "RX " << serial << ": shutdown drain: " << metadata.strerror() << std::endl;
+				return;
+			}
+		}
+		std::cerr << "RX " << serial << ": shutdown drain deadline reached" << std::endl;
+	} catch (const std::exception & error) {
+		std::cerr << "RX " << serial << ": shutdown stop/drain failed: " << error.what() << std::endl;
+	} catch (...) {
+		std::cerr << "RX " << serial << ": unknown shutdown stop/drain failure" << std::endl;
+	}
+}
+
 void U220::stop_reception() {
 	// The receive worker stops after both TX DMAs reach the shared transfer target.
 	rx_thread.waitForFinish();
-	uhd::stream_cmd_t stop_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
-	stop_cmd.stream_now = true;
-	rx_stream->issue_stream_cmd(stop_cmd);
+	stop_and_drain_rx();
 	status.rx_on[0] = status.rx_on[1] = false;
 	deinitialize_dma();
+	if (status.tx_on[0] || status.tx_on[1]) stop_transmission();
+	tx_thread.stopAndWait();
+	sync_thread.stopAndWait();
+	rx_stream.reset();
+	tx_stream.reset();
+	usrp.reset();
 	std::cout << "Stream rx stopped for device " << serial << std::endl;
 	if (rx_timing.startup_recv_count) {
 		std::cout << "RX " << serial << ": startup recv total = " << rx_timing.startup_recv_us

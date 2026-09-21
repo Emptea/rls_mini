@@ -82,6 +82,8 @@ private:
 	RxAcquisition rx_acquisition;
 	uhd::time_spec_t rx_start_time;
 	void queue_rx_command();
+	void stop_and_drain_rx();
+	bool rx_shutdown_done = false;
 
 	uhd::tx_streamer::sptr tx_stream;
 	VectorComplexS tx_buffer;
@@ -171,6 +173,7 @@ public:
 	uhd::time_spec_t get_time_last_pps() const { return usrp->get_time_last_pps(); }
 	void reset_time_next_pps() { usrp->set_time_next_pps(uhd::time_spec_t(0.0)); }
 	void receive();
+	void wait_for_reception() { rx_thread.waitForFinish(); }
 	void stop_reception();
 	int get_dma_pending_transfer_target() const;
 	void set_dma_num_transfers(int num_transfers);
