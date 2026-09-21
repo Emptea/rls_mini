@@ -95,9 +95,9 @@ int dma_channel::wait_for_transfer() {
 			printf("DMA transfer error buffer %d, devnode %s, # transfers %d, # completed %d, # in progress %d\n",
 			       ch.buffer_id,
 			       config.devnode.c_str(),
-			       num_transfers,
-			       ch.counter,
-			       ch.in_progress_count);
+			       num_transfers.load(),
+			       ch.counter.load(),
+			       ch.in_progress_count.load());
 			if (ch.buf_ptr->states[ch.buffer_id].status == proxy_status::PROXY_BUSY) {
 				fprintf(stderr, "DMA devnode %s busy\n", config.devnode.c_str());
 			}
@@ -108,20 +108,22 @@ int dma_channel::wait_for_transfer() {
 		}
 
 		if (flag_save_buf) {
-			save_buf_to_file(ch.buf_ptr->buffers[ch.buffer_id].buffer, n_samps_per_buf);
+			// save_buf_to_file(ch.buf_ptr->buffers[ch.buffer_id].buffer, n_samps_per_buf);
+			if (ch.buffer_id == 0) {
+				rx_queue.emplace(ch.buf_ptr->buffers[ch.buffer_id].buffer, (BUFFER_SIZE / sizeof(unsigned int)) * RX_BUFFER_COUNT);
+				received();
+			}
 		}
 		auto * buffer = ch.buf_ptr->buffers[ch.buffer_id].buffer;
-		rx_queue.emplace(buffer, BUFFER_SIZE);
-		if (ch.buffer_count % RX_BUFFER_COUNT == 0) {
-			received();
-		}
 		ch.in_progress_count--;
 		ch.counter++;
-		// printf("Finish transfer for DMA buffer %d devnode %s # completed transfers %d\n", ch.buffer_id, config.devnode.c_str(), ch.counter);
+		// printf("Finish transfer for DMA buffer %d devnode %s # completed transfers %d\n", ch.buffer_id, config.devnode.c_str(),
+		// ch.counter);
 	}
 	// ch.buffer_id = ch.counter % ch.buffer_count;
 	return 0;
 }
+
 void dma_channel::cleanup() {
 	if (munmap(ch.buf_ptr, sizeof(channel_buffer) * ch.buffer_count) == -1) {
 		perror("munmap failed");
@@ -131,15 +133,17 @@ void dma_channel::cleanup() {
 
 	printf("DMA transfer stopped for devnode %s, # transfers %d, # completed %d, # in progress %d\n",
 	       config.devnode.c_str(),
-	       num_transfers,
-	       ch.counter,
-	       ch.in_progress_count);
+	       num_transfers.load(),
+	       ch.counter.load(),
+	       ch.in_progress_count.load());
 }
 
 bool dma_channel::take_rx_queue_and_clear(VectorUint & output) {
 	if (rx_queue.empty()) return false;
 
 	output = std::move(rx_queue.front());
-	rx_queue.pop();
+	while (!rx_queue.empty()) {
+		rx_queue.pop();
+	}
 	return true;
 }

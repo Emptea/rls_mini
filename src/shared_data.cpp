@@ -52,6 +52,7 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::initDMAs() {
 	dma_rx->init(rx_config);
+	dma_rx->set_save_to_buf();
 	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
 		dma_rx_buffers[i] = dma_rx->get_buffer(i);
 	}
@@ -172,7 +173,7 @@ bool GlobalData::sync() {
 }
 
 
-void GlobalData::start(double acquisition_seconds) {
+void GlobalData::start() {
 	startEth();
 	// double start_time = 4.64 + 5;
 	double start_time = 3;
@@ -180,19 +181,17 @@ void GlobalData::start(double acquisition_seconds) {
 	for (auto index: active_boards) {
 		auto * board      = u220_ptrs[index];
 		const double rate = board->get_rx_rate();
-		RxAcquisition::sample_count(acquisition_seconds, rate);
 		if (rate != u220_ptrs[active_boards[0]]->get_rx_rate()) {
 			throw std::invalid_argument("Synchronized acquisition requires equal sample rates");
 		}
 		start_time = std::max(start_time, board->get_time_now().get_real_secs() + 2.0);
 	}
-	std::cout << boost::format("Scheduled RX interval: [%.9f, %.9f) device seconds\n") % (start_time - 60 * 0.2e-6 - 46.4e-5) %
-					 (start_time - 60 * 0.2e-6 - 46.4e-5 + acquisition_seconds);
+	std::cout << boost::format("Scheduled continuous RX start: %.9f device seconds\n") % (start_time - 60 * 0.2e-6 - 46.4e-5);
 	// Release the first turn only after every board has its timed command and worker.
 	const auto order = std::make_shared<RxOrder>(active_boards.size());
 	try {
 		for (size_t i = 0; i < active_boards.size(); i++) {
-			u220_ptrs[active_boards[i]]->start_reception(start_time - 60 * 0.2e-6 - 46.4e-5, acquisition_seconds, order, i);
+			u220_ptrs[active_boards[i]]->start_continuous_reception(start_time - 60 * 0.2e-6 - 46.4e-5, order, i);
 		}
 		order->start();
 	} catch (...) {
@@ -206,6 +205,18 @@ void GlobalData::start(double acquisition_seconds) {
 
 void GlobalData::stop() {
 	stopEth();
+	int num_transfers = dma_rx->get_pending_transfer_target();
+	for (auto index: active_boards)
+		num_transfers = std::max(num_transfers, u220_ptrs[index]->get_dma_pending_transfer_target());
+	// Leave enough headroom to apply the limit to every running channel before any one reaches it.
+	num_transfers += RX_BUFFER_COUNT + TX_BUFFER_COUNT;
+	dma_rx->set_num_transfers(num_transfers);
+	for (auto index: active_boards)
+		u220_ptrs[index]->set_dma_num_transfers(num_transfers);
+	piCout << "Stopping all DMA channels after" << num_transfers << "transfers";
+
+	dma_rx->waitForFinish();
+	piCout << "DMA RX stopped";
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		u220_ptrs[active_boards[i]]->stop_reception();
 		ispr_kan &= (1 << 2 * active_boards[i]);
@@ -216,10 +227,6 @@ void GlobalData::stop() {
 		// u220_ptrs[active_boards[i]]->stop_transmission();
 	}
 	piCout << "U220 stopped";
-	dma_rx->set_num_transfers(1);
-	dma_rx->stop();
-	dma_rx->waitForFinish(10_ms);
-	piCout << "DMA RX stopped";
 	piDeleteAllAndClear(u220_ptrs);
 	axi_dsp_deinit();
 }

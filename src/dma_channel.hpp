@@ -3,6 +3,7 @@
 #include "dma-proxy.h"
 #include "rlso_const.hpp"
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <piprotectedvariable.h>
@@ -27,16 +28,16 @@ class dma_channel: public PIThread {
 private:
 	struct channel {
 		channel_contagious_buffer * buf_ptr = nullptr; // proxy‑driver ring
-		int fd                   = -1;
-		int buffer_size          = 0;
-		int counter              = 0;
-		int buffer_id            = 0;
-		int in_progress_count    = 0;
-		int buffer_count         = 1;
+		int fd                              = -1;
+		int buffer_size                     = 0;
+		std::atomic_int counter{0};
+		int buffer_id = 0;
+		std::atomic_int in_progress_count{0};
+		int buffer_count = 1;
 	} ch;
 
-	int num_transfers  = 0;
-	int info_buf_num = 0;
+	std::atomic_int num_transfers{0};
+	int info_buf_num   = 0;
 	bool flag_save_buf = false;
 	FILE * dump_file;
 	int n_samps_per_buf = 232;
@@ -74,16 +75,17 @@ public:
 	}
 
 	void run() override {
-		if (wait_for_transfer() || (num_transfers && (ch.counter >= num_transfers))) {
+		if (wait_for_transfer()) {
 			stop();
 			return;
 		}
 
-		if (!num_transfers || (num_transfers && ((ch.counter + ch.in_progress_count) < num_transfers))) {
+		if (!num_transfers || ((ch.counter + ch.in_progress_count) < num_transfers)) {
 			start_transfer_for_buf(ch.buffer_id);
 			// piCout << "Started transfer for buffer " << ch.buffer_id << "global cnt is " << ch.buffer_count;
 		}
 		ch.buffer_id = (ch.buffer_id + 1) % ch.buffer_count;
+		if (num_transfers && ch.counter >= num_transfers && ch.in_progress_count == 0) stop();
 	}
 
 	void end() override { cleanup(); }
@@ -100,11 +102,19 @@ public:
 	}
 
 	void set_num_transfers(int n_trans) { num_transfers = n_trans; }
+	int get_num_transfers() const { return num_transfers.load(); }
+	int get_completed_transfers() const { return ch.counter.load(); }
+	int get_pending_transfer_target() const { return ch.counter.load() + ch.in_progress_count.load(); }
+	bool reached_transfer_limit() const { return num_transfers.load() > 0 && ch.counter.load() >= num_transfers.load(); }
 
 	void set_save_to_file(PIString f_name, int n_samps) {
-		flag_save_buf    = true;
-		n_samps_per_buf  = n_samps;
-		dump_file = fopen(f_name.data(), "w");
+		flag_save_buf   = true;
+		n_samps_per_buf = n_samps;
+		dump_file       = fopen(f_name.data(), "w");
+	}
+
+	void set_save_to_buf() {
+		flag_save_buf   = true;
 	}
 	EVENT0(received);
 

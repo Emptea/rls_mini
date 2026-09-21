@@ -422,6 +422,10 @@ void U220::receive() {
 
 	rx_errors_worker(rx_metadata.error_code);
 	stats.rx_packet_cnt += num_rx_samps;
+	if (dma_channels[0]->reached_transfer_limit() && dma_channels[1]->reached_transfer_limit()) {
+		rx_thread.stop();
+		return;
+	}
 	if (rx_metadata.end_of_burst) {
 		const auto end_time = rx_metadata.time_spec + uhd::time_spec_t::from_ticks(num_rx_samps / 2, usrp->get_rx_rate());
 		std::cout << boost::format("RX %s end timestamp (exclusive): %.9f, samples/channel: %llu\n") % serial % end_time.get_real_secs() %
@@ -431,6 +435,52 @@ void U220::receive() {
 		std::cerr << "RX " << serial << ": acquisition incomplete; no end-of-burst before drain deadline" << std::endl;
 		rx_thread.stop();
 	}
+}
+
+void U220::start_continuous_reception(double start_time, std::shared_ptr<RxOrder> order, size_t order_index) {
+	const double rate          = usrp->get_rx_rate();
+	const double settling_time = start_time - usrp->get_time_now().get_real_secs();
+	if (settling_time < 0.1) throw std::runtime_error("RX start timestamp is too close or already past");
+
+	rx_burst_pkt_time   = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
+	rx_timeout          = settling_time + rx_burst_pkt_time;
+	rx_deadline         = std::chrono::steady_clock::time_point::max();
+	rx_timing           = {};
+	stats.rx_packet_cnt = 0;
+	first_transfer      = true;
+	rx_acquisition.reset(0);
+	rx_start_time = uhd::time_spec_t(start_time);
+
+	uhd::stream_cmd_t command(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+	command.stream_now = false;
+	command.time_spec  = rx_start_time;
+	rx_stream->issue_stream_cmd(command);
+
+	status.rx_on[0]    = true;
+	status.rx_on[1]    = true;
+	const bool started = rx_thread.start([this, order, order_index]() {
+		if (order && !order->wait(order_index)) {
+			rx_thread.stop();
+			return;
+		}
+		try {
+			receive();
+		} catch (const std::exception & error) {
+			if (order) order->cancel();
+			rx_thread.stop();
+			std::cerr << "RX " << serial << ": " << error.what() << std::endl;
+		} catch (...) {
+			if (order) order->cancel();
+			rx_thread.stop();
+			std::cerr << "RX " << serial << ": unknown receive failure" << std::endl;
+		}
+		if (order) order->finish(order_index, rx_thread.isStopping());
+	});
+	if (!started) {
+		if (order) order->cancel();
+		throw std::runtime_error("Failed to start receive thread");
+	}
+	std::cout << std::endl << "Continuous reception started for " << serial << std::endl;
 }
 
 bool U220::sync() {
@@ -548,8 +598,7 @@ void U220::stop_transmission() {
 }
 
 void U220::stop_reception() {
-	// The FPGA ends acquisition after the scheduled sample count. Drain through EOB
-	// before freeing DMA resources; host thread completion need not be simultaneous.
+	// The receive worker stops after both TX DMAs reach the shared transfer target.
 	rx_thread.waitForFinish();
 	uhd::stream_cmd_t stop_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
 	stop_cmd.stream_now = true;
@@ -578,6 +627,18 @@ void U220::stop_reception() {
 		std::cout << "RX " << serial << ": no steady-state iteration periods collected" << std::endl;
 	}
 	PRINT_U220_STATS(stats);
+}
+
+int U220::get_dma_pending_transfer_target() const {
+	int target = 0;
+	for (auto * channel: dma_channels)
+		target = std::max(target, channel->get_pending_transfer_target());
+	return target;
+}
+
+void U220::set_dma_num_transfers(int num_transfers) {
+	for (auto * channel: dma_channels)
+		channel->set_num_transfers(num_transfers);
 }
 
 void U220::deinitialize_dma() {

@@ -166,11 +166,14 @@ public:
 	void stop_transmission();
 
 	void start_reception(double start_time, double acquisition_seconds, std::shared_ptr<RxOrder> order = nullptr, size_t order_index = 0);
+	void start_continuous_reception(double start_time, std::shared_ptr<RxOrder> order = nullptr, size_t order_index = 0);
 	uhd::time_spec_t get_time_now() const { return usrp->get_time_now(); }
 	uhd::time_spec_t get_time_last_pps() const { return usrp->get_time_last_pps(); }
 	void reset_time_next_pps() { usrp->set_time_next_pps(uhd::time_spec_t(0.0)); }
 	void receive();
 	void stop_reception();
+	int get_dma_pending_transfer_target() const;
+	void set_dma_num_transfers(int num_transfers);
 
 	void set_pps_source();
 	void set_time_sync();
