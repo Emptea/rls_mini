@@ -311,8 +311,9 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	auto ref = dma_channel_buf.getRef();
 	data     = (*ref);
 
-	if (((1u << msg.nkan) & ispr_kan) && !ref->isEmpty()) {
-		ans.setData(&data[HDR_SIZE], data_cnt);
+	if (!ref->isEmpty()) {
+		// ans.setData(&data[HDR_SIZE], data_cnt);
+		ans.setData(data, data_cnt);
 	} else {
 		ans.setData(zero_vector);
 	}
