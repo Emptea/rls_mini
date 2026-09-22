@@ -40,9 +40,9 @@ typedef struct {
 
 #pragma pack(push, 1)
 struct work_packet {
-	uint32_t main_amplitude;
+	uint32_t main_amplitude; //  Д_кв - величина кванта дальности
 	uint32_t neighbor_amplitude;
-	uint8_t range                 : 8;
+	uint8_t range                 : 8; // i_0 - дальность
 	uint16_t main_diagram_number  : 3;
 	uint16_t neighbor_diagram_side: 1;
 	uint16_t frequency_channel    : 9;

@@ -117,9 +117,9 @@ void GlobalDataEth::receivedRLS(PIByteArray data, int port) {
 	RLS_TRY_PARSE(POI_TK_Zapros );
 	RLS_TRY_PARSE(CIT_Zapros    );
 	RLS_TRY_PARSE(CIT_KU        );
-	RLS_TRY_PARSE(TRVO          );
-	RLS_TRY_PARSE(TRETA         );
-	RLS_TRY_PARSE(AZIMUTH       );
+	// RLS_TRY_PARSE(TRVO          );
+	// RLS_TRY_PARSE(TRETA         );
+	// RLS_TRY_PARSE(AZIMUTH       );
 	// clang-format on
 }
 
