@@ -8,6 +8,55 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+static size_t get_nsamps_to_save(void * buffer) {
+	struct header * hdr = (struct header *)buffer;
+	size_t nsamps       = 0;
+	switch (hdr->tp) {
+	case TP_WORK: {
+		nsamps = sizeof(work_posthdr) + HDR_SIZE;
+		break;
+	}
+	case TP_BYPASS: {
+		nsamps = (N_SAMPS_IN_PACK + HDR_SIZE) * N_PACKS_IN_TX_BUF;
+		break;
+	}
+	case TP_CUT:
+	case TP_FAPCH:
+	case TP_LOU: {
+		nsamps = (164 + HDR_SIZE) * N_PACKS_IN_TX_BUF;
+		break;
+	}
+	case TP_SF: {
+		nsamps = (141 + HDR_SIZE) * N_PACKS_IN_TX_BUF;
+		break;
+	}
+	case TP_MAX:
+	case TP_RANK:
+	case TP_APU: {
+		nsamps = (141 + HDR_SIZE);
+		break;
+	}
+	case TP_DDR:
+	case TP_FFT:
+	case TP_WEIGHT_OUT: {
+		nsamps = 512 + HDR_SIZE;
+		break;
+	}
+	case TP_FIND: {
+		nsamps = 141 * 5 + HDR_SIZE;
+		break;
+	}
+	case TP_FAPCH_COEFFS: {
+		nsamps = (8 + HDR_SIZE) * N_PACKS_IN_TX_BUF;
+		break;
+	}
+	default: {
+		break;
+	}
+	}
+	return nsamps;
+}
+
 void dma_channel::save_buf_to_file(void * buffer, int N) {
 	// piCout << "Saving started for buffer " << PICoutManipulators::PICoutFormat::Hex << buffer;
 	// const int16_t * buf16 = reinterpret_cast<const int16_t *>(buffer);
@@ -125,6 +174,14 @@ int dma_channel::wait_for_transfer() {
 }
 
 void dma_channel::cleanup() {
+	if (flag_save_buf) {
+		for (ch.buffer_id = 0; ch.buffer_id < ch.buffer_count; ++ch.buffer_id) {
+			size_t n_samps_to_save = get_nsamps_to_save(ch.buf_ptr->buffers[ch.buffer_id].buffer);
+
+			save_buf_to_file(ch.buf_ptr->buffers[ch.buffer_id].buffer, n_samps_to_save);
+		}
+	}
+
 	if (munmap(ch.buf_ptr, sizeof(channel_buffer) * ch.buffer_count) == -1) {
 		perror("munmap failed");
 	}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "axi_dsp.h"
 #include "dma-proxy.h"
 #include "rlso_const.hpp"
 

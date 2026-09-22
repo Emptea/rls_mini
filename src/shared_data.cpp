@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
 #include <pisemaphore.h>
@@ -14,6 +15,10 @@
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
 #include <stdexcept>
+#include <stdio.h>
+#include <stdlib.h>
+
+namespace fs = std::filesystem;
 
 GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220_args)) {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
@@ -50,9 +55,23 @@ GlobalData * GlobalData::instance() {
 	return &ret;
 }
 
+
 void GlobalData::initDMAs() {
+	PIString dir_path_str = "data/" + StdString2PIString(misc_get_date());
+	fs::path dir_path     = PIString2StdString(dir_path_str);
+
+	if (fs::create_directories(dir_path)) {
+		piCout << "Created directory" << dir_path_str;
+	}
+	piCout << "Save to directory" << dir_path_str;
+
 	dma_rx->init(rx_config);
-	dma_rx->set_save_to_buf();
+	PIString filename = dir_path_str + "/rls_mini_";
+	filename += StdString2PIString(misc_get_datetime());
+	filename += ".hex";
+
+	// dma_rx->set_save_to_buf();
+	dma_rx->set_save_to_file(filename, BUFFER_SIZE / sizeof(unsigned int));
 	for (size_t i = 0; i < RX_BUFFER_COUNT; i++) {
 		dma_rx_buffers[i] = dma_rx->get_buffer(i);
 	}
