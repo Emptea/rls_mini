@@ -258,9 +258,13 @@ void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 
-	auto ref          = dma_channel_buf.getRef();
-	VectorUint buffer = *ref;
-	if (ref->isEmpty()) return;
+	VectorUint buffer;
+	{ // short scope to not lock data
+		auto ref = dma_channel_buf.getRef();
+		buffer = *ref;
+	}
+
+	if (buffer.isEmpty()) return;
 	struct header * hdr = (header *)&buffer;
 	if (hdr->tp == TP_WORK) {
 		struct work_posthdr * work   = (struct work_posthdr *)(hdr + 1);
@@ -332,10 +336,12 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	}
 
 	VectorUint data;
-	auto ref = dma_channel_buf.getRef();
-	data     = (*ref);
+	{
+		auto ref = dma_channel_buf.getRef();
+		data     = (*ref);
+	}
 
-	if (!ref->isEmpty()) {
+	if (!data.isEmpty()) {
 		// ans.setData(&data[HDR_SIZE], data_cnt);
 		ans.setData(data, data_cnt);
 	} else {
