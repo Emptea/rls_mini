@@ -258,8 +258,9 @@ void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 
-	auto ref            = dma_channel_buf.getRef();
-	VectorUint buffer   = *ref;
+	auto ref          = dma_channel_buf.getRef();
+	VectorUint buffer = *ref;
+	if (ref->isEmpty()) return;
 	struct header * hdr = (header *)&buffer;
 	if (hdr->tp == TP_WORK) {
 		struct work_posthdr * work   = (struct work_posthdr *)(hdr + 1);
@@ -271,6 +272,8 @@ void GlobalData::processChannels() {
 			targets[i].D                = packet.range;
 			targets[i].vr               = static_cast<uint32_t>(std::round(VEL_MULT * (double)packet.frequency_channel));
 			targets[i].um               = (double)packet.main_amplitude / (double)packet.neighbor_amplitude;
+			targets[i].porog            = packet.rank_out * apu_k1;
+			targets[i].sp               = (double)packet.main_amplitude / (double)targets[i].porog;
 		}
 	}
 }
@@ -390,13 +393,17 @@ void GlobalData::received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg) {
 		   << "received_RR_Vr        ";
 	flags.kuvr = msg.par;
 
-	if (flags.kuvr == 1) {
-		techlaser.start(180);
+	if (techlaser.isOpened()) {
+		if (flags.kuvr == 1) {
+			techlaser.start(180);
+		} else {
+			techlaser.stop();
+		}
+		auto techlaser_state = techlaser.getState();
+		flags.vr             = (techlaser_state.motor_status == Techlaser::MotorStatus::Rotating);
 	} else {
-		techlaser.stop();
+		flags.vr = 0;
 	}
-	auto techlaser_state           = techlaser.getState();
-	flags.vr                       = (techlaser_state.motor_status == Techlaser::MotorStatus::Rotating);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
