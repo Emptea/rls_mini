@@ -66,11 +66,11 @@ int main(int argc, char * argv[]) {
 	msg.words << 1 << 2 << 3;
 	GLOBAL->sendMessage(msg);
 	*/
-	10_ms .sleep();
+	// 10_ms .sleep();
 	// 500_ms .sleep();
 
-	// kbd->start();
-	// WAIT_FOR_EXIT;
+	kbd->start();
+	WAIT_FOR_EXIT;
 
 	GLOBAL->stop();
 	// 1_s .sleep();

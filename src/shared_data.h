@@ -37,7 +37,8 @@ public:
 		.tx_spb     = 545200,
 		.rx_spb     = U220_SPB  // 4640
 	};
-	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,send_frame_size=8192,num_send_frames=256";
+	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,send_frame_size=8192,num_send_frames=256,"
+							   "fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin,enable_user_regs";
 
 	PIVector<size_t> active_boards;
 
