@@ -273,11 +273,17 @@ void GlobalData::processChannels() {
 		time_delayed                 = static_cast<uint32_t>(std::round((double)(hdr->packet_number - work->packet_number) * 46.4e-3));
 		for (size_t i = 0; i < nes; i++) {
 			struct work_packet & packet = packets[i];
-			targets[i].D                = packet.range;
-			targets[i].vr               = static_cast<uint32_t>(std::round(VEL_MULT * (double)packet.frequency_channel));
-			targets[i].um               = (double)packet.main_amplitude / (double)packet.neighbor_amplitude;
-			targets[i].porog            = packet.rank_out * apu_k1;
-			targets[i].sp               = (double)packet.main_amplitude / (double)targets[i].porog;
+			struct target targ;
+			targ.az    = delayed_az;
+			targ.um    = (double)packet.main_amplitude / (double)packet.neighbor_amplitude;
+			targ.D     = packet.range;
+			targ.porog = packet.rank_out * apu_k1;
+			targ.sp    = (double)packet.main_amplitude / (double)targets[i].porog;
+			targ.amp   = (double)packet.main_amplitude;
+			targ.vr    = static_cast<uint32_t>(std::round(VEL_MULT * (double)packet.frequency_channel));
+			targ.dum   = 1;
+			targ.tn    = 0;
+			targets.append(targ);
 		}
 	}
 }

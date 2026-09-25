@@ -170,18 +170,18 @@ private:
 		uint16_t sp    = 0; // Отношение сигнал/порог, 0.5 дБ
 		uint16_t amp   = 0; // Амплитуда сигнала цели, 0.5 дБ
 		int16_t vr     = 0; // Радиальная скорость, 1 м/с
+		union {
+			uint8_t bits = 0;
+			struct {
+				uint8_t _reserve0: 6;
+				uint8_t tn       : 1; // Признак тренажной цели
+				uint8_t dum      : 1; // Признак достоверности измерения угла места цели
+			};
+		};
 	};
 
 	PIVector<target> targets;
 
-	union {
-		uint8_t bits = 0;
-		struct {
-			uint8_t _reserve0: 6;
-			uint8_t tn       : 1; // Признак тренажной цели
-			uint8_t dum      : 1; // Признак достоверности измерения угла места цели
-		};
-	};
 
 	dma_channel * dma_rx;
 	void * dma_rx_buffers[RX_BUFFER_COUNT];
