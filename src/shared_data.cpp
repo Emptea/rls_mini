@@ -265,7 +265,7 @@ void GlobalData::processChannels() {
 	}
 
 	if (buffer.isEmpty()) return;
-	struct header * hdr = (header *)&buffer;
+	struct header * hdr = (header *)buffer.data();
 	if (hdr->tp == TP_WORK) {
 		struct work_posthdr * work   = (struct work_posthdr *)(hdr + 1);
 		struct work_packet * packets = reinterpret_cast<struct work_packet *>(work + 1);
