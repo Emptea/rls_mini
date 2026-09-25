@@ -258,25 +258,21 @@ void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 
-	auto ref = dma_channel_buf.getRef();
-	VectorUint buffers = *ref;
-	for (size_t i; i << buffers.size(); i++){
-		
+	auto ref            = dma_channel_buf.getRef();
+	VectorUint buffer   = *ref;
+	struct header * hdr = (header *)&buffer;
+	if (hdr->tp == TP_WORK) {
+		struct work_posthdr * work   = (struct work_posthdr *)(hdr + 1);
+		struct work_packet * packets = reinterpret_cast<struct work_packet *>(work + 1);
+		nes                          = work->n_work_packets;
+		time_delayed                 = static_cast<uint32_t>(std::round((double)(hdr->packet_number - work->packet_number) * 46.4e-3));
+		for (size_t i = 0; i < nes; i++) {
+			struct work_packet & packet = packets[i];
+			targets[i].D                = packet.range;
+			targets[i].vr               = static_cast<uint32_t>(std::round(VEL_MULT * (double)packet.frequency_channel));
+			targets[i].um               = (double)packet.main_amplitude / (double)packet.neighbor_amplitude;
+		}
 	}
-
-	// 	PIMap<int, VectorComplexS> channels;
-	// 	bool all_channels = true;
-	// 	{ // start work with "getRef"
-	// 		auto ref = dma_channel_buf.getRef();
-
-	// 		channels = *ref; // copy data
-
-	// 		for (int ch = 0; ch < 8; ++ch) {
-	// 			if (!(*ref)[ch].isEmpty()) {
-	// 				(*ref)[ch].clear(); // clear input data
-	// 			}
-	// 		}
-	// 	} // desctuct "ref", release current_channels
 }
 
 

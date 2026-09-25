@@ -11,6 +11,10 @@
 #define NUM_CHANNELS_TX 8
 #define NUM_CHANNELS_RX 1
 
+#define LAMBDA                   (0.0325)
+#define FREQUENCY                (21551.7)
+#define VEL_MULT                 (FREQUENCY * LAMBDA / 512.0 / 2.0)
+
 
 #include <pivector.h>
 #include <pimathcomplex.h>

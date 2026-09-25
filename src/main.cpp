@@ -61,19 +61,11 @@ int main(int argc, char * argv[]) {
 	GLOBAL->start();
 	piCout << "started";
 
-	/*
-	Protocol_RLS_Mini::POI_TK_Kvit msg;
-	msg.words << 1 << 2 << 3;
-	GLOBAL->sendMessage(msg);
-	*/
-	10_ms .sleep();
-	// 500_ms .sleep();
-
-	// kbd->start();
-	// WAIT_FOR_EXIT;
+	kbd->start();
+	WAIT_FOR_EXIT;
 
 	GLOBAL->stop();
-	// 1_s .sleep();
+	1_s .sleep();
 	piCout << "stop done";
 
 	piDeleteSafety(kbd);

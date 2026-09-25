@@ -158,10 +158,8 @@ int dma_channel::wait_for_transfer() {
 
 		if (flag_save_buf) {
 			// save_buf_to_file(ch.buf_ptr->buffers[ch.buffer_id].buffer, n_samps_per_buf);
-			if (ch.buffer_id == 0) {
-				rx_queue.emplace(ch.buf_ptr->buffers[ch.buffer_id].buffer, (BUFFER_SIZE / sizeof(unsigned int)) * RX_BUFFER_COUNT);
-				received();
-			}
+			rx_queue.emplace(ch.buf_ptr->buffers[ch.buffer_id].buffer, (BUFFER_SIZE / sizeof(unsigned int)) * RX_BUFFER_COUNT);
+			received();
 		}
 		auto * buffer = ch.buf_ptr->buffers[ch.buffer_id].buffer;
 		ch.in_progress_count--;

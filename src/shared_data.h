@@ -37,7 +37,8 @@ public:
 		.tx_spb     = 545200,
 		.rx_spb     = U220_SPB  // 4640
 	};
-	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,send_frame_size=8192,num_send_frames=256";
+	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,send_frame_size=8192,num_send_frames=256,"
+							   "fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin,enable_user_regs";
 
 	PIVector<size_t> active_boards;
 
@@ -159,15 +160,20 @@ private:
 	                    // ...
 	                    // uint16_t[nes]
 
+	struct target {
+		uint16_t n     = 0;
+		uint32_t time  = 0;
+		uint16_t az    = 0;
+		int16_t um     = 0; // Угол места
+		uint16_t D     = 0; // Дальность, 1 м
+		uint16_t porog = 0; // Порог обнаружения, 0.5 дБ
+		uint16_t sp    = 0; // Отношение сигнал/порог, 0.5 дБ
+		uint16_t amp   = 0; // Амплитуда сигнала цели, 0.5 дБ
+		int16_t vr     = 0; // Радиальная скорость, 1 м/с
+	};
 
-	uint16_t N     = 0; // Номер КТА
-	uint16_t az    = 0; // Азимут
-	int16_t um     = 0; // Угол места
-	uint16_t D     = 0; // Дальность, 1 м
-	uint16_t porog = 0; // Порог обнаружения, 0.5 дБ
-	uint16_t sp    = 0; // Отношение сигнал/порог, 0.5 дБ
-	uint16_t amp   = 0; // Амплитуда сигнала цели, 0.5 дБ
-	int16_t vr     = 0; // Радиальная скорость, 1 м/с
+	PIVector<target> targets;
+
 	union {
 		uint8_t bits = 0;
 		struct {
