@@ -93,13 +93,13 @@ void Techlaser::packetReceived(PIByteArray msg) {
 		break;
 	case 'c':
 		if (args.size() < 1) return;
-		state.getRef()->current_angle = args[0].toFloat();
-		receive_tm.reset();
+		auto ref                     = state.getRef();
+		ref->current_angle           = args[0].toFloat();
+		ref->angle_receive_timestamp = PISystemTime::current();
 		break;
 	case 'd':
 		if (args.size() < 1) return;
 		state.getRef()->current_speed = args[0].toFloat();
-		receive_tm.reset();
 		break;
 	default: break;
 	}
@@ -107,7 +107,17 @@ void Techlaser::packetReceived(PIByteArray msg) {
 
 
 Techlaser::State Techlaser::getState() const {
-	auto ref             = state.getRef();
-	ref->receive_elapsed = receive_tm.elapsed();
-	return *ref;
+	return *state.getRef();
+}
+
+
+double Techlaser::getAngleAgo(PISystemTime ago) const {
+	auto s              = getState();
+	PISystemTime now    = PISystemTime::current();
+	PISystemTime target = now - ago;
+	PISystemTime dt     = target - s.angle_receive_timestamp;
+	double angle        = s.current_angle + s.current_speed * dt.toSeconds();
+	angle               = std::fmod(angle, 360.0);
+	if (angle < 0.0) angle += 360.0;
+	return angle;
 }
