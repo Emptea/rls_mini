@@ -36,7 +36,7 @@ public:
 		bool motor_error           = false;
 		float current_angle        = 0.f; // 0 - 360
 		float current_speed        = 0.f; // °/c
-		PISystemTime receive_elapsed;     // since last receive
+		PISystemTime angle_receive_timestamp;
 	};
 
 	// open serial, starts receive
@@ -56,6 +56,7 @@ public:
 
 	// current state
 	State getState() const;
+	double getAngleAgo(PISystemTime ago) const;
 
 private:
 	void packetReceived(PIByteArray msg);
@@ -63,7 +64,7 @@ private:
 	PIThread req_thread;
 	PISerial ser;
 	PIPacketExtractor pext;
-	PITimeMeasurer receive_tm;
+	PITimeMeasurer angle_receive_tm;
 	mutable PIProtectedVariable<State> state;
 };
 
