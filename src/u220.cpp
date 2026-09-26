@@ -315,32 +315,32 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 	switch (err) {
 	case uhd::rx_metadata_t::ERROR_CODE_TIMEOUT: {
 		stats.rx_timeouts++;
-		piCout << "Timeout in recv";
+		piCout << "Timeout in recv for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_LATE_COMMAND: {
 		stats.rx_late_commands++;
-		piCout << "Late command in recv";
+		piCout << "Late command in for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_BROKEN_CHAIN: {
 		stats.rx_broken_chains++;
-		piCout << "Broken chain in recv";
+		piCout << "Broken chain in for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW: {
 		stats.rx_overflows++;
-		piCout << "Overflow in recv";
+		piCout << "Overflow in for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_ALIGNMENT: {
 		stats.rx_alignment_errors++;
-		piCout << "Wrong code aligment in recv";
+		piCout << "Wrong code aligment in for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_BAD_PACKET: {
 		stats.rx_bad_packets++;
-		piCout << "Bad packet in recv";
+		piCout << "Bad packet in for" << serial;
 		break;
 	}
 	default: {

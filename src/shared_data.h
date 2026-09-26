@@ -163,7 +163,7 @@ private:
 	struct target {
 		uint16_t n     = 0;
 		uint32_t time  = 0;
-		uint16_t az    = 0;
+		double az    = 0;
 		int16_t um     = 0; // Угол места
 		uint16_t D     = 0; // Дальность, 1 м
 		uint16_t porog = 0; // Порог обнаружения, 0.5 дБ
@@ -180,7 +180,8 @@ private:
 		};
 	};
 
-	PIVector<target> targets;
+	void send_KTA_VO(struct target targ);
+	void send_PI();
 
 
 	dma_channel * dma_rx;

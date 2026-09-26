@@ -274,26 +274,45 @@ void GlobalData::processChannels() {
 		for (size_t i = 0; i < nes; i++) {
 			struct work_packet & packet = packets[i];
 			struct target targ;
-			targ.az    = delayed_az;
+			targ.az    = az_delayed;
 			targ.um    = (double)packet.main_amplitude / (double)packet.neighbor_amplitude;
 			targ.D     = packet.range;
 			targ.porog = packet.rank_out * apu_k1;
-			targ.sp    = (double)packet.main_amplitude / (double)targets[i].porog;
+			targ.sp    = (double)packet.main_amplitude / (double)targ.porog;
 			targ.amp   = (double)packet.main_amplitude;
 			targ.vr    = static_cast<uint32_t>(std::round(VEL_MULT * (double)packet.frequency_channel));
 			targ.dum   = 1;
 			targ.tn    = 0;
-			targets.append(targ);
+			send_KTA_VO(targ);
 		}
 	}
 }
 
+void GlobalData::send_KTA_VO(struct target targ) {
+	Protocol_RLS_Mini::KTA_VO ans;
+	ans.az = targ.az;
+	ans.setDegreesUm(targ.um);
+	ans.D     = targ.D;
+	ans.porog = targ.porog;
+	ans.sp    = targ.sp;
+	ans.amp   = targ.amp;
+	ans.vr    = targ.vr;
+	ans.dum   = targ.dum;
+	ans.tn    = targ.tn;
+	global->sendMessage(ans);
+}
+
+void GlobalData::send_PI() {
+	Protocol_RLS_Mini::PI ans;
+
+	global->sendMessage(ans);
+}
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
-	piCout << "rec msg"
-		   << "received_POI_TK_Zapros";
+	// piCout << "rec msg"
+	// 	   << "received_POI_TK_Zapros";
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
-	piCout << "rec msg kt" << msg.kt;
+	// piCout << "rec msg kt" << msg.kt;
 	axi_dsp_set_output_source(msg.kt, msg.nkan, msg.reg_takt);
 	axi_dsp_apply();
 	req_test_channel = msg.kt;
@@ -523,3 +542,4 @@ void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
+

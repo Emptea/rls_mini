@@ -57,7 +57,7 @@ void Techlaser::start(float rotate_speed_deg_s) {
 	req_thread.lock();
 	ser.write("$i,%1#"_a.arg(rotate_speed_deg_s).toAscii());
 	req_thread.unlock();
-	req_thread.start(20_Hz); /// TODO: set desired rate
+	req_thread.start(100_Hz); /// TODO: set desired rate
 }
 
 
