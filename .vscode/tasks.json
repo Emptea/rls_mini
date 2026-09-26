@@ -1,0 +1,57 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "RLS Mini: Configure",
+            "type": "process",
+            "command": "cmake",
+            "args": [
+                "-S",
+                "${workspaceFolder}/src",
+                "-B",
+                "${workspaceFolder}/build",
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DCMAKE_TOOLCHAIN_FILE=/share/toolchain.cmake",
+                "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "RLS Mini: Build",
+            "type": "process",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build",
+                "--target",
+                "install",
+                "-j3"
+            ],
+            "dependsOn": "RLS Mini: Configure",
+            "dependsOrder": "sequence",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "RLS Mini: Copy to board",
+            "type": "process",
+            "command": "scp",
+            "args": [
+                "${workspaceFolder}/bin/rls_mini",
+                "ubuntu@172.16.0.123:~/rls_mini/bin"
+            ],
+            "dependsOn": "RLS Mini: Build",
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
+            "label": "RLS Mini: Build and copy to board",
+            "dependsOn": "RLS Mini: Copy to board",
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
