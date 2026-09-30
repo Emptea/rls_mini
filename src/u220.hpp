@@ -126,7 +126,7 @@ public:
 	void start_sync();
 	bool sync();
 
-	void start_transmission(double start_time);
+	void start_transmission();
 	void transmit();
 	void stop_transmission();
 

@@ -95,9 +95,9 @@ void GlobalData::start() {
 	startEth();
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		// u220_ptrs[active_boards[i]]->start_reception(4.64+180*0.2e-6);
-		double start_time = 4.64 + 5;
-		u220_ptrs[active_boards[i]]->start_reception(start_time - 60 * 0.2e-6 - 46.4e-5);
-		u220_ptrs[active_boards[i]]->start_transmission(start_time);
+		double start_time = 0.05;
+		u220_ptrs[active_boards[i]]->start_reception(start_time);
+		u220_ptrs[active_boards[i]]->start_transmission();
 	}
 }
 

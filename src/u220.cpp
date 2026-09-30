@@ -1,5 +1,7 @@
 #include "u220.hpp"
 
+#include "user_regs.h"
+
 #include <pistring_std.h>
 
 // clang-format off
@@ -152,6 +154,8 @@ void U220::setup_tx_streamer() {
 
 	// Pre-fill buffer with waveform
 	fill_buffer_with_wavetable(tx_buffer);
+
+	set_sr_core_tx_delay(usrp, 0x03, 0x30);
 }
 
 void U220::setup_rx_streamer() {
@@ -172,6 +176,7 @@ void U220::setup_rx_streamer() {
 	for (size_t ch = 0; ch < 2; ch++) {
 		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
 	}
+	set_sr_core_rx_delay(usrp, 0xFD);
 }
 
 void U220::set_pps_source() {
@@ -272,7 +277,7 @@ void U220::transmit() {
 	// piCout << PISystemTime::current() << " " << num_samps;
 	tx_metadata.start_of_burst = false;
 	tx_metadata.has_time_spec  = false;
-	tx_metadata.time_spec      = usrp->get_time_now() + uhd::time_spec_t(0.01);
+	tx_metadata.time_spec      = usrp->get_time_now() + uhd::time_spec_t(0.05);
 	stats.tx_packet_cnt += num_samps;
 }
 
@@ -335,8 +340,8 @@ void U220::receive() {
 
 bool U220::sync() {
 	PISystemTime sync_time = PISystemTime::current();
-	if (!usrp || !tx_stream) {
-		std::cerr << "USRP not properl	y initialized!" << std::endl;
+	if (!usrp) {
+		std::cerr << "USRP not properly initialized!" << std::endl;
 		return false;
 	}
 
@@ -367,16 +372,9 @@ void U220::start_sync() {
 	sync_thread.startOnce([this]() { status.on = sync(); });
 }
 
-void U220::start_transmission(double start_time) {
-	// Setup tx_metadata
-	tx_metadata.start_of_burst = true;
-	tx_metadata.end_of_burst   = false;
-	tx_metadata.has_time_spec  = true;
-	tx_metadata.time_spec      = uhd::time_spec_t(start_time);
-
-	status.tx_on[0]            = true;
-	status.tx_on[1]            = true;
-	tx_thread.start([this]() { transmit(); });
+void U220::start_transmission() {
+	set_sr_core_play_enable(usrp, 1);
+	set_sr_core_play_gain_on_enable(usrp, 1);
 	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 }
 
@@ -388,8 +386,10 @@ void U220::start_reception(double settling_time) {
 	// setup streaming
 	rx_stream_cmd.num_samps  = board_config.rx_spb;
 	rx_stream_cmd.stream_now = false;
-	rx_stream_cmd.time_spec  = uhd::time_spec_t(settling_time);
+	rx_stream_cmd.time_spec  = uhd::time_spec_t(0.05);
+	// rx_stream_cmd.time_spec  = uhd::time_spec_t(0, 4640, 5e6);
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
+	set_sr_core_play_rx_enable(usrp, 1);
 
 	status.rx_on[0] = true;
 	status.rx_on[1] = true;
@@ -398,14 +398,16 @@ void U220::start_reception(double settling_time) {
 }
 
 void U220::stop_transmission() {
-	tx_thread.stopAndWait();
-	if (tx_stream) {
-		tx_metadata.end_of_burst = true;		
-		tx_stream->send("", 0, tx_metadata);
-		std::cout << "Stream tx stopped." << std::endl;
-	} else {
-		std::cout << "No stream to stop." << std::endl << std::endl;
-	}
+	set_sr_core_play_enable(usrp, 0);
+	set_sr_core_play_gain_on_enable(usrp, 0);
+	// tx_thread.stopAndWait();
+	// if (tx_stream) {
+	// 	tx_metadata.end_of_burst = true;
+	// 	tx_stream->send("", 0, tx_metadata);
+	// 	std::cout << "Stream tx stopped." << std::endl;
+	// } else {
+	// 	std::cout << "No stream to stop." << std::endl << std::endl;
+	// }
 }
 
 void U220::stop_reception() {
