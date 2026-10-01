@@ -334,8 +334,7 @@ void U220::receive() {
 	stats.rx_packet_cnt += num_rx_samps;
 	stats.cycles_completed++;
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
-		piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << " at " << rx_metadata.time_spec.get_real_secs() << "."
-			   << rx_metadata.time_spec.get_frac_secs();
+		piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt;
 		PRINT_U220_STATS(stats);
 	}
 }
@@ -383,6 +382,7 @@ void U220::start_transmission() {
 
 void U220::start_reception(double settling_time) {
 	const double rate = usrp->get_rx_rate();
+	auto start_time   = usrp->get_time_now() + uhd::time_spec_t(settling_time);
 	rx_burst_pkt_time = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
 	rx_timeout        = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
 	
@@ -391,7 +391,7 @@ void U220::start_reception(double settling_time) {
 	print_config(board_config);
 	rx_stream_cmd.num_samps  = board_config.rx_spb;
 	rx_stream_cmd.stream_now = false;
-	rx_stream_cmd.time_spec  = uhd::time_spec_t(0.05);
+	rx_stream_cmd.time_spec  = start_time;
 	// rx_stream_cmd.time_spec  = uhd::time_spec_t(0, 4640, 5e6);
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
 
