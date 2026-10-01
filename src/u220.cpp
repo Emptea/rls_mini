@@ -325,16 +325,17 @@ void U220::receive() {
 	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
 
-	for (int ch: {0, 1}) {
-		auto ch_ptr = rx_queue[ch].getRef();
-		ch_ptr->push_back(rx_buffer[ch]);
-	}
+	// for (int ch: {0, 1}) {
+	// 	auto ch_ptr = rx_queue[ch].getRef();
+	// 	ch_ptr->push_back(rx_buffer[ch]);
+	// }
 
 	rx_errors_worker(rx_metadata.error_code);
 	stats.rx_packet_cnt += num_rx_samps;
 	stats.cycles_completed++;
+	piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt << "hdr is"
+		   << *((uint32_t *)rx_buffer_ptrs[0]) << "for" << serial;
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
-		piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt;
 		PRINT_U220_STATS(stats);
 	}
 }
@@ -385,7 +386,7 @@ void U220::start_reception(double settling_time) {
 	auto start_time   = usrp->get_time_now() + uhd::time_spec_t(settling_time);
 	rx_burst_pkt_time = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
 	rx_timeout        = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
-	
+
 	// setup streaming
 	set_sr_core_play_rx_enable(usrp, 1);
 	print_config(board_config);

@@ -28,10 +28,10 @@ public:
 		.rx_bw      = {56e6, 56e6},
 		.ref        = "internal",
 		.cpu_format = "sc16",
-		.otw_format = "sc12",
+		.otw_format = "sc16",
 		.pps        = "internal",
 		.tx_spb     = 545200,
-		.rx_spb     = 4640
+		.rx_spb     = (4640 + 20)
     };
 	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,send_frame_size=8192,num_send_frames=256,type=b200,enable_user_"
 	                           "regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";

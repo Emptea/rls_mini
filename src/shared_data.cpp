@@ -150,18 +150,18 @@ void GlobalData::u220_recv() {
 
 	auto packet_cnt = u220_ptrs[active_boards[0]]->get_stats().rx_packet_cnt;
 
-	if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 1000) == 0) {
-		for (const auto board_index: active_boards) {
-			auto * board = u220_ptrs[board_index];
-			auto ref1    = current_channels.getRef();
-			auto ref2    = adc_channels.getRef();
-			for (int channel: {0, 1}) {
-				const int global_channel = 2 * board_index + channel;
-				(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
-			}
-		}
-		notifier_channels.notify();
-	}
+	// if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 1000) == 0) {
+	// 	for (const auto board_index: active_boards) {
+	// 		auto * board = u220_ptrs[board_index];
+	// 		auto ref1    = current_channels.getRef();
+	// 		auto ref2    = adc_channels.getRef();
+	// 		for (int channel: {0, 1}) {
+	// 			const int global_channel = 2 * board_index + channel;
+	// 			(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
+	// 		}
+	// 	}
+	// 	notifier_channels.notify();
+	// }
 }
 
 void GlobalData::u220_stop_and_drain_rx() {
