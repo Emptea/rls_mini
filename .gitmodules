@@ -1,0 +1,3 @@
+[submodule "rls_fpga"]
+	path = rls_fpga
+	url = https://github.com/ki4igin/rls_fpga.git
