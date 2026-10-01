@@ -156,6 +156,7 @@ void U220::setup_tx_streamer() {
 	fill_buffer_with_wavetable(tx_buffer);
 
 	set_sr_core_tx_delay(usrp, 0x03, 0x30);
+	set_sr_core_play_gpio_tx_enable(usrp, 0b11);
 }
 
 void U220::setup_rx_streamer() {
@@ -177,6 +178,7 @@ void U220::setup_rx_streamer() {
 		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
 	}
 	set_sr_core_rx_delay(usrp, 0xFD);
+	set_sr_core_play_gpio_rx_enable(usrp, 0b11);
 }
 
 void U220::set_pps_source() {

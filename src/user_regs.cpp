@@ -98,6 +98,22 @@ void set_sr_core_play_rx_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t rx_en
 	std::cout << boost::format("0x%016X") % raw_got << std::endl;
 }
 
+void set_sr_core_play_gpio_tx_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t gpio_enable) {
+	play_ctrl_un.play_ctrl.GPIO_TX_ENABLE = gpio_enable;
+
+	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
+	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
+	std::cout << boost::format("0x%016X") % raw_got << std::endl;
+}
+
+void set_sr_core_play_gpio_rx_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t gpio_enable) {
+	play_ctrl_un.play_ctrl.GPIO_RX_ENABLE = gpio_enable;
+
+	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
+	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
+	std::cout << boost::format("0x%016X") % raw_got << std::endl;
+}
+
 void set_sr_core_tx_delay_del_dac(uhd::usrp::multi_usrp::sptr usrp, uint32_t del_dac) {
 	tx_delay_un.tx_delay.del_dac = del_dac;
 
