@@ -17,6 +17,10 @@ class GlobalData
 	, public GlobalDataEth {
 	PIOBJECT(GlobalData)
 
+private:
+	PISystemTime t_start;
+	PISystemTime t_end;
+
 public:
 	UHD_UTILS uhd_utils;
 	PIVector<U220 *> u220_ptrs;

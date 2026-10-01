@@ -46,8 +46,16 @@ void GlobalData::init() {
 			active_boards.push_back(i);
 			u220_ptrs[i]->init(dma.get_tx_buffer(2 * i), dma.get_tx_buffer(2 * i + 1));
 			dit++;
+			ispr_kan |= (1 << 2 * i);
+			ispr_kan |= (1 << 2 * i + 1);
 		}
 	}
+	axi_dsp_configure();
+	axi_dsp_set_output_source(1, 0, 0);
+	auto v = axi_dsp_get_output_source();
+	piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE << "\n";
+	axi_dsp_set_channel_mask((uint32_t)ispr_kan);
+	axi_dsp_apply();
 	// sync();
 }
 
@@ -95,6 +103,7 @@ void GlobalData::start() {
 			if (u220_recv_thread.isStopping()) u220_stop_and_drain_rx();
 		});
 	}
+	t_start = PISystemTime::current();
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		u220_ptrs[active_boards[i]]->start_transmission();
 	}
@@ -110,6 +119,14 @@ void GlobalData::stop() {
 	}
 	piDeleteAllAndClear(u220_ptrs);
 	active_boards.clear();
+	axi_dsp_deinit();
+	t_end = PISystemTime::current();
+	piCout << "====";
+	if (dma.get_completed() > 0) {
+		piCout << "Mean: transfer time = " << (t_end - t_start) / dma.get_completed();
+	}
+	piCout << "====";
+	dma.cleanup();
 }
 
 void GlobalData::processChannels() {
@@ -148,31 +165,31 @@ void GlobalData::u220_recv() {
 		u220_ptrs[board_index]->receive();
 	}
 
-	if (dma.can_send()) {
-		int ret = dma.send();
-		if (ret != 0) {
-			fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
-		}
-	}
-	int ret = dma.receive();
+	// if (dma.can_send()) {
+	int ret = dma.send();
 	if (ret != 0) {
-		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
+		fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
 	}
-	void * rx_buffer = dma.get_rx_buffer();
+	// }
+	// int ret = dma.receive();
+	// if (ret != 0) {
+	// 	fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
+	// }
+	// void * rx_buffer = dma.get_rx_buffer();
 	auto packet_cnt = u220_ptrs[active_boards[0]]->get_stats().rx_packet_cnt;
 
-	if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 1000) == 0) {
-		for (const auto board_index: active_boards) {
-			auto * board = u220_ptrs[board_index];
-			auto ref1    = current_channels.getRef();
-			auto ref2    = adc_channels.getRef();
-			for (int channel: {0, 1}) {
-				const int global_channel = 2 * board_index + channel;
-				(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
-			}
-		}
-		notifier_channels.notify();
-	}
+	// if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 1000) == 0) {
+	// 	for (const auto board_index: active_boards) {
+	// 		auto * board = u220_ptrs[board_index];
+	// 		auto ref1    = current_channels.getRef();
+	// 		auto ref2    = adc_channels.getRef();
+	// 		for (int channel: {0, 1}) {
+	// 			const int global_channel = 2 * board_index + channel;
+	// 			(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
+	// 		}
+	// 	}
+	// 	notifier_channels.notify();
+	// }
 }
 
 void GlobalData::u220_stop_and_drain_rx() {

@@ -325,10 +325,10 @@ void U220::receive() {
 	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
 
-	for (int ch: {0, 1}) {
-		auto ch_ptr = rx_queue[ch].getRef();
-		ch_ptr->push_back(rx_buffer[ch]);
-	}
+	// for (int ch: {0, 1}) {
+	// 	auto ch_ptr = rx_queue[ch].getRef();
+	// 	ch_ptr->push_back(rx_buffer[ch]);
+	// }
 
 	rx_errors_worker(rx_metadata.error_code);
 	stats.rx_packet_cnt += num_rx_samps;
