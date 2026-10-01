@@ -130,7 +130,16 @@ void set_sr_core_play_start_pulse_40m(uhd::usrp::multi_usrp::sptr usrp, uint32_t
 	std::cout << boost::format("0x%016X") % raw_got << std::endl;
 }
 
-void set_sr_core_play_start_tx(uhd::usrp::multi_usrp::sptr usrp) {
+void set_sr_core_play_rx_insert_count(uhd::usrp::multi_usrp::sptr usrp, uint32_t rx_insert_count) {
+	play_ctrl_un.play_ctrl.rx_insert_count = rx_insert_count;
+
+	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
+	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
+	std::cout << boost::format("0x%016X") % raw_got << std::endl;
+}
+
+
+	void set_sr_core_play_start_tx(uhd::usrp::multi_usrp::sptr usrp) {
 	play_ctrl_un.play_ctrl.enable             = 1;
 	play_ctrl_un.play_ctrl.gain_on_enable     = 1;
 	play_ctrl_un.play_ctrl.start_pulse_enable = 1;
