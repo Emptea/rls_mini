@@ -16,19 +16,6 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 	for (int i = 0; i < serial_list.size(); i++) {
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
 		u220_ptrs << u;
-		int u_channels[2] = {2 * i, 2 * i + 1};
-
-
-		CONNECTL(u, received, ([this, u_channels, u] { // grab local "u" and "u_channels" as copies
-					 auto ref1 = current_channels.getRef();
-					 auto ref2 = adc_channels.getRef();
-					 for (int i: {0, 1}) {                        // 0 and 1 - index in U220, doesn`t change!
-						 int global_channel      = u_channels[i]; // 0 - 7
-						 (*ref1)[global_channel] = (*ref2)[global_channel] =
-							 u->take_rx_queue_and_clear(i); // or something else ... grab your 0/1 channel data
-					 }
-					 notifier_channels.notify();
-				 }));
 	}
 
 	process_thread.start([this] { processChannels(); });
@@ -36,6 +23,7 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 
 
 GlobalData::~GlobalData() {
+	u220_recv_thread.stopAndWait();
 	process_thread.stop();          // mark thread for stop
 	notifier_channels.notify();     // notify thread
 	process_thread.waitForFinish(); // wait for thread really finish
@@ -54,13 +42,13 @@ void GlobalData::init() {
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
-		if (StdString2PIString(dit->first) == u220_ptrs[i]->get_serial() & dit != devices.end()) {
+		if (dit != devices.end() && StdString2PIString(dit->first) == u220_ptrs[i]->get_serial()) {
 			u220_ptrs[i]->init();
 			active_boards.push_back(i);
 			dit++;
 		}
 	}
-	sync();
+	// sync();
 }
 
 
@@ -95,20 +83,33 @@ void GlobalData::start() {
 	startEth();
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		// u220_ptrs[active_boards[i]]->start_reception(4.64+180*0.2e-6);
-		double start_time = 0.05;
+		u220_ptrs[active_boards[i]]->set_time_sync();
+		double start_time = 0.1;
 		u220_ptrs[active_boards[i]]->start_reception(start_time);
+	}
+	0.1_s .sleep();
+	for (size_t i = 0; i < active_boards.size(); i++) {
 		u220_ptrs[active_boards[i]]->start_transmission();
+	}
+
+	if (!active_boards.isEmpty()) {
+		u220_recv_thread.start([this] {
+			u220_recv();
+			if (u220_recv_thread.isStopping()) u220_stop_and_drain_rx();
+		});
 	}
 }
 
 
 void GlobalData::stop() {
+	u220_recv_thread.stopAndWait();
 	stopEth();
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		u220_ptrs[active_boards[i]]->stop_reception();
 		u220_ptrs[active_boards[i]]->stop_transmission();
 	}
 	piDeleteAllAndClear(u220_ptrs);
+	active_boards.clear();
 }
 
 void GlobalData::processChannels() {
@@ -142,6 +143,32 @@ void GlobalData::processChannels() {
 	// adc_channels = channels;
 }
 
+void GlobalData::u220_recv() {
+	if (active_boards.isEmpty()) return;
+
+	for (const auto board_index: active_boards) {
+		u220_ptrs[board_index]->receive();
+	}
+	auto packet_cnt = u220_ptrs[active_boards[0]]->get_stats().rx_packet_cnt;
+	if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 5000) == 0) {
+		for (const auto board_index: active_boards) {
+			auto * board = u220_ptrs[board_index];
+			auto ref1    = current_channels.getRef();
+			auto ref2    = adc_channels.getRef();
+			for (int channel: {0, 1}) {
+				const int global_channel = 2 * board_index + channel;
+				(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
+			}
+		}
+		notifier_channels.notify();
+	}
+}
+
+void GlobalData::u220_stop_and_drain_rx() {
+	for (const auto board_index: active_boards) {
+		u220_ptrs[board_index]->stop_and_drain_rx();
+	}
+}
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	piCout << "rec msg" << "received_POI_TK_Zapros";

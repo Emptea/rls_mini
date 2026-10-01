@@ -62,10 +62,14 @@ private:
 	GlobalData();
 	~GlobalData();
 
+	void u220_stop_and_drain_rx();
+	void u220_recv();
+
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
 	PIThreadNotifier notifier_channels;
 	PIThread process_thread;
+	PIThread u220_recv_thread;
 
 	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
 	VectorComplexS zero_vector;

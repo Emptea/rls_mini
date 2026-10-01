@@ -64,7 +64,7 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 	: serial(serial)
 	, device_args(args)
 	, user_config(config)
-	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS  
+	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS
                                      : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE) {}
 
 U220::~U220() {}
@@ -287,32 +287,32 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 	switch (err) {
 	case uhd::rx_metadata_t::ERROR_CODE_TIMEOUT: {
 		stats.rx_timeouts++;
-		piCout << "Timeout in recv";
+		piCout << "Timeout in recv for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_LATE_COMMAND: {
 		stats.rx_late_commands++;
-		piCout << "Late command in recv";
+		piCout << "Late command in recv for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_BROKEN_CHAIN: {
 		stats.rx_broken_chains++;
-		piCout << "Broken chain in recv";
+		piCout << "Broken chain in recv for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW: {
 		stats.rx_overflows++;
-		piCout << "Overflow in recv";
+		piCout << "Overflow in recv for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_ALIGNMENT: {
 		stats.rx_alignment_errors++;
-		piCout << "Wrong code aligment in recv";
+		piCout << "Wrong code aligment in recv for" << serial;
 		break;
 	}
 	case uhd::rx_metadata_t::ERROR_CODE_BAD_PACKET: {
 		stats.rx_bad_packets++;
-		piCout << "Bad packet in recv";
+		piCout << "Bad packet in recv for" << serial;
 		break;
 	}
 	default: {
@@ -331,11 +331,11 @@ void U220::receive() {
 	}
 
 	rx_errors_worker(rx_metadata.error_code);
-	// piCout << "Received " << num_rx_samps << " at " << rx_metadata.time_spec.get_real_secs() << "." << rx_metadata.time_spec.get_frac_secs();
 	stats.rx_packet_cnt += num_rx_samps;
-	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0)
-	{
-		received();
+	stats.cycles_completed++;
+	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
+		piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << " at " << rx_metadata.time_spec.get_real_secs() << "."
+			   << rx_metadata.time_spec.get_frac_secs();
 		PRINT_U220_STATS(stats);
 	}
 }
@@ -375,33 +375,38 @@ void U220::start_sync() {
 }
 
 void U220::start_transmission() {
-	set_sr_core_play_enable(usrp, 1);
-	set_sr_core_play_gain_on_enable(usrp, 1);
+	// set_sr_core_play_enable(usrp, 1);
+	// set_sr_core_play_gain_on_enable(usrp, 1);
+	set_sr_core_play_start_tx(usrp); // sets enable, gain_on_enable, start_pulse_enable, start_pulse_40m
 	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 }
 
 void U220::start_reception(double settling_time) {
-	const double rate        = usrp->get_rx_rate();
-	rx_burst_pkt_time        = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
-	rx_timeout               = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
-
+	const double rate = usrp->get_rx_rate();
+	rx_burst_pkt_time = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
+	rx_timeout        = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
+	
 	// setup streaming
+	set_sr_core_play_rx_enable(usrp, 1);
+	print_config(board_config);
 	rx_stream_cmd.num_samps  = board_config.rx_spb;
 	rx_stream_cmd.stream_now = false;
 	rx_stream_cmd.time_spec  = uhd::time_spec_t(0.05);
 	// rx_stream_cmd.time_spec  = uhd::time_spec_t(0, 4640, 5e6);
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
-	set_sr_core_play_rx_enable(usrp, 1);
 
 	status.rx_on[0] = true;
 	status.rx_on[1] = true;
-	rx_thread.start([this]() { receive(); });
+	shutdown_done   = false;
+
+	// rx_thread.start([this]() { receive(); });
 	std::cout << std::endl << "Reception started for " << serial << std::endl;
 }
 
 void U220::stop_transmission() {
-	set_sr_core_play_enable(usrp, 0);
-	set_sr_core_play_gain_on_enable(usrp, 0);
+	set_sr_core_play_stop_tx(usrp);
+	// set_sr_core_play_enable(usrp, 0);
+	// set_sr_core_play_gain_on_enable(usrp, 0);
 	// tx_thread.stopAndWait();
 	// if (tx_stream) {
 	// 	tx_metadata.end_of_burst = true;
@@ -412,12 +417,47 @@ void U220::stop_transmission() {
 	// }
 }
 
-void U220::stop_reception() {
-	rx_thread.stopAndWait();
-	rx_stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
-	rx_stream->issue_stream_cmd(rx_stream_cmd);
-	piCout << "Stream rx stopped";
+void U220::stop_and_drain_rx() {
+	if (shutdown_done) return;
+	shutdown_done = true;
+	try {
+		uhd::stream_cmd_t stop_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+		stop_cmd.stream_now = true;
+		rx_stream->issue_stream_cmd(stop_cmd);
 
+		// Discard trailing USB samples without touching or submitting DMA buffers.
+		const size_t count = rx_stream->get_max_num_samps();
+		std::vector<std::vector<complexs>> buffers(2, std::vector<complexs>(count));
+		std::vector<void *> pointers{buffers[0].data(), buffers[1].data()};
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+		size_t discarded    = 0;
+		while (std::chrono::steady_clock::now() < deadline) {
+			uhd::rx_metadata_t metadata;
+			// One packet limits each recv; a nonzero timeout also surfaces pending errors.
+			discarded += rx_stream->recv(pointers, count, metadata, 0.05, true);
+			if (metadata.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
+				std::cout << "RX " << serial << ": shutdown drained " << discarded << " samples/channel" << std::endl;
+				return;
+			}
+			if (metadata.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE &&
+			    metadata.error_code != uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
+				std::cerr << "RX " << serial << ": shutdown drain: " << metadata.strerror() << std::endl;
+				return;
+			}
+		}
+		std::cerr << "RX " << serial << ": shutdown drain deadline reached" << std::endl;
+	} catch (const std::exception & error) {
+		std::cerr << "RX " << serial << ": shutdown stop/drain failed: " << error.what() << std::endl;
+	} catch (...) {
+		std::cerr << "RX " << serial << ": unknown shutdown stop/drain failure" << std::endl;
+	}
+}
+
+void U220::stop_reception() {
+	// rx_thread.stopAndWait();
+	stop_and_drain_rx();
+	// rx_stream->issue_stream_cmd(rx_stream_cmd);
+	piCout << "Stream rx stopped";
 }
 
 void U220::set_tx_gain(double new_gain) {

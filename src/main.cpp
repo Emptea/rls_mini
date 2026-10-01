@@ -72,6 +72,7 @@ int main(int argc, char * argv[]) {
 	WAIT_FOR_EXIT;
 
 	GLOBAL->stop();
+	1_s .sleep();
 	piCout << "stop done";
 
 	piDeleteSafety(kbd);

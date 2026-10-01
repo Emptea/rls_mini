@@ -12,7 +12,10 @@ typedef struct {
 	uint32_t rx_enable     : 1;
 	uint32_t GPIO_TX_ENABLE: 2;
 	uint32_t GPIO_RX_ENABLE: 2;
-	uint32_t               : 24; // reserved
+	uint32_t start_pulse_enable: 1;
+	uint32_t cat_sync_enable   : 1;
+	uint32_t start_pulse_40m   : 1;
+	uint32_t                   : 21; // reserved
 } sr_core_play_ctrl;
 
 #define SR_CORE_WR_TX_DELAY_ADDR 0x10
@@ -55,3 +58,8 @@ void set_sr_core_tx_delay_del_pps(uhd::usrp::multi_usrp::sptr usrp, uint32_t del
 void set_sr_core_rx_delay(uhd::usrp::multi_usrp::sptr usrp, uint32_t del_adc);
 void set_sr_core_play_gpio_tx_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t gpio_enable);
 void set_sr_core_play_gpio_rx_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t gpio_enable);
+void set_sr_core_play_start_pulse_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t start_pulse_enable);
+void set_sr_core_play_start_pulse_40m(uhd::usrp::multi_usrp::sptr usrp, uint32_t start_pulse_40m);
+
+void set_sr_core_play_start_tx(uhd::usrp::multi_usrp::sptr usrp);
+void set_sr_core_play_stop_tx(uhd::usrp::multi_usrp::sptr usrp);

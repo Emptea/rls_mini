@@ -13,9 +13,7 @@
 #include <uhd/utils/thread.hpp>
 
 #define PRINT_U220_STATS(s) piCout << "Cycles:" << s.cycles_completed \
-    << " RX:" << s.rx_packet_cnt << "(" << s.rx_bad_packets << "err)" \
-    << " TX:" << s.tx_packet_cnt << " TX - RX:" << (int64_t)(s.tx_packet_cnt - s.rx_packet_cnt);
-
+    << " RX:" << s.rx_packet_cnt << "(" << s.rx_bad_packets << "err)";
 typedef struct u220_config {
 	double rate;
 	double freq;
@@ -88,6 +86,8 @@ private:
 	u220_stats stats;
 	u220_status status;
 
+	bool shutdown_done = false;
+
 	void fill_buffer_with_wavetable(VectorComplexS & buffer);
 	void initialize_usrp();
 	void configure_tx_channel(size_t channel);
@@ -132,7 +132,7 @@ public:
 
 	void start_reception(double settling_time);
 	void receive();
-	EVENT0(received);
+	void stop_and_drain_rx();
 	void stop_reception();
 
 	void set_pps_source();
@@ -162,12 +162,15 @@ public:
 	void set_frequency(double new_freq);
 
 	struct u220_status get_status() { return status; };
+	struct u220_stats get_stats() { return stats; };
 	void print_status() {
 		piCout << serial << " status";
 		piCout << "  on:       " << (status.on ? "true" : "false") << "\n";
 		piCout << "  rx_on:   [" << (status.rx_on[0] ? "true" : "false") << ", " << (status.rx_on[1] ? "true" : "false") << "]\n";
 		piCout << "  tx_on:   [" << (status.tx_on[0] ? "true" : "false") << ", " << (status.tx_on[1] ? "true" : "false") << "]\n";
 	}
+
+
 };
 
 #endif // U220_HPP

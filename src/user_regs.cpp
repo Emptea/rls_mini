@@ -17,8 +17,8 @@ static void sr_core_set_reg(uhd::usrp::multi_usrp::sptr usrp, uint32_t addr, uin
 		return;
 	} else {
 		user_regs->poke32(addr, raw);
-		std::cout << "Setting reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::hex
-				  << std::setw(8) << std::setfill('0') << raw << std::endl;
+		std::cout << "Setting reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::hex << std::setw(8)
+				  << std::setfill('0') << raw << std::dec << std::endl;
 	}
 }
 
@@ -108,6 +108,44 @@ void set_sr_core_play_gpio_tx_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t 
 
 void set_sr_core_play_gpio_rx_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t gpio_enable) {
 	play_ctrl_un.play_ctrl.GPIO_RX_ENABLE = gpio_enable;
+
+	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
+	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
+	std::cout << boost::format("0x%016X") % raw_got << std::endl;
+}
+
+void set_sr_core_play_start_pulse_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t start_pulse_enable) {
+	play_ctrl_un.play_ctrl.start_pulse_enable = start_pulse_enable;
+
+	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
+	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
+	std::cout << boost::format("0x%016X") % raw_got << std::endl;
+}
+
+void set_sr_core_play_start_pulse_40m(uhd::usrp::multi_usrp::sptr usrp, uint32_t start_pulse_40m) {
+	play_ctrl_un.play_ctrl.start_pulse_40m = start_pulse_40m;
+
+	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
+	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
+	std::cout << boost::format("0x%016X") % raw_got << std::endl;
+}
+
+void set_sr_core_play_start_tx(uhd::usrp::multi_usrp::sptr usrp) {
+	play_ctrl_un.play_ctrl.enable             = 1;
+	play_ctrl_un.play_ctrl.gain_on_enable     = 1;
+	play_ctrl_un.play_ctrl.start_pulse_enable = 1;
+	play_ctrl_un.play_ctrl.start_pulse_40m    = 1;
+
+	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
+	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
+	std::cout << boost::format("0x%016X") % raw_got << std::endl;
+}
+
+void set_sr_core_play_stop_tx(uhd::usrp::multi_usrp::sptr usrp) {
+	play_ctrl_un.play_ctrl.enable             = 0;
+	play_ctrl_un.play_ctrl.gain_on_enable     = 0;
+	play_ctrl_un.play_ctrl.start_pulse_enable = 0;
+	play_ctrl_un.play_ctrl.start_pulse_40m    = 0;
 
 	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
 	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
