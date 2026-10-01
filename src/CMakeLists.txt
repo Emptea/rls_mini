@@ -34,12 +34,16 @@ set_deploy_property(${PROJECT_NAME}
 	COMPANY "SM5"
 	INFO "")
 make_rc(${PROJECT_NAME} out_RC)
+add_subdirectory(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../rls_fpga
+    ${CMAKE_CURRENT_BINARY_DIR}/rls_fpga
+)
 
 file(GLOB CPPS "*.cpp")
 file(GLOB HDRS "*.h")
 pip_code_model(CCM_PROTOCOL "protocol_rls_mini.h" OPTIONS "-SEMs" NAME "ccm_protocol")
 add_executable(${PROJECT_NAME} ${CPPS} ${HDRS} ${out_RC} ${CCM_PROTOCOL})
-target_link_libraries(${PROJECT_NAME} PIP::Console PIP::IOUtils)
+target_link_libraries(${PROJECT_NAME} PIP::Console PIP::IOUtils rls_fpga)
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 deploy_target(${PROJECT_NAME}

@@ -69,10 +69,10 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 
 U220::~U220() {}
 
-void U220::init() {
+void U220::init(void *tx0_buf, void *tx1_buf) {
 	initialize_usrp();
 	setup_tx_streamer();
-	setup_rx_streamer();
+	setup_rx_streamer(tx0_buf, tx1_buf);
 }
 
 void U220::initialize_usrp() {
@@ -159,7 +159,7 @@ void U220::setup_tx_streamer() {
 	set_sr_core_play_gpio_tx_enable(usrp, 0b11);
 }
 
-void U220::setup_rx_streamer() {
+void U220::setup_rx_streamer(void * tx0_buf, void * tx1_buf) {
 	uhd::stream_args_t stream_args(PIString2StdString(user_config.cpu_format), PIString2StdString(user_config.otw_format));
 	board_config.cpu_format = user_config.cpu_format;
 	board_config.otw_format = user_config.otw_format;
@@ -174,9 +174,8 @@ void U220::setup_rx_streamer() {
 
 	rx_buffer.resize(2, VectorComplexS(board_config.rx_spb));
 	rx_buffer_ptrs.resize(2);
-	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
-	}
+	rx_buffer_ptrs[0] = static_cast<complexs *>(tx0_buf);
+	rx_buffer_ptrs[1] = static_cast<complexs *>(tx1_buf);
 	set_sr_core_rx_delay(usrp, 0xFD);
 	set_sr_core_play_gpio_rx_enable(usrp, 0b11);
 }

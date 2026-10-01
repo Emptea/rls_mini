@@ -1,12 +1,14 @@
 #ifndef shared_data_H
 #define shared_data_H
 
+#include "axi_dsp.h"
+#include "fpga_dma.hpp"
 #include "shared_data_eth.h"
 #include "u220.hpp"
-#include "uhd_utils.hpp"
+#include "uhd_utils.hpp" 
+#include "rls.hpp"
 
 #include <pivaluetree.h>
-
 
 #define GLOBAL (GlobalData::instance())
 
@@ -18,6 +20,7 @@ class GlobalData
 public:
 	UHD_UTILS uhd_utils;
 	PIVector<U220 *> u220_ptrs;
+	fpga_dma dma;
 
 	const u220_config_t u220_config = {
 		.rate       = 5e6,

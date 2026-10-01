@@ -43,8 +43,8 @@ void GlobalData::init() {
 	auto dit                        = devices.begin();
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
 		if (dit != devices.end() && StdString2PIString(dit->first) == u220_ptrs[i]->get_serial()) {
-			u220_ptrs[i]->init();
 			active_boards.push_back(i);
+			u220_ptrs[i]->init(dma.get_tx_buffer(2 * i), dma.get_tx_buffer(2 * i + 1));
 			dit++;
 		}
 	}
@@ -148,6 +148,17 @@ void GlobalData::u220_recv() {
 		u220_ptrs[board_index]->receive();
 	}
 
+	if (dma.can_send()) {
+		int ret = dma.send();
+		if (ret != 0) {
+			fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
+		}
+	}
+	int ret = dma.receive();
+	if (ret != 0) {
+		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
+	}
+	void * rx_buffer = dma.get_rx_buffer();
 	auto packet_cnt = u220_ptrs[active_boards[0]]->get_stats().rx_packet_cnt;
 
 	if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 1000) == 0) {
