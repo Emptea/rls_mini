@@ -179,6 +179,7 @@ void U220::setup_rx_streamer() {
 	}
 	set_sr_core_rx_delay(usrp, 0xFD);
 	set_sr_core_play_gpio_rx_enable(usrp, 0b11);
+	set_sr_core_play_rx_insert_count(usrp, 1);
 }
 
 void U220::set_pps_source() {
@@ -333,8 +334,9 @@ void U220::receive() {
 	rx_errors_worker(rx_metadata.error_code);
 	stats.rx_packet_cnt += num_rx_samps;
 	stats.cycles_completed++;
-	piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt << "hdr is"
-		   << *((uint32_t *)rx_buffer_ptrs[0]) << "for" << serial;
+	piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
+		   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[0]) + 1)
+		   << "serial" << serial;
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
 		PRINT_U220_STATS(stats);
 	}
