@@ -13,8 +13,8 @@
 #define GLOBAL (GlobalData::instance())
 
 class GlobalData
-	: public PIObject
-	, public GlobalDataEth {
+    : public PIObject
+    , public GlobalDataEth {
 	PIOBJECT(GlobalData)
 
 private:
@@ -72,6 +72,8 @@ private:
 
 	void u220_stop_and_drain_rx();
 	void u220_recv();
+	void generate_ad9361_sync_in();
+	void sync_ad9361_mcs();
 
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;

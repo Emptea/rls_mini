@@ -75,3 +75,8 @@ void set_sr_core_play_pps_time_reset(uhd::usrp::multi_usrp::sptr usrp, uint32_t 
 
 void set_sr_core_play_start_tx(uhd::usrp::multi_usrp::sptr usrp);
 void set_sr_core_play_stop_tx(uhd::usrp::multi_usrp::sptr usrp);
+
+void sync_ad9361_stage1(uhd::usrp::multi_usrp::sptr usrp);
+void sync_ad9361_stage2(uhd::usrp::multi_usrp::sptr usrp);
+void sync_ad9361_master(uhd::usrp::multi_usrp::sptr usrp);
+void sync_ad9361_finish(uhd::usrp::multi_usrp::sptr usrp);
