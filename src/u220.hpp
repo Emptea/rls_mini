@@ -12,8 +12,7 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/thread.hpp>
 
-#define PRINT_U220_STATS(s) piCout << "Cycles:" << s.cycles_completed \
-    << " RX:" << s.rx_packet_cnt << "(" << s.rx_bad_packets << "err)";
+#define PRINT_U220_STATS(s) piCout << "Cycles:" << s.cycles_completed << " RX:" << s.rx_packet_cnt << "(" << s.rx_bad_packets << "err)";
 typedef struct u220_config {
 	double rate;
 	double freq;
@@ -108,18 +107,18 @@ public:
 	     const PIString & args   = "recv_frame_size=4104,num_recv_frames=128,send_frame_size=8192,num_send_frames=512",
 	     uint64_t num_samps      = 0,
 	     u220_config_t config    = {
-             5e6,
-             3.6e9,
-             {0.0},
-             {0.0},
-             {56e6, 56e6},
-             {56e6, 56e6},
-             "",
-             "sc16",
-             "sc16",
-             "internal",
-             0,
-             0
+			 5e6,
+			 3.6e9,
+			 {0.0},
+			 {0.0},
+			 {56e6, 56e6},
+			 {56e6, 56e6},
+			 "",
+			 "sc16",
+			 "sc16",
+			 "internal",
+			 0,
+			 0
     });
 
 	~U220();
@@ -172,7 +171,11 @@ public:
 		piCout << "  tx_on:   [" << (status.tx_on[0] ? "true" : "false") << ", " << (status.tx_on[1] ? "true" : "false") << "]\n";
 	}
 
+	void mcs_stage1();
+	void mcs_stage2();
+	void mcs_finish();
 
+	uhd::usrp::multi_usrp::sptr get_usrp() { return usrp; }
 };
 
 #endif // U220_HPP

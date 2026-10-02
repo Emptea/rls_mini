@@ -1,6 +1,7 @@
 #include "shared_data.h"
 
 #include "protocol_rls_mini.h"
+#include "user_regs.h"
 
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
@@ -65,6 +66,8 @@ void GlobalData::init() {
 	axi_dsp_apply();
 	first_transfer = false;
 	// sync();
+
+	sync_ad9361_mcs();
 }
 
 
@@ -322,4 +325,58 @@ void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI &
 	daz_poi                        = msg.getDegrees();
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
+}
+
+void GlobalData::generate_ad9361_sync_in() {
+	// 1. Prepare all FPGA sync generators
+	for (size_t i: active_boards) {
+		sync_ad9361_stage1(u220_ptrs[i]->get_usrp());
+	}
+
+	// 2. Arm sync logic on all boards
+	for (size_t i: active_boards) {
+		sync_ad9361_stage2(u220_ptrs[i]->get_usrp());
+	}
+
+	// 3. Start sync generation
+	for (size_t i: active_boards) {
+		sync_ad9361_master(u220_ptrs[i]->get_usrp());
+	}
+
+	// 4. Return sync logic to idle
+	for (size_t i: active_boards) {
+		sync_ad9361_finish(u220_ptrs[i]->get_usrp());
+	}
+}
+
+void GlobalData::sync_ad9361_mcs() {
+	piCout << "AD9361 MCS: stage 1\n";
+
+	for (size_t i: active_boards) {
+		u220_ptrs[i]->mcs_stage1();
+	}
+
+	piCout << "AD9361 MCS: SYNC #1\n";
+
+	generate_ad9361_sync_in();
+	1_s .sleep();
+
+	piCout << "AD9361 MCS: stage 2\n";
+
+	for (size_t i: active_boards) {
+		u220_ptrs[i]->mcs_stage2();
+	}
+
+	piCout << "AD9361 MCS: SYNC #2\n";
+
+	generate_ad9361_sync_in();
+	1_s .sleep();
+
+	piCout << "AD9361 MCS: finish\n";
+
+	for (size_t i: active_boards) {
+		u220_ptrs[i]->mcs_finish();
+	}
+
+	piCout << "AD9361 MCS: complete\n";
 }

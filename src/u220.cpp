@@ -65,11 +65,11 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 	, device_args(args)
 	, user_config(config)
 	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS
-                                     : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE) {}
+	                                 : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE) {}
 
 U220::~U220() {}
 
-void U220::init(void *tx0_buf, void *tx1_buf) {
+void U220::init(void * tx0_buf, void * tx1_buf) {
 	initialize_usrp();
 	setup_tx_streamer();
 	setup_rx_streamer(tx0_buf, tx1_buf);
@@ -324,9 +324,9 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 
 void U220::receive() {
 	const auto recv_start = std::chrono::steady_clock::now();
-	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout) * 2;
+	size_t num_rx_samps   = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	const auto recv_us    = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - recv_start).count();
-	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
+	rx_timeout            = rx_burst_pkt_time; // small timeout for subsequent recv
 
 	// for (int ch: {0, 1}) {
 	// 	auto ch_ptr = rx_queue[ch].getRef();
@@ -393,7 +393,7 @@ void U220::start_reception(double settling_time) {
 	auto start_time   = usrp->get_time_now() + uhd::time_spec_t(settling_time);
 	rx_burst_pkt_time = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
 	rx_timeout        = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
-	
+
 	// setup streaming
 	set_sr_core_play_rx_enable(usrp, 1);
 	print_config(board_config);
@@ -467,7 +467,7 @@ void U220::stop_reception() {
 	// rx_stream->issue_stream_cmd(rx_stream_cmd);
 
 	piCout << "RX recv" << serial << "mean(us):" << static_cast<double>(stats.rx_recv_total_us) / stats.cycles_completed
-		   << "max(us):" << stats.rx_recv_max_us;
+	       << "max(us):" << stats.rx_recv_max_us;
 	piCout << "Stream rx stopped";
 }
 
@@ -500,4 +500,19 @@ void U220::set_frequency(double new_freq) {
 
 void U220::set_serial(const PIString & ser) {
 	serial = ser;
+}
+
+void U220::mcs_stage1() {
+	auto tree = usrp->get_device()->get_tree();
+	tree->access<int>("/mboards/0/mcs/command").set(1);
+}
+
+void U220::mcs_stage2() {
+	auto tree = usrp->get_device()->get_tree();
+	tree->access<int>("/mboards/0/mcs/command").set(2);
+}
+
+void U220::mcs_finish() {
+	auto tree = usrp->get_device()->get_tree();
+	tree->access<int>("/mboards/0/mcs/command").set(3);
 }
