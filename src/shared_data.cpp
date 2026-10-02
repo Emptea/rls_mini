@@ -44,18 +44,26 @@ void GlobalData::init() {
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
 		if (dit != devices.end() && StdString2PIString(dit->first) == u220_ptrs[i]->get_serial()) {
 			active_boards.push_back(i);
-			u220_ptrs[i]->init(dma.get_tx_buffer(2 * i), dma.get_tx_buffer(2 * i + 1));
+			void * tx0_buf = dma.get_tx_buffer(2 * i);
+			void * tx1_buf = dma.get_tx_buffer(2 * i + 1);
+			piCout << "DMA TX buffers addreses for" << u220_ptrs[i]->get_serial() << "0:" << tx0_buf << "1:" << tx1_buf;
+			u220_ptrs[i]->init(tx0_buf, tx1_buf);
 			dit++;
 			ispr_kan |= (1 << 2 * i);
 			ispr_kan |= (1 << 2 * i + 1);
 		}
 	}
+	axi_dsp_init();
 	axi_dsp_configure();
 	axi_dsp_set_output_source(1, 0, 0);
 	auto v = axi_dsp_get_output_source();
 	piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE << "\n";
 	axi_dsp_set_channel_mask((uint32_t)ispr_kan);
 	axi_dsp_apply();
+
+	if (dma.init() != 0) {
+		fprintf(stderr, "Failed to initialize FPGA DMA\n");
+	}
 	// sync();
 }
 
@@ -166,10 +174,10 @@ void GlobalData::u220_recv() {
 	}
 
 	// if (dma.can_send()) {
-	int ret = dma.send();
-	if (ret != 0) {
-		fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
-	}
+	// int ret = dma.send();
+	// if (ret != 0) {
+	// 	fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
+	// }
 	// }
 	// int ret = dma.receive();
 	// if (ret != 0) {
