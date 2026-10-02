@@ -40,6 +40,8 @@ struct u220_stats {
 	size_t rx_alignment_errors = 0;
 	size_t rx_bad_packets      = 0;
 	size_t rx_packet_cnt       = 0;
+	uint64_t rx_recv_total_us  = 0;
+	uint64_t rx_recv_max_us    = 0;
 
 	// TX errors
 	size_t tx_underruns        = 0;
