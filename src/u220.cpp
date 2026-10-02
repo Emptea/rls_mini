@@ -69,11 +69,11 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 
 U220::~U220() {}
 
-void U220::init(void *tx0_buf, void *tx1_buf) {
+void U220::init(void ** tx0_buf, void ** tx1_buf) {
 	initialize_usrp();
 	setup_tx_streamer();
-	// setup_rx_streamer(tx0_buf, tx1_buf);
-	setup_rx_streamer();
+	setup_rx_streamer(tx0_buf, tx1_buf);
+	// setup_rx_streamer();
 }
 
 void U220::initialize_usrp() {
@@ -160,7 +160,7 @@ void U220::setup_tx_streamer() {
 	set_sr_core_play_gpio_tx_enable(usrp, 0b11);
 }
 
-void U220::setup_rx_streamer(void * tx0_buf, void * tx1_buf) {
+void U220::setup_rx_streamer(void ** tx0_buf, void ** tx1_buf) {
 	uhd::stream_args_t stream_args(PIString2StdString(user_config.cpu_format), PIString2StdString(user_config.otw_format));
 	board_config.cpu_format = user_config.cpu_format;
 	board_config.otw_format = user_config.otw_format;
@@ -173,14 +173,18 @@ void U220::setup_rx_streamer(void * tx0_buf, void * tx1_buf) {
 	}
 	board_config.rx_spb = user_config.rx_spb;
 
-	rx_buffer.resize(2, VectorComplexS(board_config.rx_spb));
-	rx_buffer_ptrs.resize(2);
-	rx_buffer_ptrs[0] = static_cast<complexs *>(tx0_buf);
-	rx_buffer_ptrs[1] = static_cast<complexs *>(tx1_buf);
+	rx_buffer.resize(4, VectorComplexS(board_config.rx_spb));
+	rx_buffer_ptrs[0].resize(2);
+	rx_buffer_ptrs[1].resize(2);
+
+	for (size_t ch = 0; ch < 2; ch++) {
+		rx_buffer_ptrs[0][ch] = static_cast<complexs *>(tx0_buf[ch]);
+		rx_buffer_ptrs[1][ch] = static_cast<complexs *>(tx1_buf[ch]);
+	}
 	set_sr_core_rx_delay(usrp, 0xFD);
 	set_sr_core_play_gpio_rx_enable(usrp, 0b11);
 	set_sr_core_play_rx_insert_count(usrp, 1);
-	// set_sr_core_play_pps_time_reset(usrp, 1);
+	set_sr_core_play_pps_time_reset(usrp, 0x05DC05DD);
 }
 
 void U220::setup_rx_streamer() {
@@ -197,9 +201,11 @@ void U220::setup_rx_streamer() {
 	board_config.rx_spb = user_config.rx_spb;
 
 	rx_buffer.resize(2, VectorComplexS(board_config.rx_spb));
-	rx_buffer_ptrs.resize(2);
+	rx_buffer_ptrs[0].resize(2);
+	rx_buffer_ptrs[1].resize(2);
 	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
+		rx_buffer_ptrs[ch][0] = &rx_buffer[ch].front();
+		rx_buffer_ptrs[ch][1] = &rx_buffer[ch].front();
 	}
 	set_sr_core_rx_delay(usrp, 0xFD);
 	set_sr_core_play_gpio_rx_enable(usrp, 0b11);
@@ -350,7 +356,7 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 
 void U220::receive() {
 	const auto recv_start = std::chrono::steady_clock::now();
-	size_t num_rx_samps = rx_stream->recv(rx_buffer_ptrs, board_config.rx_spb, rx_metadata, rx_timeout) * 2;
+	size_t num_rx_samps   = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
 	const auto recv_us    = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - recv_start).count();
 	rx_timeout          = rx_burst_pkt_time; // small timeout for subsequent recv
 
@@ -360,10 +366,13 @@ void U220::receive() {
 	// }
 
 	rx_errors_worker(rx_metadata.error_code);
+	if (num_rx_samps) {
+		active_buffer_idx = 1 - active_buffer_idx;
+		stats.cycles_completed++;
+		stats.rx_recv_total_us += recv_us;
+		stats.rx_recv_max_us = std::max<uint64_t>(stats.rx_recv_max_us, recv_us);
+	}
 	stats.rx_packet_cnt += num_rx_samps;
-	stats.cycles_completed++;
-	stats.rx_recv_total_us += recv_us;
-	stats.rx_recv_max_us = std::max<uint64_t>(stats.rx_recv_max_us, recv_us);
 	// piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
 	// 	   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[0]) + 1)
 	// 	   << "serial" << serial;

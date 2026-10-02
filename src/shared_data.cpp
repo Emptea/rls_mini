@@ -1,5 +1,6 @@
 #include "shared_data.h"
 
+#include "../rls_fpga/dma-proxy.h"
 #include "protocol_rls_mini.h"
 
 #include <piliterals_bytes.h>
@@ -39,16 +40,16 @@ void GlobalData::init() {
 	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
+	void * tx0_buf[TX_BUFFER_COUNT];
+	void * tx1_buf[TX_BUFFER_COUNT];
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
 		if (dit != devices.end() && StdString2PIString(dit->first) == u220_ptrs[i]->get_serial()) {
 			active_boards.push_back(i);
-			void * tx0_buf = dma.get_tx_buffer(2 * i);
-			void * tx1_buf = dma.get_tx_buffer(2 * i + 1);
-			piCout << "DMA TX buffers addreses for" << u220_ptrs[i]->get_serial() << "0:" << tx0_buf << "1:" << tx1_buf;
+			dma.get_all_tx_buffers(2 * i, tx0_buf);
+			dma.get_all_tx_buffers(2 * i + 1, tx1_buf);
 			u220_ptrs[i]->init(tx0_buf, tx1_buf);
 			dit++;
-			ispr_kan |= (1 << 2 * i);
-			ispr_kan |= (1 << 2 * i + 1);
+			ispr_kan |= (1 << 2 * i) | (1 << 2 * i + 1);
 		}
 	}
 	axi_dsp_init();
