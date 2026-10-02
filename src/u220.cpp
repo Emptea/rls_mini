@@ -69,8 +69,11 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 
 U220::~U220() {}
 
-void U220::init(void ** tx0_buf, void ** tx1_buf) {
+void U220::init() {
 	initialize_usrp();
+}
+
+void U220::setup(void ** tx0_buf, void ** tx1_buf){
 	setup_tx_streamer();
 	setup_rx_streamer(tx0_buf, tx1_buf);
 	// setup_rx_streamer();

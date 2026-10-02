@@ -126,7 +126,8 @@ public:
 
 	~U220();
 
-	void init(void ** tx0_buf, void ** tx1_buf);
+	void init();
+	void setup(void ** tx0_buf, void ** tx1_buf);
 	void start_sync();
 	bool sync();
 

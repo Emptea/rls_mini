@@ -43,16 +43,24 @@ void GlobalData::init() {
 	auto dit                        = devices.begin();
 	void * tx0_buf[TX_BUFFER_COUNT];
 	void * tx1_buf[TX_BUFFER_COUNT];
+
 	for (size_t i = 0; i < u220_ptrs.size(); i++) {
 		if (dit != devices.end() && StdString2PIString(dit->first) == u220_ptrs[i]->get_serial()) {
 			active_boards.push_back(i);
-			dma.get_all_tx_buffers(2 * i, tx0_buf);
-			dma.get_all_tx_buffers(2 * i + 1, tx1_buf);
-			u220_ptrs[i]->init(tx0_buf, tx1_buf);
+			u220_ptrs[i]->init();
 			dit++;
 			ispr_kan |= (1 << 2 * i) | (1 << 2 * i + 1);
 		}
 	}
+
+	for (const auto board_index: active_boards) {
+		dma.get_all_tx_buffers(2 * board_index, tx0_buf);
+		dma.get_all_tx_buffers(2 * board_index + 1, tx1_buf);
+		u220_ptrs[board_index]->setup(tx0_buf, tx1_buf);
+	}
+
+	sync_ad9361_mcs();
+
 	axi_dsp_init();
 	axi_dsp_configure();
 	axi_dsp_set_output_source(1, 0, 0);
@@ -62,8 +70,6 @@ void GlobalData::init() {
 	axi_dsp_apply();
 	first_transfer = false;
 	// sync();
-
-	sync_ad9361_mcs();
 }
 
 
@@ -71,13 +77,13 @@ bool GlobalData::sync() {
 	PISemaphore sem;
 	PIVector<PIThread *> sync_threads;
 	PIVector<bool> results(active_boards.size(), false);
-	for (int i = 0; i < active_boards.size_s(); ++i) {
-		auto * u  = u220_ptrs[active_boards[i]];
+	for (const auto board_index: active_boards) {
+		auto * u  = u220_ptrs[board_index];
 		// create thread with this functor
 		// capture "i" and "u" as values, "sem" and "results" as reference (we want modify it)
-		auto * st = new PIThread([i, u, &sem, &results] {
+		auto * st = new PIThread([board_index, u, &sem, &results] {
 			sem.acquire();          // wait for 1 resource from semaphore
-			results[i] = u->sync(); // sync and store result to results by index
+			results[board_index] = u->sync(); // sync and store result to results by index
 		});
 		st->startOnce();    // start thread with up functor
 		st->waitForStart(); // wait for thread actually starts
@@ -96,11 +102,11 @@ bool GlobalData::sync() {
 
 void GlobalData::start() {
 	startEth();
-	for (size_t i = 0; i < active_boards.size(); i++) {
-		// u220_ptrs[active_boards[i]]->start_reception(4.64+180*0.2e-6);
-		u220_ptrs[active_boards[i]]->set_time_sync();
+	for (const auto board_index: active_boards) {
+		// u220_ptrs[board_index]->start_reception(4.64+180*0.2e-6);
+		u220_ptrs[board_index]->set_time_sync();
 		double start_time = 0.05;
-		u220_ptrs[active_boards[i]]->start_reception(start_time);
+		u220_ptrs[board_index]->start_reception(start_time);
 	}
 	// 0.1_s .sleep();
 
@@ -111,8 +117,8 @@ void GlobalData::start() {
 		});
 	}
 	t_start = PISystemTime::current();
-	for (size_t i = 0; i < active_boards.size(); i++) {
-		u220_ptrs[active_boards[i]]->start_transmission();
+	for (const auto board_index: active_boards) {
+		u220_ptrs[board_index]->start_transmission();
 	}
 }
 
@@ -123,9 +129,9 @@ void GlobalData::stop() {
 	notifier_channels.notify();     // notify thread
 	process_thread.waitForFinish(); // wait for thread really finish
 	stopEth();
-	for (size_t i = 0; i < active_boards.size(); i++) {
-		u220_ptrs[active_boards[i]]->stop_reception();
-		u220_ptrs[active_boards[i]]->stop_transmission();
+	for (const auto board_index: active_boards) {
+		u220_ptrs[board_index]->stop_reception();
+		u220_ptrs[board_index]->stop_transmission();
 	}
 	piDeleteAllAndClear(u220_ptrs);
 	active_boards.clear();
