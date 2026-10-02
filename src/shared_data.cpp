@@ -22,12 +22,7 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 }
 
 
-GlobalData::~GlobalData() {
-	u220_recv_thread.stopAndWait();
-	process_thread.stop();          // mark thread for stop
-	notifier_channels.notify();     // notify thread
-	process_thread.waitForFinish(); // wait for thread really finish
-}
+GlobalData::~GlobalData() {}
 
 
 GlobalData * GlobalData::instance() {
@@ -120,6 +115,9 @@ void GlobalData::start() {
 
 void GlobalData::stop() {
 	u220_recv_thread.stopAndWait();
+	process_thread.stop();          // mark thread for stop
+	notifier_channels.notify();     // notify thread
+	process_thread.waitForFinish(); // wait for thread really finish
 	stopEth();
 	for (size_t i = 0; i < active_boards.size(); i++) {
 		u220_ptrs[active_boards[i]]->stop_reception();
