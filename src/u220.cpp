@@ -516,3 +516,23 @@ void U220::mcs_finish() {
 	auto tree = usrp->get_device()->get_tree();
 	tree->access<int>("/mboards/0/mcs/command").set(3);
 }
+
+void U220::enable_external_lo()
+{
+    if (!usrp) {
+        throw std::runtime_error("U220: USRP not initialized");
+    }
+
+    auto tree = usrp->get_device()->get_tree();
+
+    const std::string path = "/mboards/0/lo/external";
+
+    if (!tree->exists(path)) {
+        throw std::runtime_error(
+            "U220: external LO property not found");
+    }
+
+    tree->access<int>(path).set(1);
+
+    std::cout << "[U220] External LO enabled" << std::endl;
+}

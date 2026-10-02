@@ -174,6 +174,7 @@ public:
 	void mcs_stage1();
 	void mcs_stage2();
 	void mcs_finish();
+	void enable_external_lo();
 
 	uhd::usrp::multi_usrp::sptr get_usrp() { return usrp; }
 };

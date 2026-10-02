@@ -380,3 +380,9 @@ void GlobalData::sync_ad9361_mcs() {
 
 	piCout << "AD9361 MCS: complete\n";
 }
+
+void GlobalData::enable_external_lo_all() {
+	for (auto i: active_boards) {
+		u220_ptrs[i]->enable_external_lo();
+	}
+}

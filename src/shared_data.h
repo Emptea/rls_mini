@@ -74,6 +74,7 @@ private:
 	void u220_recv();
 	void generate_ad9361_sync_in();
 	void sync_ad9361_mcs();
+	void enable_external_lo_all();
 
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
