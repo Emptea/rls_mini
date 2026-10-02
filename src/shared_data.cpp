@@ -142,28 +142,39 @@ void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 
-	PIMap<int, VectorComplexS> channels;
-	bool all_channels = true;
-	{ // start work with "getRef"
-		auto ref = current_channels.getRef();
-		for (int ch = 0; ch < 8; ++ch) {
-			if ((*ref)[ch].isEmpty()) {
-				ispr_kan &= ~(1U << ch);
-				all_channels = false;
-			} else {
-				ispr_kan |= (1U << ch);
-			}
-		}
+	while (!dma.can_send())
+		;
+	int ret = dma.send();
+	if (ret != 0) {
+		fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
+	}
 
-		if (~all_channels) return;
-		channels = *ref; // copy data
+	ret = dma.receive();
+	if (ret != 0) {
+		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
+	}
+	// PIMap<int, VectorComplexS> channels;
+	// bool all_channels = true;
+	// { // start work with "getRef"
+	// 	auto ref = current_channels.getRef();
+	// 	for (int ch = 0; ch < 8; ++ch) {
+	// 		if ((*ref)[ch].isEmpty()) {
+	// 			ispr_kan &= ~(1U << ch);
+	// 			all_channels = false;
+	// 		} else {
+	// 			ispr_kan |= (1U << ch);
+	// 		}
+	// 	}
 
-		for (int ch = 0; ch < 8; ++ch) {
-			if (!(*ref)[ch].isEmpty()) {
-				(*ref)[ch].clear(); // clear input data
-			}
-		}
-	} // desctuct "ref", release current_channels
+	// 	if (~all_channels) return;
+	// 	channels = *ref; // copy data
+
+	// 	for (int ch = 0; ch < 8; ++ch) {
+	// 		if (!(*ref)[ch].isEmpty()) {
+	// 			(*ref)[ch].clear(); // clear input data
+	// 		}
+	// 	}
+	// } // desctuct "ref", release current_channels
 
 	// work with your data (channels)
 	// adc_channels = channels;
@@ -174,10 +185,10 @@ void GlobalData::u220_recv() {
 		u220_ptrs[board_index]->receive();
 	}
 
-	int ret = dma.send();
-	if (ret != 0) {
-		fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
-	}
+	// int ret = dma.send();
+	// if (ret != 0) {
+	// 	fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
+	// }
 
 	// if (!first_transfer) {
 	// 	first_transfer = true;
@@ -200,7 +211,7 @@ void GlobalData::u220_recv() {
 	// 			(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
 	// 		}
 	// 	}
-	// 	notifier_channels.notify();
+	notifier_channels.notify();
 	// }
 }
 

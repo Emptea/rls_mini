@@ -72,7 +72,8 @@ U220::~U220() {}
 void U220::init(void *tx0_buf, void *tx1_buf) {
 	initialize_usrp();
 	setup_tx_streamer();
-	setup_rx_streamer(tx0_buf, tx1_buf);
+	// setup_rx_streamer(tx0_buf, tx1_buf);
+	setup_rx_streamer();
 }
 
 void U220::initialize_usrp() {
@@ -181,6 +182,29 @@ void U220::setup_rx_streamer(void * tx0_buf, void * tx1_buf) {
 	set_sr_core_play_rx_insert_count(usrp, 1);
 	// set_sr_core_play_pps_time_reset(usrp, 1);
 }
+
+void U220::setup_rx_streamer() {
+	uhd::stream_args_t stream_args(PIString2StdString(user_config.cpu_format), PIString2StdString(user_config.otw_format));
+	board_config.cpu_format = user_config.cpu_format;
+	board_config.otw_format = user_config.otw_format;
+	stream_args.channels    = {0, 1};
+	rx_stream               = usrp->get_rx_stream(stream_args);
+
+	if (user_config.rx_spb == 0) {
+		user_config.rx_spb = rx_stream->get_max_num_samps();
+		user_config.rx_spb = ((user_config.rx_spb + SAMPLES_PER_CYCLE - 1) / SAMPLES_PER_CYCLE) * SAMPLES_PER_CYCLE;
+	}
+	board_config.rx_spb = user_config.rx_spb;
+
+	rx_buffer.resize(2, VectorComplexS(board_config.rx_spb));
+	rx_buffer_ptrs.resize(2);
+	for (size_t ch = 0; ch < 2; ch++) {
+		rx_buffer_ptrs[ch] = &rx_buffer[ch].front();
+	}
+	set_sr_core_rx_delay(usrp, 0xFD);
+	set_sr_core_play_gpio_rx_enable(usrp, 0b11);
+}
+
 
 void U220::set_pps_source() {
 	usrp->set_time_source(PIString2StdString(user_config.pps));

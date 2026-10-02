@@ -95,6 +95,7 @@ private:
 	void configure_tx_channel(size_t channel);
 	void configure_rx_channel(size_t channel);
 	void setup_tx_streamer();
+	void setup_rx_streamer();
 	void setup_rx_streamer(void * tx0_buf, void * tx1_buf);
 	void rx_errors_worker(uhd::rx_metadata_t::error_code_t err);
 
