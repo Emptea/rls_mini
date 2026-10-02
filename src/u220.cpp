@@ -203,6 +203,8 @@ void U220::setup_rx_streamer() {
 	}
 	set_sr_core_rx_delay(usrp, 0xFD);
 	set_sr_core_play_gpio_rx_enable(usrp, 0b11);
+	set_sr_core_play_rx_insert_count(usrp, 1);
+	set_sr_core_play_pps_time_reset(usrp, 0x05DC05DD);
 }
 
 
@@ -366,8 +368,9 @@ void U220::receive() {
 	// 	   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[0]) + 1)
 	// 	   << "serial" << serial;
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
-		piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt;
-		PRINT_U220_STATS(stats);
+		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
+			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6);
+		// PRINT_U220_STATS(stats);
 	}
 }
 
@@ -488,6 +491,8 @@ void U220::stop_and_drain_rx() {
 void U220::stop_reception() {
 	// rx_thread.stopAndWait();
 	stop_and_drain_rx();
+	set_sr_core_play_pps_time_reset(usrp, 0);
+
 	// rx_stream->issue_stream_cmd(rx_stream_cmd);
 
 	piCout << "RX recv" << serial << "mean(us):" << static_cast<double>(stats.rx_recv_total_us) / stats.cycles_completed
