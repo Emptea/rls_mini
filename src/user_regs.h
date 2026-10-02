@@ -39,12 +39,21 @@ typedef struct {
 
 #define SR_CORE_WR_RX_GPIO_DELAY_ADDR 0x18
 #define SR_CORE_RD_RX_GPIO_DELAY_ADDR 0x30
-#define SR_CORE_RX__GPIO_DELAY_WIDTH  16
+#define SR_CORE_RX_GPIO_DELAY_WIDTH  16
 
 typedef struct {
 	uint32_t del_rx_gpio: 16;
 	uint32_t            : 16; // reserved
 } sr_core_rx_gpio_delay;
+
+#define SR_CORE_WR_PPS_TIME_RESET_ADDR     0x20
+#define SR_CORE_RD_PPS_TIME_RESET_ADDR     0x40
+#define SR_CORE_PPS_TIME_RESET_ADDR_WIDTH 1
+
+typedef struct {
+	uint32_t val: 1;
+	uint32_t    : 31; // reserved
+} sr_core_pps_time_reset;
 
 void set_sr_core_play(uhd::usrp::multi_usrp::sptr usrp, uint32_t enable, uint32_t trigger_src, uint32_t gain_on_enable, uint32_t rx_enable);
 void set_sr_core_tx_delay(uhd::usrp::multi_usrp::sptr usrp, uint32_t del_dac, uint32_t del_pps);
@@ -62,6 +71,7 @@ void set_sr_core_play_gpio_rx_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t 
 void set_sr_core_play_start_pulse_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t start_pulse_enable);
 void set_sr_core_play_start_pulse_40m(uhd::usrp::multi_usrp::sptr usrp, uint32_t start_pulse_40m);
 void set_sr_core_play_rx_insert_count(uhd::usrp::multi_usrp::sptr usrp, uint32_t rx_insert_count);
+void set_sr_core_play_pps_time_reset(uhd::usrp::multi_usrp::sptr usrp, uint32_t pps_time_reset);
 
 void set_sr_core_play_start_tx(uhd::usrp::multi_usrp::sptr usrp);
 void set_sr_core_play_stop_tx(uhd::usrp::multi_usrp::sptr usrp);

@@ -67,7 +67,7 @@ void set_sr_core_rx_delay(uhd::usrp::multi_usrp::sptr usrp, uint32_t del_adc) {
 }
 
 void set_sr_core_play_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t enable) {
-    play_ctrl_un.play_ctrl.enable         = enable;
+	play_ctrl_un.play_ctrl.enable = enable;
 
 	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
 	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
@@ -75,7 +75,7 @@ void set_sr_core_play_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t enable) 
 }
 
 void set_sr_core_play_trigger_src(uhd::usrp::multi_usrp::sptr usrp, uint32_t trigger_src) {
-	play_ctrl_un.play_ctrl.trigger_src    = trigger_src;
+	play_ctrl_un.play_ctrl.trigger_src = trigger_src;
 
 	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
 	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
@@ -91,7 +91,7 @@ void set_sr_core_play_gain_on_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t 
 }
 
 void set_sr_core_play_rx_enable(uhd::usrp::multi_usrp::sptr usrp, uint32_t rx_enable) {
-	play_ctrl_un.play_ctrl.rx_enable      = rx_enable;
+	play_ctrl_un.play_ctrl.rx_enable = rx_enable;
 
 	sr_core_set_reg(usrp, SR_CORE_WR_PLAY_CTRL_ADDR, play_ctrl_un.raw);
 	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PLAY_CTRL_ADDR);
@@ -139,7 +139,7 @@ void set_sr_core_play_rx_insert_count(uhd::usrp::multi_usrp::sptr usrp, uint32_t
 }
 
 
-	void set_sr_core_play_start_tx(uhd::usrp::multi_usrp::sptr usrp) {
+void set_sr_core_play_start_tx(uhd::usrp::multi_usrp::sptr usrp) {
 	play_ctrl_un.play_ctrl.enable             = 1;
 	play_ctrl_un.play_ctrl.gain_on_enable     = 1;
 	play_ctrl_un.play_ctrl.start_pulse_enable = 1;
@@ -177,3 +177,8 @@ void set_sr_core_tx_delay_del_pps(uhd::usrp::multi_usrp::sptr usrp, uint32_t del
 	std::cout << boost::format("0x%016X") % raw_got << std::endl;
 }
 
+void set_sr_core_play_pps_time_reset(uhd::usrp::multi_usrp::sptr usrp, uint32_t pps_time_reset) {
+	sr_core_set_reg(usrp, SR_CORE_WR_PPS_TIME_RESET_ADDR, pps_time_reset);
+	uint64_t raw_got = sr_core_get_reg(usrp, SR_CORE_RD_PPS_TIME_RESET_ADDR);
+	std::cout << boost::format("0x%016X") % raw_got << std::endl;
+}

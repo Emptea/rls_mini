@@ -130,8 +130,9 @@ void GlobalData::stop() {
 	axi_dsp_deinit();
 	t_end = PISystemTime::current();
 	piCout << "====";
-	if (dma.get_submitted() > 0) {
-		piCout << "Mean: transfer time = " << (t_end - t_start) / dma.get_submitted();
+	auto cycles_completed = u220_ptrs[active_boards[0]]->get_stats().cycles_completed;
+	if (cycles_completed > 0) {
+		piCout << "Mean: transfer time = " << (t_end - t_start) / cycles_completed;
 	}
 	piCout << "====";
 	dma.cleanup();
