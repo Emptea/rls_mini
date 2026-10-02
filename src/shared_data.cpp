@@ -38,6 +38,9 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
+	if (dma.init() != 0) {
+		fprintf(stderr, "Failed to initialize FPGA DMA\n");
+	}
 	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
@@ -60,10 +63,7 @@ void GlobalData::init() {
 	piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE << "\n";
 	axi_dsp_set_channel_mask((uint32_t)ispr_kan);
 	axi_dsp_apply();
-
-	if (dma.init() != 0) {
-		fprintf(stderr, "Failed to initialize FPGA DMA\n");
-	}
+	first_transfer = false;
 	// sync();
 }
 
@@ -104,7 +104,7 @@ void GlobalData::start() {
 		u220_ptrs[active_boards[i]]->start_reception(start_time);
 	}
 	// 0.1_s .sleep();
-	
+
 	if (!active_boards.isEmpty()) {
 		u220_recv_thread.start([this] {
 			u220_recv();
@@ -130,8 +130,8 @@ void GlobalData::stop() {
 	axi_dsp_deinit();
 	t_end = PISystemTime::current();
 	piCout << "====";
-	if (dma.get_completed() > 0) {
-		piCout << "Mean: transfer time = " << (t_end - t_start) / dma.get_completed();
+	if (dma.get_submitted() > 0) {
+		piCout << "Mean: transfer time = " << (t_end - t_start) / dma.get_submitted();
 	}
 	piCout << "====";
 	dma.cleanup();
@@ -173,15 +173,18 @@ void GlobalData::u220_recv() {
 		u220_ptrs[board_index]->receive();
 	}
 
-	// if (dma.can_send()) {
-	// int ret = dma.send();
-	// if (ret != 0) {
-	// 	fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
-	// }
-	// }
-	// int ret = dma.receive();
-	// if (ret != 0) {
-	// 	fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
+	int ret = dma.send();
+	if (ret != 0) {
+		fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
+	}
+
+	// if (!first_transfer) {
+	// 	first_transfer = true;
+	// } else {
+	// 	int ret = dma.receive();
+	// 	if (ret != 0) {
+	// 		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
+	// 	}
 	// }
 	// void * rx_buffer = dma.get_rx_buffer();
 	auto packet_cnt = u220_ptrs[active_boards[0]]->get_stats().rx_packet_cnt;

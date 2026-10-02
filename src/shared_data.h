@@ -3,10 +3,10 @@
 
 #include "axi_dsp.h"
 #include "fpga_dma.hpp"
+#include "rls.hpp"
 #include "shared_data_eth.h"
 #include "u220.hpp"
-#include "uhd_utils.hpp" 
-#include "rls.hpp"
+#include "uhd_utils.hpp"
 
 #include <pivaluetree.h>
 
@@ -20,6 +20,7 @@ class GlobalData
 private:
 	PISystemTime t_start;
 	PISystemTime t_end;
+	bool first_transfer = false;
 
 public:
 	UHD_UTILS uhd_utils;
@@ -38,10 +39,9 @@ public:
 		.otw_format = "sc12",
 		.pps        = "internal",
 		.tx_spb     = 545200,
-		.rx_spb     = 4640 //if you want to print hdr add 40 more samples to buf
-    };
-	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,send_frame_size=8192,num_send_frames=256,type=b200,enable_user_"
-	                           "regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
+		.rx_spb     = 4640  //  if you want to print hdr add 40 more samples to buf
+	};
+	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
 
 	PIVector<size_t> active_boards;
 	static GlobalData * instance();
@@ -55,14 +55,15 @@ public:
 	const PIValueTree & mainConfig() const { return main_config; }
 	Protocol_RLS_Mini::RR_Kvit set_RR_Kvit();
 	void received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg);
-	void received_RR_Zapros       (const Protocol_RLS_Mini::RR_Zapros      & msg);
-	void received_RR_Vr           (const Protocol_RLS_Mini::RR_Vr          & msg);
-	void received_RR_Izl          (const Protocol_RLS_Mini::RR_Izl         & msg);
-	void received_RR_Ant          (const Protocol_RLS_Mini::RR_Ant         & msg);
-	void received_RR_TTek         (const Protocol_RLS_Mini::RR_TTek        & msg);
-	void received_RR_AzPopr       (const Protocol_RLS_Mini::RR_AzPopr      & msg);
-	void received_RR_DPopr_POI    (const Protocol_RLS_Mini::RR_DPopr_POI   & msg);
-	void received_RR_AzPopr_POI   (const Protocol_RLS_Mini::RR_AzPopr_POI  & msg);
+	void received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg);
+	void received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg);
+	void received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg);
+	void received_RR_Ant(const Protocol_RLS_Mini::RR_Ant & msg);
+	void received_RR_TTek(const Protocol_RLS_Mini::RR_TTek & msg);
+	void received_RR_AzPopr(const Protocol_RLS_Mini::RR_AzPopr & msg);
+	void received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg);
+	void received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg);
+
 protected:
 
 private:
@@ -92,11 +93,11 @@ private:
 			uint8_t vr      : 2;
 			uint8_t kuvr    : 2;
 		};
-	} flags = {0};
+	} flags          = {0};
 	uint8_t ispr_kan = 0;
-	double daz      = 0;
+	double daz       = 0;
 	int16_t dd_poi   = 0; // 1 м
-	double daz_poi  = 0;
+	double daz_poi   = 0;
 	double time;
 };
 
