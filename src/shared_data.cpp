@@ -82,7 +82,7 @@ bool GlobalData::sync() {
 		// create thread with this functor
 		// capture "i" and "u" as values, "sem" and "results" as reference (we want modify it)
 		auto * st = new PIThread([board_index, u, &sem, &results] {
-			sem.acquire();          // wait for 1 resource from semaphore
+			sem.acquire();                    // wait for 1 resource from semaphore
 			results[board_index] = u->sync(); // sync and store result to results by index
 		});
 		st->startOnce();    // start thread with up functor
@@ -161,31 +161,15 @@ void GlobalData::processChannels() {
 	if (ret != 0) {
 		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
 	}
-	// PIMap<int, VectorComplexS> channels;
-	// bool all_channels = true;
-	// { // start work with "getRef"
-	// 	auto ref = current_channels.getRef();
-	// 	for (int ch = 0; ch < 8; ++ch) {
-	// 		if ((*ref)[ch].isEmpty()) {
-	// 			ispr_kan &= ~(1U << ch);
-	// 			all_channels = false;
-	// 		} else {
-	// 			ispr_kan |= (1U << ch);
-	// 		}
-	// 	}
 
-	// 	if (~all_channels) return;
-	// 	channels = *ref; // copy data
-
-	// 	for (int ch = 0; ch < 8; ++ch) {
-	// 		if (!(*ref)[ch].isEmpty()) {
-	// 			(*ref)[ch].clear(); // clear input data
-	// 		}
-	// 	}
-	// } // desctuct "ref", release current_channels
-
-	// work with your data (channels)
-	// adc_channels = channels;
+	unsigned int * rx_buffer = (unsigned int *) dma.get_rx_buffer();
+	dma_rx_queue.emplace(rx_buffer, (BUFFER_SIZE / sizeof(unsigned int)) * RX_BUFFER_COUNT);
+	if ((current_vals.tp != rls::TP_WORK) && data_updated) {
+		while (dma_rx_queue.size() > 1) {
+			dma_rx_queue.pop();
+		}
+	}
+	data_updated = true;
 }
 
 void GlobalData::u220_recv() {
@@ -193,34 +177,8 @@ void GlobalData::u220_recv() {
 		u220_ptrs[board_index]->receive();
 	}
 
-	// int ret = dma.send();
-	// if (ret != 0) {
-	// 	fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
-	// }
-
-	// if (!first_transfer) {
-	// 	first_transfer = true;
-	// } else {
-	// 	int ret = dma.receive();
-	// 	if (ret != 0) {
-	// 		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
-	// 	}
-	// }
-	// void * rx_buffer = dma.get_rx_buffer();
 	auto packet_cnt = u220_ptrs[active_boards[0]]->get_stats().rx_packet_cnt;
-
-	// if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 1000) == 0) {
-	// 	for (const auto board_index: active_boards) {
-	// 		auto * board = u220_ptrs[board_index];
-	// 		auto ref1    = current_channels.getRef();
-	// 		auto ref2    = adc_channels.getRef();
-	// 		for (int channel: {0, 1}) {
-	// 			const int global_channel = 2 * board_index + channel;
-	// 			(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
-	// 		}
-	// 	}
 	notifier_channels.notify();
-	// }
 }
 
 void GlobalData::u220_stop_and_drain_rx() {
@@ -230,50 +188,33 @@ void GlobalData::u220_stop_and_drain_rx() {
 }
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
-	piCout << "rec msg" << "received_POI_TK_Zapros";
+	// piCout << "rec msg"
+	// 	   << "received_POI_TK_Zapros";
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
-	piCout << "rec msg kt" << msg.kt;
+	// piCout << "rec msg kt" << msg.kt;
+	axi_dsp_set_output_source(msg.kt, msg.nkan, msg.reg_takt);
+	axi_dsp_apply();
+	current_vals.tp         = msg.kt;
+	current_vals.ch         = msg.nkan;
+	current_vals.range_gate = msg.reg_takt;
 
-	switch (msg.kt) {
-	case Protocol_RLS_Mini::CTRL: {
-		break;
+	if (data_updated) {
+		data_updated = false;
 	}
-	case Protocol_RLS_Mini::ADC: {
-		VectorComplexS data;
-		{
-			auto ref = adc_channels.getRef();
-			data     = (*ref)[msg.nkan];
-		}
-		ans.nw = data.size();
-		if (data.isEmpty()) {
-			ans.setData(zero_vector);
-		} else {
-			ans.setData(data, 232 * 3);
-		}
-		break;
+
+	int data_cnt = rls::get_rx_words_per_buf(msg.kt);
+	while (!data_updated)
+		;
+
+	auto & data = dma_rx_queue.front();
+	if (!data.isEmpty()) {
+		// ans.setData(&data[HDR_SIZE], data_cnt);
+		ans.setData(data, data_cnt);
+	} else {
+		ans.setData(zero_vector);
 	}
-	case Protocol_RLS_Mini::PHD: {
-		break;
-	}
-	case Protocol_RLS_Mini::PLL: {
-		break;
-	}
-	case Protocol_RLS_Mini::OPH: {
-		break;
-	}
-	case Protocol_RLS_Mini::LOU: {
-		break;
-	}
-	case Protocol_RLS_Mini::KN: {
-		break;
-	}
-	case Protocol_RLS_Mini::AD: {
-		break;
-	}
-	case Protocol_RLS_Mini::APU: {
-		break;
-	}
-	}
+	dma_rx_queue.pop();
+	ans.nw = static_cast<uint16_t>(data_cnt);
 	global->sendMessage(ans);
 }
 

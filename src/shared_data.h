@@ -9,6 +9,7 @@
 #include "uhd_utils.hpp"
 
 #include <pivaluetree.h>
+#include <queue>
 
 #define GLOBAL (GlobalData::instance())
 
@@ -26,6 +27,8 @@ public:
 	UHD_UTILS uhd_utils;
 	PIVector<U220 *> u220_ptrs;
 	fpga_dma dma;
+
+	bool data_updated               = true;
 
 	const u220_config_t u220_config = {
 		.rate       = 5e6,
@@ -81,7 +84,7 @@ private:
 	PIThread process_thread;
 	PIThread u220_recv_thread;
 
-	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
+	std::queue<VectorUint> dma_rx_queue;
 	VectorComplexS zero_vector;
 
 	PIMap<int, bool> board_statuses;
@@ -101,6 +104,12 @@ private:
 	int16_t dd_poi   = 0; // 1 м
 	double daz_poi   = 0;
 	double time;
+
+	struct {
+		uint32_t tp;
+		uint32_t ch;
+		uint32_t range_gate;
+	} current_vals;
 };
 
 #endif
