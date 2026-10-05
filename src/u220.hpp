@@ -128,6 +128,8 @@ public:
 
 	void init();
 	void setup(void ** tx0_buf, void ** tx1_buf);
+	void setup();
+
 	void start_sync();
 	bool sync();
 

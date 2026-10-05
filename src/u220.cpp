@@ -79,6 +79,12 @@ void U220::setup(void ** tx0_buf, void ** tx1_buf){
 	// setup_rx_streamer();
 }
 
+void U220::setup() {
+	setup_tx_streamer();
+	setup_rx_streamer();
+	// setup_rx_streamer();
+}
+
 void U220::initialize_usrp() {
 	device_args.append(",serial=");
 	device_args.append(serial);
@@ -363,10 +369,10 @@ void U220::receive() {
 	const auto recv_us    = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - recv_start).count();
 	rx_timeout            = rx_burst_pkt_time; // small timeout for subsequent recv
 
-	// for (int ch: {0, 1}) {
-	// 	auto ch_ptr = rx_queue[ch].getRef();
-	// 	ch_ptr->push_back(rx_buffer[ch]);
-	// }
+	for (int ch: {0, 1}) {
+		auto ch_ptr = rx_queue[ch].getRef();
+		ch_ptr->push_back(rx_buffer[ch]);
+	}
 
 	rx_errors_worker(rx_metadata.error_code);
 	if (num_rx_samps) {

@@ -102,6 +102,8 @@ private:
 	int16_t dd_poi   = 0; // 1 м
 	double daz_poi   = 0;
 	double time;
+
+	std::atomic_int dma_enabled = {0};
 };
 
 #endif

@@ -37,6 +37,10 @@ void GlobalData::init() {
 	initEth();
 	if (dma.init() != 0) {
 		fprintf(stderr, "Failed to initialize FPGA DMA\n");
+		dma_enabled = 0;
+		fprintf(stderr, "DMA disabled\n");
+	} else {
+		dma_enabled = 1;
 	}
 	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
@@ -54,20 +58,28 @@ void GlobalData::init() {
 	}
 
 	for (const auto board_index: active_boards) {
-		dma.get_all_tx_buffers(2 * board_index, tx0_buf);
-		dma.get_all_tx_buffers(2 * board_index + 1, tx1_buf);
-		u220_ptrs[board_index]->setup(tx0_buf, tx1_buf);
+		if (dma_enabled) {
+			dma.get_all_tx_buffers(2 * board_index, tx0_buf);
+			dma.get_all_tx_buffers(2 * board_index + 1, tx1_buf);
+			u220_ptrs[board_index]->setup(tx0_buf, tx1_buf);
+		} else {
+			u220_ptrs[board_index]->setup();
+		}
 	}
 
 	sync_ad9361_mcs();
 
-	axi_dsp_init();
-	axi_dsp_configure();
-	axi_dsp_set_output_source(1, 0, 0);
-	auto v = axi_dsp_get_output_source();
-	piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE << "\n";
-	axi_dsp_set_channel_mask((uint32_t)ispr_kan);
-	axi_dsp_apply();
+	enable_external_lo_all();
+
+	if (dma_enabled) {
+		axi_dsp_init();
+		axi_dsp_configure();
+		axi_dsp_set_output_source(1, 0, 0);
+		auto v = axi_dsp_get_output_source();
+		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE << "\n";
+		axi_dsp_set_channel_mask((uint32_t)ispr_kan);
+		axi_dsp_apply();
+	}
 	first_transfer = false;
 	// sync();
 }
@@ -82,7 +94,7 @@ bool GlobalData::sync() {
 		// create thread with this functor
 		// capture "i" and "u" as values, "sem" and "results" as reference (we want modify it)
 		auto * st = new PIThread([board_index, u, &sem, &results] {
-			sem.acquire();          // wait for 1 resource from semaphore
+			sem.acquire();                    // wait for 1 resource from semaphore
 			results[board_index] = u->sync(); // sync and store result to results by index
 		});
 		st->startOnce();    // start thread with up functor
@@ -135,7 +147,9 @@ void GlobalData::stop() {
 	}
 	piDeleteAllAndClear(u220_ptrs);
 	active_boards.clear();
-	axi_dsp_deinit();
+	if (dma_enabled) {
+		axi_dsp_deinit();
+	}
 	t_end = PISystemTime::current();
 	piCout << "====";
 	auto cycles_completed = u220_ptrs[active_boards[0]]->get_stats().cycles_completed;
@@ -143,13 +157,13 @@ void GlobalData::stop() {
 		piCout << "Mean: transfer time = " << (t_end - t_start) / cycles_completed;
 	}
 	piCout << "====";
-	dma.cleanup();
+	if (dma_enabled) dma.cleanup();
 }
 
 void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
-
+	if (!dma_enabled) return;
 	while (!dma.can_send())
 		;
 	int ret = dma.send();
@@ -209,18 +223,18 @@ void GlobalData::u220_recv() {
 	// void * rx_buffer = dma.get_rx_buffer();
 	auto packet_cnt = u220_ptrs[active_boards[0]]->get_stats().rx_packet_cnt;
 
-	// if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 1000) == 0) {
-	// 	for (const auto board_index: active_boards) {
-	// 		auto * board = u220_ptrs[board_index];
-	// 		auto ref1    = current_channels.getRef();
-	// 		auto ref2    = adc_channels.getRef();
-	// 		for (int channel: {0, 1}) {
-	// 			const int global_channel = 2 * board_index + channel;
-	// 			(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
-	// 		}
-	// 	}
-	notifier_channels.notify();
-	// }
+	if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 1000) == 0) {
+		for (const auto board_index: active_boards) {
+			auto * board = u220_ptrs[board_index];
+			auto ref1    = current_channels.getRef();
+			auto ref2    = adc_channels.getRef();
+			for (int channel: {0, 1}) {
+				const int global_channel = 2 * board_index + channel;
+				(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
+			}
+		}
+		notifier_channels.notify();
+	}
 }
 
 void GlobalData::u220_stop_and_drain_rx() {
