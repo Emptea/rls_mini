@@ -1,7 +1,5 @@
 #include "u220.hpp"
 
-#include "user_regs.h"
-
 #include <pistring_std.h>
 
 // clang-format off

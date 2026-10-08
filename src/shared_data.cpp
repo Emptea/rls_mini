@@ -2,7 +2,7 @@
 
 #include "../rls_fpga/dma-proxy.h"
 #include "protocol_rls_mini.h"
-#include "user_regs.h"
+#include "user_u220.h"
 
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
@@ -18,6 +18,7 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 	for (int i = 0; i < serial_list.size(); i++) {
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
 		u220_ptrs << u;
+		user_u220_ptrs << nullptr;
 	}
 
 	process_thread.start([this] { processChannels(); });
@@ -52,6 +53,7 @@ void GlobalData::init() {
 		if (dit != devices.end() && StdString2PIString(dit->first) == u220_ptrs[i]->get_serial()) {
 			active_boards.push_back(i);
 			u220_ptrs[i]->init();
+			user_u220_ptrs[i] = new UserU220(u220_ptrs[i]->get_usrp());
 			dit++;
 			ispr_kan |= (1 << 2 * i) | (1 << 2 * i + 1);
 		}
@@ -360,22 +362,22 @@ void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI &
 void GlobalData::generate_ad9361_sync_in() {
 	// 1. Prepare all FPGA sync generators
 	for (size_t i: active_boards) {
-		sync_ad9361_stage1(u220_ptrs[i]->get_usrp());
+		user_u220_ptrs[i]->sync_ad9361_stage1();
 	}
 
 	// 2. Arm sync logic on all boards
 	for (size_t i: active_boards) {
-		sync_ad9361_stage2(u220_ptrs[i]->get_usrp());
+		user_u220_ptrs[i]->sync_ad9361_stage2();
 	}
 
 	// 3. Start sync generation
 	for (size_t i: active_boards) {
-		sync_ad9361_master(u220_ptrs[i]->get_usrp());
+		user_u220_ptrs[i]->sync_ad9361_master();
 	}
 
 	// 4. Return sync logic to idle
 	for (size_t i: active_boards) {
-		sync_ad9361_finish(u220_ptrs[i]->get_usrp());
+		user_u220_ptrs[i]->sync_ad9361_finish();
 	}
 }
 

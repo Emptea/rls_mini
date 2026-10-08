@@ -7,6 +7,7 @@
 #include "shared_data_eth.h"
 #include "u220.hpp"
 #include "uhd_utils.hpp"
+#include "user_u220.h"
 
 #include <pivaluetree.h>
 
@@ -25,6 +26,7 @@ private:
 public:
 	UHD_UTILS uhd_utils;
 	PIVector<U220 *> u220_ptrs;
+	PIVector<UserU220 *> user_u220_ptrs;
 	fpga_dma dma;
 
 	const u220_config_t u220_config = {
