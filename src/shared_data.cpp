@@ -1,6 +1,7 @@
 #include "shared_data.h"
 
 #include "../rls_fpga/dma-proxy.h"
+#include "mini_config.hpp"
 #include "protocol_rls_mini.h"
 #include "user_u220.h"
 
@@ -11,7 +12,7 @@
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
 
-GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220_args)) {
+GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220_args)), cfg() {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
 
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
@@ -36,13 +37,13 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
-	if (dma.init() != 0) {
-		fprintf(stderr, "Failed to initialize FPGA DMA\n");
-		dma_enabled = 0;
-		fprintf(stderr, "DMA disabled\n");
-	} else {
-		dma_enabled = 1;
+	if (cfg.dma_enabled) {
+		if (dma.init() != 0) {
+			fprintf(stderr, "Failed to initialize FPGA DMA\n");
+			cfg.dma_enabled = false;
+		}
 	}
+
 	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
@@ -60,7 +61,7 @@ void GlobalData::init() {
 	}
 
 	for (const auto board_index: active_boards) {
-		if (dma_enabled) {
+		if (cfg.dma_enabled) {
 			dma.get_all_tx_buffers(2 * board_index, tx0_buf);
 			dma.get_all_tx_buffers(2 * board_index + 1, tx1_buf);
 			u220_ptrs[board_index]->setup(tx0_buf, tx1_buf);
@@ -69,11 +70,47 @@ void GlobalData::init() {
 		}
 	}
 
-	sync_ad9361_mcs();
+	uint32_t cnt = 0;
+	5_s .sleep();
+	cnt++;
+	piCout << cnt;
 
+	for (size_t i: active_boards) {
+		// user_u220_ptrs[i]->set_tx0_delay(cfg.tx_dac_delay[i * 2], cfg.tx_gpio_delay[i * 2]);
+		// user_u220_ptrs[i]->set_tx1_delay(cfg.tx_dac_delay[i * 2 + 1], cfg.tx_gpio_delay[i * 2 + 1]);
+		user_u220_ptrs[i]->set_play_gpio_tx_enable(0b11);
+		user_u220_ptrs[i]->set_rx0_delay(0xFD);
+		user_u220_ptrs[i]->set_rx1_delay(0xFD);
+		user_u220_ptrs[i]->set_play_gpio_rx_enable(0b11);
+		user_u220_ptrs[i]->set_play_rx_insert_count(1);
+		user_u220_ptrs[i]->reset_time(0x05DC);
+		// user_u220_ptrs[i]->set_tx_gainon_sg(0, cfg.tx_gainon_sg[i * 2]);
+		// user_u220_ptrs[i]->set_tx_gainon_sg(1, cfg.tx_gainon_sg[i * 2 + 1]);
+		// user_u220_ptrs[i]->set_tx_dac_sg(0, cfg.tx_dac_sg[i * 2]);
+		// user_u220_ptrs[i]->set_tx_dac_sg(1, cfg.tx_dac_sg[i * 2 + 1]);
+	}
+
+	5_s .sleep();
+	cnt++;
+	piCout << cnt;
+
+	sync_ad9361_mcs();
 	enable_external_lo_all();
 
-	if (dma_enabled) {
+	5_s .sleep();
+	cnt++;
+	piCout << cnt;
+
+	for (size_t i: active_boards) {
+		user_u220_ptrs[i]->set_play_start_tx();
+		user_u220_ptrs[i]->set_play_rx_enable(1);
+	}
+
+	5_s .sleep();
+	cnt++;
+	piCout << cnt;
+
+	if (cfg.dma_enabled) {
 		axi_dsp_init();
 		axi_dsp_configure();
 		axi_dsp_set_output_source(1, 0, 0);
@@ -147,9 +184,15 @@ void GlobalData::stop() {
 		u220_ptrs[board_index]->stop_reception();
 		u220_ptrs[board_index]->stop_transmission();
 	}
+
+	for (size_t i: active_boards) {
+		user_u220_ptrs[i]->set_play_stop_tx();
+		// user_u220_ptrs[i]->reset_time(0)
+	}
+
 	piDeleteAllAndClear(u220_ptrs);
 	active_boards.clear();
-	if (dma_enabled) {
+	if (cfg.dma_enabled) {
 		axi_dsp_deinit();
 	}
 	t_end = PISystemTime::current();
@@ -159,13 +202,13 @@ void GlobalData::stop() {
 		piCout << "Mean: transfer time = " << (t_end - t_start) / cycles_completed;
 	}
 	piCout << "====";
-	if (dma_enabled) dma.cleanup();
+	if (cfg.dma_enabled) dma.cleanup();
 }
 
 void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
-	if (!dma_enabled) return;
+	if (!cfg.dma_enabled) return;
 	while (!dma.can_send())
 		;
 	int ret = dma.send();

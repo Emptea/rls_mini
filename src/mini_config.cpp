@@ -1,0 +1,281 @@
+#include "mini_config.hpp"
+
+#include <algorithm>
+#include <fstream>
+#include <limits>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+
+MiniConfig::MiniConfig() {
+	load("mini.ini");
+	load_settings();
+	load_signal("tx_gainon.txt", tx_gainon_sg);
+	load_signal("rx_en.txt", rx_en_sg);
+	load_complex_signal("tx_dac.txt", tx_dac_sg);
+}
+
+void MiniConfig::trim(std::string & s) {
+	const auto first = s.find_first_not_of(" \t\r\n");
+
+	if (first == std::string::npos) {
+		s.clear();
+		return;
+	}
+
+	const auto last = s.find_last_not_of(" \t\r\n");
+	s               = s.substr(first, last - first + 1);
+}
+
+void MiniConfig::load(const std::string & filename) {
+	std::ifstream file(filename);
+
+	if (!file) {
+		throw std::runtime_error("Cannot open config: " + filename);
+	}
+
+	std::string section;
+	std::string line;
+
+	while (std::getline(file, line)) {
+		const auto comment = line.find_first_of("#;");
+
+		if (comment != std::string::npos) {
+			line.erase(comment);
+		}
+
+		trim(line);
+
+		if (line.empty()) {
+			continue;
+		}
+
+		if (line.front() == '[' && line.back() == ']') {
+			section = line.substr(1, line.size() - 2);
+			trim(section);
+			continue;
+		}
+
+		const auto pos = line.find('=');
+
+		if (pos == std::string::npos) {
+			throw std::runtime_error("Invalid config line: " + line);
+		}
+
+		std::string key   = line.substr(0, pos);
+		std::string value = line.substr(pos + 1);
+
+		trim(key);
+		trim(value);
+
+		if (section.empty() || key.empty() || value.empty()) {
+			throw std::runtime_error("Invalid config line: " + line);
+		}
+
+		data_[section][key] = value;
+	}
+}
+
+uint32_t MiniConfig::get_uint(const std::string & section, const std::string & key) const {
+	const auto section_it = data_.find(section);
+
+	if (section_it == data_.end()) {
+		throw std::runtime_error("Missing config section: [" + section + "]");
+	}
+
+	const auto key_it = section_it->second.find(key);
+
+	if (key_it == section_it->second.end()) {
+		throw std::runtime_error("Missing config key: " + section + "." + key);
+	}
+
+	const std::string & value = key_it->second;
+
+	if (value.empty() || value.front() == '-') {
+		throw std::runtime_error("Invalid config value: " + section + "." + key);
+	}
+
+	size_t pos        = 0;
+	const auto result = std::stoull(value, &pos, 0);
+
+	if (pos != value.size() || result > std::numeric_limits<uint32_t>::max()) {
+		throw std::runtime_error("Invalid config value: " + section + "." + key);
+	}
+
+	return static_cast<uint32_t>(result);
+}
+
+int32_t MiniConfig::get_int(const std::string & section, const std::string & key) const {
+	const auto section_it = data_.find(section);
+
+	if (section_it == data_.end()) {
+		throw std::runtime_error("Missing config section: [" + section + "]");
+	}
+
+	const auto key_it = section_it->second.find(key);
+
+	if (key_it == section_it->second.end()) {
+		throw std::runtime_error("Missing config key: " + section + "." + key);
+	}
+
+	const auto & value = key_it->second;
+
+	if (value.empty()) {
+		throw std::runtime_error("Invalid config value: " + section + "." + key);
+	}
+
+	size_t pos     = 0;
+	int64_t result = 0;
+
+	try {
+		result = std::stoll(value, &pos, 0);
+	} catch (const std::exception &) {
+		throw std::runtime_error("Invalid config value: " + section + "." + key);
+	}
+
+	if (pos != value.size() || result < std::numeric_limits<int32_t>::min() || result > std::numeric_limits<int32_t>::max()) {
+		throw std::runtime_error("Invalid config value: " + section + "." + key);
+	}
+
+	return static_cast<int32_t>(result);
+}
+
+std::array<uint32_t, MiniConfig::CHANNEL_COUNT> MiniConfig::get_uint_array(const std::string & section, const std::string & key) const {
+	std::array<uint32_t, CHANNEL_COUNT> result{};
+
+	const auto section_it = data_.find(section);
+
+	if (section_it == data_.end()) {
+		throw std::runtime_error("Missing config section: [" + section + "]");
+	}
+
+	const auto key_it = section_it->second.find(key);
+
+	if (key_it == section_it->second.end()) {
+		throw std::runtime_error("Missing config key: " + section + "." + key);
+	}
+
+	std::stringstream ss(key_it->second);
+	std::string value;
+
+	for (size_t i = 0; i < CHANNEL_COUNT; ++i) {
+		if (!std::getline(ss, value, ',')) {
+			throw std::runtime_error("Not enough values: " + section + "." + key);
+		}
+
+		trim(value);
+
+		if (value.empty() || value.front() == '-') {
+			throw std::runtime_error("Invalid value: " + section + "." + key);
+		}
+
+		size_t pos      = 0;
+		uint64_t number = 0;
+
+		try {
+			number = std::stoull(value, &pos, 0);
+		} catch (const std::exception &) {
+			throw std::runtime_error("Invalid value: " + section + "." + key);
+		}
+
+		if (pos != value.size() || number > std::numeric_limits<uint32_t>::max()) {
+			throw std::runtime_error("Invalid value: " + section + "." + key);
+		}
+
+		result[CHANNEL_COUNT - 1 - i] = static_cast<uint32_t>(number);
+	}
+
+	if (std::getline(ss, value, ',')) {
+		throw std::runtime_error("Too many values: " + section + "." + key);
+	}
+
+	return result;
+}
+
+void MiniConfig::load_settings() {
+	tx_dac_delay     = get_uint_array("tx", "dac_delay");
+	tx_gpio_delay    = get_uint_array("tx", "gpio_delay");
+	tx_gpio_enable   = get_uint("tx", "gpio_enable");
+	rx_delay         = get_uint("rx", "delay");
+	rx_gpio_enable   = get_uint("rx", "gpio_enable");
+	rx_insert_count  = get_uint("rx", "insert_count");
+	pps_dead_zone_ms = get_uint("sync", "pps_dead_zone_ms");
+	dma_enabled      = get_uint("dma", "enable") == 1;
+}
+
+void MiniConfig::load_signal(const std::string & filename, ChannelSignals & signals) {
+	std::ifstream file(filename);
+
+	if (!file) {
+		throw std::runtime_error("Cannot open signal file: " + filename);
+	}
+
+	std::string line;
+	size_t sample = 0;
+
+	while (std::getline(file, line)) {
+		if (!line.empty() && line.back() == '\r') {
+			line.pop_back();
+		}
+
+		if (sample >= SAMPLE_COUNT || line.size() != CHANNEL_COUNT) {
+			throw std::runtime_error("Invalid signal file size: " + filename);
+		}
+
+		for (size_t channel = 0; channel < CHANNEL_COUNT; ++channel) {
+			const char value = line[CHANNEL_COUNT - 1 - channel];
+
+			if (value != '0' && value != '1') {
+				throw std::runtime_error("Invalid signal value: " + filename);
+			}
+
+			signals[channel][sample] = static_cast<uint8_t>(value - '0');
+		}
+
+		++sample;
+	}
+
+	if (sample != SAMPLE_COUNT) {
+		throw std::runtime_error("Invalid signal sample count: " + filename);
+	}
+}
+
+void MiniConfig::load_complex_signal(const std::string & filename, ChannelComplexSignals & signals) {
+	std::ifstream file(filename);
+
+	if (!file) {
+		throw std::runtime_error("Cannot open signal file: " + filename);
+	}
+
+	std::string line;
+	size_t sample = 0;
+
+	while (std::getline(file, line)) {
+		if (!line.empty() && line.back() == '\r') {
+			line.pop_back();
+		}
+
+		if (sample >= SAMPLE_COUNT || line.size() != CHANNEL_COUNT * 8) {
+			throw std::runtime_error("Invalid signal file size: " + filename);
+		}
+
+		for (size_t ch = 0; ch < CHANNEL_COUNT; ++ch) {
+			const size_t offset = (CHANNEL_COUNT - 1 - ch) * 8;
+
+			const auto im       = std::stoul(line.substr(offset, 4), nullptr, 16);
+			const auto re       = std::stoul(line.substr(offset + 4, 4), nullptr, 16);
+
+			if (im > 0xFFFF || re > 0xFFFF) {
+				throw std::runtime_error("Invalid signal value: " + filename);
+			}
+
+			signals[ch][sample] = {static_cast<int16_t>(static_cast<uint16_t>(re)), static_cast<int16_t>(static_cast<uint16_t>(im))};
+		}
+
+		++sample;
+	}
+
+	if (sample != SAMPLE_COUNT) {
+		throw std::runtime_error("Invalid signal sample count: " + filename);
+	}
+}

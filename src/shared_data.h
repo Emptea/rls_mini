@@ -8,6 +8,7 @@
 #include "u220.hpp"
 #include "uhd_utils.hpp"
 #include "user_u220.h"
+#include "mini_config.hpp"
 
 #include <pivaluetree.h>
 
@@ -104,8 +105,7 @@ private:
 	int16_t dd_poi   = 0; // 1 м
 	double daz_poi   = 0;
 	double time;
-
-	std::atomic_int dma_enabled = {0};
+	MiniConfig cfg;
 };
 
 #endif

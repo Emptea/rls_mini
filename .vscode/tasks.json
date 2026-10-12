@@ -44,6 +44,19 @@
                 "ubuntu@172.16.0.123:~/rls_mini/bin"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "RLS Mini: Copy config to board",
+            "type": "process",
+            "command": "scp",
+            "args": [
+                "${workspaceFolder}/config/mini.ini",
+                "${workspaceFolder}/config/tx_gainon.txt",
+                "${workspaceFolder}/config/tx_dac.txt",
+                "${workspaceFolder}/config/rx_en.txt",
+                "ubuntu@172.16.0.123:~/rls_mini/bin/"
+            ],
+            "problemMatcher": []
         }
     ]
 }

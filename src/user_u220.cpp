@@ -39,7 +39,7 @@ void UserU220::write_reg(WrReg reg, uint32_t value) {
 	user_regs->poke32(addr, value);
 
 	std::cout << "Write reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(8) << std::setfill('0')
-	          << value << std::dec << std::endl;
+			  << value << std::dec << std::endl;
 }
 
 uint64_t UserU220::read_reg(RdReg reg) {
@@ -53,7 +53,7 @@ uint64_t UserU220::read_reg(RdReg reg) {
 	const uint64_t value = user_regs->peek64(addr);
 
 	std::cout << "Read reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(16) << std::setfill('0')
-	          << value << std::dec << std::endl;
+			  << value << std::dec << std::endl;
 
 	return value;
 }
@@ -90,12 +90,17 @@ void UserU220::set_rx0_delay(uint32_t val) {
 }
 
 void UserU220::set_rx1_delay(uint32_t val) {
-	write_reg(WrReg::RX0_DELAY, val & 0xFFFF);
-	const uint64_t raw = read_reg(RdReg::RX0_DELAY);
+	write_reg(WrReg::RX1_DELAY, val & 0xFFFF);
+	const uint64_t raw = read_reg(RdReg::RX1_DELAY);
 }
 
-void UserU220::set_rx_en_delay(uint32_t val) {
-	write_reg(WrReg::RX_EN_DELAY, val & 0xFFFF);
+void UserU220::set_rx0_en_delay(uint32_t val) {
+	write_reg(WrReg::RX0_DELAY, val & 0xFFFF);
+	const uint64_t raw = read_reg(RdReg::RX_EN_DELAY);
+}
+
+void UserU220::set_rx1_en_delay(uint32_t val) {
+	write_reg(WrReg::RX1_DELAY, val & 0xFFFF);
 	const uint64_t raw = read_reg(RdReg::RX_EN_DELAY);
 }
 
@@ -144,9 +149,9 @@ void UserU220::set_play_rx_insert_count(uint32_t rx_insert_count) {
 	write_play_ctrl();
 }
 
-void UserU220::set_play_pps_time_reset(uint32_t pps_time_reset) {
-	write_reg(WrReg::PPS_TIME_RESET, pps_time_reset & 0x1);
-	const uint64_t raw = read_reg(RdReg::PPS_TIME_RESET);
+void UserU220::reset_time(uint32_t vita_time) {
+	write_reg(WrReg::RESET_TIME, vita_time << 16 | 0x1);
+	const uint64_t raw = read_reg(RdReg::RESET_TIME);
 }
 
 void UserU220::set_play_start_tx() {
@@ -165,16 +170,6 @@ void UserU220::set_play_stop_tx() {
 	play_ctrl_.start_pulse_40m    = 0;
 
 	write_play_ctrl();
-}
-
-void UserU220::set_tx_delay_del_dac(uint32_t del_dac) {
-	tx_delay_.del_dac = del_dac;
-	write_tx_delay();
-}
-
-void UserU220::set_tx_delay_del_pps(uint32_t del_pps) {
-	tx_delay_.del_pps = del_pps;
-	write_tx_delay();
 }
 
 void UserU220::sync_ad9361_stage1() {
@@ -207,4 +202,29 @@ void UserU220::sync_ad9361_finish() {
 	play_ctrl_.start_pulse_40m    = 0;
 
 	write_play_ctrl();
+}
+
+void UserU220::set_tx_dac_sg(size_t channel, const std::array<std::complex<short>, 232 * 4> & samples) {
+	const WrReg reg = channel == 0 ? WrReg::TX0_DAC_MEM : WrReg::TX1_DAC_MEM;
+	write_reg(WrReg::MEM_PTR, 0);
+	for (const auto & sample: samples) {
+		const uint32_t value = static_cast<uint16_t>(sample.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(sample.imag())) << 16);
+		write_reg(reg, value);
+	}
+}
+
+void UserU220::set_tx_gainon_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples) {
+	const WrReg reg = channel == 0 ? WrReg::TX0_GAINON_MEM : WrReg::TX1_GAINON_MEM;
+	write_reg(WrReg::MEM_PTR, 0);
+	for (uint8_t sample: samples) {
+		write_reg(reg, sample);
+	}
+}
+
+void UserU220::set_rx_en_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples) {
+	const WrReg reg = channel == 0 ? WrReg::RX0_EN_MEM : WrReg::RX1_EN_MEM;
+	write_reg(WrReg::MEM_PTR, 0);
+	for (uint8_t sample: samples) {
+		write_reg(reg, sample);
+	}
 }

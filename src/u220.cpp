@@ -162,9 +162,6 @@ void U220::setup_tx_streamer() {
 
 	// Pre-fill buffer with waveform
 	fill_buffer_with_wavetable(tx_buffer);
-
-	set_sr_core_tx_delay(usrp, 0x03, 0x30);
-	set_sr_core_play_gpio_tx_enable(usrp, 0b11);
 }
 
 void U220::setup_rx_streamer(void ** tx0_buf, void ** tx1_buf) {
@@ -188,10 +185,6 @@ void U220::setup_rx_streamer(void ** tx0_buf, void ** tx1_buf) {
 		rx_buffer_ptrs[0][ch] = static_cast<complexs *>(tx0_buf[ch]);
 		rx_buffer_ptrs[1][ch] = static_cast<complexs *>(tx1_buf[ch]);
 	}
-	set_sr_core_rx_delay(usrp, 0xFD);
-	set_sr_core_play_gpio_rx_enable(usrp, 0b11);
-	set_sr_core_play_rx_insert_count(usrp, 1);
-	set_sr_core_play_pps_time_reset(usrp, 0x05DC05DD);
 }
 
 void U220::setup_rx_streamer() {
@@ -214,10 +207,6 @@ void U220::setup_rx_streamer() {
 		rx_buffer_ptrs[ch][0] = &rx_buffer[ch].front();
 		rx_buffer_ptrs[ch][1] = &rx_buffer[ch].front();
 	}
-	set_sr_core_rx_delay(usrp, 0xFD);
-	set_sr_core_play_gpio_rx_enable(usrp, 0b11);
-	set_sr_core_play_rx_insert_count(usrp, 1);
-	set_sr_core_play_pps_time_reset(usrp, 0x05DC05DD);
 }
 
 
@@ -425,10 +414,6 @@ void U220::start_sync() {
 }
 
 void U220::start_transmission() {
-	// set_sr_core_play_enable(usrp, 1);
-	// set_sr_core_play_gain_on_enable(usrp, 1);
-	set_sr_core_play_start_tx(usrp); // sets enable, gain_on_enable, start_pulse_enable, start_pulse_40m
-	std::cout << std::endl << "Transmission started for " << serial << std::endl;
 }
 
 void U220::start_reception(double settling_time) {
@@ -438,7 +423,7 @@ void U220::start_reception(double settling_time) {
 	rx_timeout        = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
 
 	// setup streaming
-	set_sr_core_play_rx_enable(usrp, 1);
+	
 	print_config(board_config);
 	rx_stream_cmd.num_samps  = board_config.rx_spb;
 	rx_stream_cmd.stream_now = false;
@@ -455,7 +440,6 @@ void U220::start_reception(double settling_time) {
 }
 
 void U220::stop_transmission() {
-	set_sr_core_play_stop_tx(usrp);
 	// set_sr_core_play_enable(usrp, 0);
 	// set_sr_core_play_gain_on_enable(usrp, 0);
 	// tx_thread.stopAndWait();
@@ -507,7 +491,6 @@ void U220::stop_and_drain_rx() {
 void U220::stop_reception() {
 	// rx_thread.stopAndWait();
 	stop_and_drain_rx();
-	set_sr_core_play_pps_time_reset(usrp, 0);
 
 	// rx_stream->issue_stream_cmd(rx_stream_cmd);
 
