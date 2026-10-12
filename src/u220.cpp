@@ -424,7 +424,7 @@ void U220::start_reception(double settling_time) {
 
 	// setup streaming
 	
-	print_config(board_config);
+	// print_config(board_config);
 	rx_stream_cmd.num_samps  = board_config.rx_spb;
 	rx_stream_cmd.stream_now = false;
 	rx_stream_cmd.time_spec  = start_time;

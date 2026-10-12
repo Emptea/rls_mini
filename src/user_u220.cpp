@@ -72,36 +72,28 @@ void UserU220::set_play(uint32_t enable, uint32_t trigger_src, uint32_t gain_on_
 	write_play_ctrl();
 }
 
-void UserU220::set_tx0_delay(uint32_t dac_delay, uint32_t gainon_delay) {
-	uint32_t word = gainon_delay << 16 | (dac_delay & 0xFFFF);
-	write_reg(WrReg::TX0_DELAY, word);
-	read_reg(RdReg::TX0_DELAY);
+void UserU220::set_tx_dac_delay(uint32_t delay_ch0, uint32_t delay_ch1) {
+	uint32_t word = delay_ch1 << 16 | (delay_ch0 & 0xFFFF);
+	write_reg(WrReg::TX_DAC_DELAY, word);
+	// read_reg(RdReg::TX_DAC_DELAY);
 }
 
-void UserU220::set_tx1_delay(uint32_t dac_delay, uint32_t gainon_delay) {
-	uint32_t word = gainon_delay << 16 | (dac_delay & 0xFFFF);
-	write_reg(WrReg::TX1_DELAY, word);
-	read_reg(RdReg::TX1_DELAY);
+void UserU220::set_tx_gainon_delay(uint32_t delay_ch0, uint32_t delay_ch1) {
+	uint32_t word = delay_ch1 << 16 | (delay_ch0 & 0xFFFF);
+	write_reg(WrReg::TX_GAINON_DELAY, word);
+	// read_reg(RdReg::TX_GAINON_DELAY);
 }
 
-void UserU220::set_rx0_delay(uint32_t val) {
-	write_reg(WrReg::RX0_DELAY, val & 0xFFFF);
-	const uint64_t raw = read_reg(RdReg::RX0_DELAY);
+void UserU220::set_rx_adc_delay(uint32_t delay_ch0, uint32_t delay_ch1) {
+	uint32_t word = delay_ch1 << 16 | (delay_ch0 & 0xFFFF);
+	write_reg(WrReg::RX_ADC_DELAY, word);
+	// read_reg(RdReg::RX_ADC_DELAY);
 }
 
-void UserU220::set_rx1_delay(uint32_t val) {
-	write_reg(WrReg::RX1_DELAY, val & 0xFFFF);
-	const uint64_t raw = read_reg(RdReg::RX1_DELAY);
-}
-
-void UserU220::set_rx0_en_delay(uint32_t val) {
-	write_reg(WrReg::RX0_DELAY, val & 0xFFFF);
-	const uint64_t raw = read_reg(RdReg::RX_EN_DELAY);
-}
-
-void UserU220::set_rx1_en_delay(uint32_t val) {
-	write_reg(WrReg::RX1_DELAY, val & 0xFFFF);
-	const uint64_t raw = read_reg(RdReg::RX_EN_DELAY);
+void UserU220::set_rx_en_delay(uint32_t delay_ch0, uint32_t delay_ch1) {
+	uint32_t word = delay_ch1 << 16 | (delay_ch0 & 0xFFFF);
+	write_reg(WrReg::RX_EN_DELAY, word);
+	// read_reg(RdReg::RX_EN_DELAY);
 }
 
 void UserU220::set_play_enable(uint32_t enable) {

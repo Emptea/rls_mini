@@ -10,12 +10,10 @@ public:
 
 	void set_play(uint32_t enable, uint32_t trigger_src, uint32_t gain_on_enable, uint32_t rx_enable);
 
-	void set_tx0_delay(uint32_t dac_delay, uint32_t gainon_delay);
-	void set_tx1_delay(uint32_t dac_delay, uint32_t gainon_delay);
-	void set_rx0_delay(uint32_t val);
-	void set_rx1_delay(uint32_t val);
-	void set_rx0_en_delay(uint32_t val);
-	void set_rx1_en_delay(uint32_t val);
+	void set_tx_dac_delay(uint32_t delay_ch0, uint32_t delay_ch1);
+	void set_tx_gainon_delay(uint32_t delay_ch0, uint32_t delay_ch1);
+	void set_rx_adc_delay(uint32_t delay_ch0, uint32_t delay_ch1);
+	void set_rx_en_delay(uint32_t delay_ch0, uint32_t delay_ch1);
 
 	void set_play_enable(uint32_t enable);
 	void set_play_trigger_src(uint32_t trigger_src);
@@ -48,46 +46,41 @@ private:
 		MEM_PTR           = 1,
 		TX0_DAC_MEM       = 2,
 		TX0_GAINON_MEM    = 3,
-		TX0_DELAY         = 4,
-		RX0_DELAY         = 5,
-		RX0_EN_DELAY      = 6,
+		TX_DAC_DELAY      = 4,
+		RX_ADC_DELAY      = 5,
+		RX_EN_DELAY       = 6,
 		RX0_EN_MEM        = 7,
 		RESET_TIME        = 8,
 		CAT_SYNC_WIDTH    = 9,
 		TX0_GAIN          = 10,
 		TX1_GAIN          = 11,
 		TX1_DAC_MEM       = 12,
-		TX1_DELAY         = 13,
-		RX1_DELAY         = 14,
-		RX_PLAYBACK_START = 15,
-		TX1_GAINON_MEM    = 16,
-		HHHHHHHHHH        = 17,
-		RX1_EN_MEM        = 18,
-		RX1_EN_DELAY      = 19,
+		TX_GAINON_DELAY   = 13,
+		RX_PLAYBACK_START = 14,
+		TX1_GAINON_MEM    = 15,
+		RX1_EN_MEM        = 16,
 	};
 
 	enum class RdReg : uint32_t {
-		PLAY_CTRL             = 0,
-		PLAY_CTRL_EFFECTIVE   = 1,
-		TX0_DELAY             = 2,
-		TX0_DELAY_EFFECTIVE   = 3,
-		RX0_DELAY             = 4,
-		RX0_DELAY_EFFECTIVE   = 5,
-		RX_EN_DELAY           = 6,
-		RX_EN_DELAY_EFFECTIVE = 7,
-		RESET_TIME            = 8,
-		RESET_TIME_EFFECTIVE  = 9,
-		PPS_STATUS            = 10,
-		CAT_SYNC_WIDTH        = 11,
-		CAT_SYNC_STATUS       = 12,
-		TX0_GAIN              = 13,
-		TX0_GAIN_EFFECTIVE    = 14,
-		TX1_GAIN              = 15,
-		TX1_GAIN_EFFECTIVE    = 16,
-		TX1_DELAY             = 17,
-		TX1_DELAY_EFFECTIVE   = 18,
-		RX1_DELAY             = 19,
-		RX1_DELAY_EFFECTIVE   = 20
+		PLAY_CTRL                 = 0,
+		PLAY_CTRL_EFFECTIVE       = 1,
+		TX_DAC_DELAY              = 2,
+		TX_DAC_DELAY_EFFECTIVE    = 3,
+		RX_ADC_DELAY              = 4,
+		RX_ADC_EFFECTIVE          = 5,
+		RX_EN_DELAY               = 6,
+		RX_EN_DELAY_EFFECTIVE     = 7,
+		RESET_TIME                = 8,
+		RESET_TIME_EFFECTIVE      = 9,
+		PPS_STATUS                = 10,
+		CAT_SYNC_WIDTH            = 11,
+		CAT_SYNC_STATUS           = 12,
+		TX0_GAIN                  = 13,
+		TX0_GAIN_EFFECTIVE        = 14,
+		TX1_GAIN                  = 15,
+		TX1_GAIN_EFFECTIVE        = 16,
+		TX_GAINON_DELAY           = 17,
+		TX_GAINON_DELAY_EFFECTIVE = 18,
 	};
 
 	static constexpr uint32_t reg_addr(WrReg reg) { return static_cast<uint32_t>(reg) << 2; }

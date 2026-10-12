@@ -193,14 +193,20 @@ std::array<uint32_t, MiniConfig::CHANNEL_COUNT> MiniConfig::get_uint_array(const
 }
 
 void MiniConfig::load_settings() {
-	tx_dac_delay     = get_uint_array("tx", "dac_delay");
-	tx_gpio_delay    = get_uint_array("tx", "gpio_delay");
-	tx_gpio_enable   = get_uint("tx", "gpio_enable");
-	rx_delay         = get_uint("rx", "delay");
-	rx_gpio_enable   = get_uint("rx", "gpio_enable");
-	rx_insert_count  = get_uint("rx", "insert_count");
-	pps_dead_zone_ms = get_uint("sync", "pps_dead_zone_ms");
-	dma_enabled      = get_uint("dma", "enable") == 1;
+	tx_dac_delay      = get_uint_array("tx", "dac_delay");
+	tx_gpio_delay     = get_uint_array("tx", "gpio_delay");
+	rx_adc_delay      = get_uint_array("rx", "adc_delay");
+	rx_en_delay       = get_uint_array("rx", "en_delay");
+	tx_gpio_enable    = get_uint("tx", "gpio_enable");
+	rx_gpio_enable    = get_uint("rx", "gpio_enable");
+	rx_insert_count   = get_uint("rx", "insert_count");
+	pps_dead_zone_ms  = get_uint("sync", "pps_dead_zone_ms");
+	dma_enabled       = get_uint("dma", "enable") == 1;
+	const auto values = get_uint_array("tx", "use_ext_file_sg");
+	for (size_t ch = 0; ch < CHANNEL_COUNT; ++ch) {
+		if (values[ch] > 1) throw std::runtime_error("Invalid tx.use_ext_file_sg");
+		use_ext_file_sg[ch] = values[ch] == 1;
+	}
 }
 
 void MiniConfig::load_signal(const std::string & filename, ChannelSignals & signals) {

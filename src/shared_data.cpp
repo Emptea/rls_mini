@@ -76,31 +76,36 @@ void GlobalData::init() {
 	piCout << cnt;
 
 	for (size_t i: active_boards) {
-		// user_u220_ptrs[i]->set_tx0_delay(cfg.tx_dac_delay[i * 2], cfg.tx_gpio_delay[i * 2]);
-		// user_u220_ptrs[i]->set_tx1_delay(cfg.tx_dac_delay[i * 2 + 1], cfg.tx_gpio_delay[i * 2 + 1]);
+		user_u220_ptrs[i]->set_tx_dac_delay(cfg.tx_dac_delay[i * 2], cfg.tx_dac_delay[i * 2 + 1]);
+		user_u220_ptrs[i]->set_tx_gainon_delay(cfg.tx_gpio_delay[i * 2], cfg.tx_gpio_delay[i * 2 + 1]);
+		user_u220_ptrs[i]->set_rx_adc_delay(cfg.rx_adc_delay[i * 2], cfg.rx_adc_delay[i * 2 + 1]);
+		user_u220_ptrs[i]->set_rx_en_delay(cfg.rx_en_delay[i * 2], cfg.rx_en_delay[i * 2 + 1]);
 		user_u220_ptrs[i]->set_play_gpio_tx_enable(0b11);
-		user_u220_ptrs[i]->set_rx0_delay(0xFD);
-		user_u220_ptrs[i]->set_rx1_delay(0xFD);
 		user_u220_ptrs[i]->set_play_gpio_rx_enable(0b11);
 		user_u220_ptrs[i]->set_play_rx_insert_count(1);
-		user_u220_ptrs[i]->reset_time(0x05DC);
-		// user_u220_ptrs[i]->set_tx_gainon_sg(0, cfg.tx_gainon_sg[i * 2]);
-		// user_u220_ptrs[i]->set_tx_gainon_sg(1, cfg.tx_gainon_sg[i * 2 + 1]);
-		// user_u220_ptrs[i]->set_tx_dac_sg(0, cfg.tx_dac_sg[i * 2]);
-		// user_u220_ptrs[i]->set_tx_dac_sg(1, cfg.tx_dac_sg[i * 2 + 1]);
+		user_u220_ptrs[i]->set_tx_gainon_sg(0, cfg.tx_gainon_sg[i * 2]);
+		user_u220_ptrs[i]->set_tx_gainon_sg(1, cfg.tx_gainon_sg[i * 2 + 1]);
+		user_u220_ptrs[i]->set_tx_dac_sg(0, cfg.tx_dac_sg[i * 2]);
+		user_u220_ptrs[i]->set_tx_dac_sg(1, cfg.tx_dac_sg[i * 2 + 1]);
 	}
 
-	5_s .sleep();
+	// 5_s .sleep();
 	cnt++;
 	piCout << cnt;
 
+	// for (size_t i = 0; i < 10; i++) {
 	sync_ad9361_mcs();
+	// 5_s .sleep();
+	// }
 	enable_external_lo_all();
 
-	5_s .sleep();
+	// 5_s .sleep();
 	cnt++;
 	piCout << cnt;
 
+	for (size_t i: active_boards) {
+		user_u220_ptrs[i]->reset_time(0x05DC);
+	}
 	for (size_t i: active_boards) {
 		user_u220_ptrs[i]->set_play_start_tx();
 		user_u220_ptrs[i]->set_play_rx_enable(1);
@@ -435,6 +440,8 @@ void GlobalData::sync_ad9361_mcs() {
 
 	generate_ad9361_sync_in();
 	1_s .sleep();
+	// generate_ad9361_sync_in();
+	// 1_s .sleep();
 
 	piCout << "AD9361 MCS: stage 2\n";
 
@@ -446,6 +453,8 @@ void GlobalData::sync_ad9361_mcs() {
 
 	generate_ad9361_sync_in();
 	1_s .sleep();
+	// generate_ad9361_sync_in();
+	// 1_s .sleep();
 
 	piCout << "AD9361 MCS: finish\n";
 
