@@ -20,14 +20,6 @@ uint32_t UserU220::to_raw(const PlayCtrl & ctrl) {
 	return raw;
 }
 
-uint32_t UserU220::to_raw(const TxDelay & delay) {
-	static_assert(sizeof(TxDelay) == sizeof(uint32_t));
-
-	uint32_t raw = 0;
-	std::memcpy(&raw, &delay, sizeof(raw));
-	return raw;
-}
-
 void UserU220::write_reg(WrReg reg, uint32_t value) {
 	auto user_regs = usrp_->get_user_settings_iface();
 
@@ -219,4 +211,11 @@ void UserU220::set_rx_en_sg(size_t channel, const std::array<uint8_t, 232 * 4> &
 	for (uint8_t sample: samples) {
 		write_reg(reg, sample);
 	}
+}
+
+uint32_t UserU220::get_fpga_version() {
+    const uint64_t value = read_reg(RdReg::FPGA_VERSION);
+    const uint32_t version = (value & 0xFFFFFF);
+    std::cout << "U220 FPGA version: " << std::hex << version << std::dec << std::endl;
+	return version;
 }

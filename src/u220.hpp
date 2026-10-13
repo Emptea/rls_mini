@@ -110,18 +110,18 @@ public:
 	     const PIString & args   = "recv_frame_size=4104,num_recv_frames=128,send_frame_size=8192,num_send_frames=512",
 	     uint64_t num_samps      = 0,
 	     u220_config_t config    = {
-			 5e6,
-			 3.6e9,
-			 {0.0},
-			 {0.0},
-			 {56e6, 56e6},
-			 {56e6, 56e6},
-			 "",
-			 "sc16",
-			 "sc16",
-			 "internal",
-			 0,
-			 0
+             5e6,
+             3.6e9,
+             {0.0},
+             {0.0},
+             {56e6, 56e6},
+             {56e6, 56e6},
+             "",
+             "sc16",
+             "sc16",
+             "internal",
+             0,
+             0
     });
 
 	~U220();
@@ -133,7 +133,6 @@ public:
 	void start_sync();
 	bool sync();
 
-	void start_transmission();
 	void transmit();
 	void stop_transmission();
 
@@ -181,6 +180,8 @@ public:
 	void mcs_stage2();
 	void mcs_finish();
 	void enable_external_lo();
+	void ensm_to_alert();
+	void ensm_to_fdd();
 
 	uhd::usrp::multi_usrp::sptr get_usrp() { return usrp; }
 };

@@ -71,9 +71,14 @@ void GlobalData::init() {
 	}
 
 	uint32_t cnt = 0;
-	5_s .sleep();
 	cnt++;
 	piCout << cnt;
+	for	(size_t i: active_boards) {
+		const auto ver = user_u220_ptrs[i]->get_fpga_version();
+		const auto ser = u220_ptrs[i]->get_serial();
+		piCout << ser << PICoutManipulators::Hex << ver;
+	}
+	5_s .sleep();
 
 	for (size_t i: active_boards) {
 		user_u220_ptrs[i]->set_tx_dac_delay(cfg.tx_dac_delay[i * 2], cfg.tx_dac_delay[i * 2 + 1]);
@@ -83,10 +88,10 @@ void GlobalData::init() {
 		user_u220_ptrs[i]->set_play_gpio_tx_enable(0b11);
 		user_u220_ptrs[i]->set_play_gpio_rx_enable(0b11);
 		user_u220_ptrs[i]->set_play_rx_insert_count(1);
-		user_u220_ptrs[i]->set_tx_gainon_sg(0, cfg.tx_gainon_sg[i * 2]);
-		user_u220_ptrs[i]->set_tx_gainon_sg(1, cfg.tx_gainon_sg[i * 2 + 1]);
-		user_u220_ptrs[i]->set_tx_dac_sg(0, cfg.tx_dac_sg[i * 2]);
-		user_u220_ptrs[i]->set_tx_dac_sg(1, cfg.tx_dac_sg[i * 2 + 1]);
+		// user_u220_ptrs[i]->set_tx_gainon_sg(0, cfg.tx_gainon_sg[i * 2]);
+		// user_u220_ptrs[i]->set_tx_gainon_sg(1, cfg.tx_gainon_sg[i * 2 + 1]);
+		// user_u220_ptrs[i]->set_tx_dac_sg(0, cfg.tx_dac_sg[i * 2]);
+		// user_u220_ptrs[i]->set_tx_dac_sg(1, cfg.tx_dac_sg[i * 2 + 1]);
 	}
 
 	// 5_s .sleep();
@@ -94,12 +99,21 @@ void GlobalData::init() {
 	piCout << cnt;
 
 	// for (size_t i = 0; i < 10; i++) {
-	sync_ad9361_mcs();
+	// sync_ad9361_mcs();
 	// 5_s .sleep();
 	// }
 	enable_external_lo_all();
 
 	// 5_s .sleep();
+	// for (size_t i = 0; i < 16; i++)
+	// {
+	// 	u220_ptrs[0]->ensm_to_alert();
+	// 	1_s .sleep();
+	// 	u220_ptrs[0]->ensm_to_fdd();
+	// 	5_s .sleep();
+	// }
+	
+
 	cnt++;
 	piCout << cnt;
 
@@ -107,8 +121,8 @@ void GlobalData::init() {
 		user_u220_ptrs[i]->reset_time(0x05DC);
 	}
 	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->set_play_start_tx();
-		user_u220_ptrs[i]->set_play_rx_enable(1);
+		// user_u220_ptrs[i]->set_play_start_tx();
+		// user_u220_ptrs[i]->set_play_rx_enable(1);
 	}
 
 	5_s .sleep();
@@ -162,6 +176,7 @@ void GlobalData::start() {
 		// u220_ptrs[board_index]->start_reception(4.64+180*0.2e-6);
 		u220_ptrs[board_index]->set_time_sync();
 		double start_time = 0.05;
+		user_u220_ptrs[board_index]->set_play_rx_enable(1);
 		u220_ptrs[board_index]->start_reception(start_time);
 	}
 	// 0.1_s .sleep();
@@ -174,7 +189,7 @@ void GlobalData::start() {
 	}
 	t_start = PISystemTime::current();
 	for (const auto board_index: active_boards) {
-		u220_ptrs[board_index]->start_transmission();
+		user_u220_ptrs[board_index]->set_play_start_tx();
 	}
 }
 

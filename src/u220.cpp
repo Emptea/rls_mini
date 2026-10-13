@@ -63,7 +63,7 @@ U220::U220(const PIString & serial, const PIString & args, uint64_t num_samps, u
 	, device_args(args)
 	, user_config(config)
 	, rx_stream_cmd((num_samps == 0) ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS
-	                                 : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE) {}
+                                     : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE) {}
 
 U220::~U220() {}
 
@@ -71,7 +71,7 @@ void U220::init() {
 	initialize_usrp();
 }
 
-void U220::setup(void ** tx0_buf, void ** tx1_buf){
+void U220::setup(void ** tx0_buf, void ** tx1_buf) {
 	setup_tx_streamer();
 	setup_rx_streamer(tx0_buf, tx1_buf);
 	// setup_rx_streamer();
@@ -374,7 +374,8 @@ void U220::receive() {
 	// 	   << "serial" << serial;
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
 		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
-			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6);
+			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6)
+			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
 		// PRINT_U220_STATS(stats);
 	}
 }
@@ -413,17 +414,14 @@ void U220::start_sync() {
 	sync_thread.startOnce([this]() { status.on = sync(); });
 }
 
-void U220::start_transmission() {
-}
-
 void U220::start_reception(double settling_time) {
-	const double rate = usrp->get_rx_rate();
-	auto start_time   = usrp->get_time_now() + uhd::time_spec_t(settling_time);
-	rx_burst_pkt_time = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
-	rx_timeout        = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
+	const double rate        = usrp->get_rx_rate();
+	auto start_time          = usrp->get_time_now() + uhd::time_spec_t(settling_time);
+	rx_burst_pkt_time        = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
+	rx_timeout               = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
 
 	// setup streaming
-	
+
 	// print_config(board_config);
 	rx_stream_cmd.num_samps  = board_config.rx_spb;
 	rx_stream_cmd.stream_now = false;
@@ -495,7 +493,7 @@ void U220::stop_reception() {
 	// rx_stream->issue_stream_cmd(rx_stream_cmd);
 
 	piCout << "RX recv" << serial << "mean(us):" << static_cast<double>(stats.rx_recv_total_us) / stats.cycles_completed
-	       << "max(us):" << stats.rx_recv_max_us;
+		   << "max(us):" << stats.rx_recv_max_us;
 	piCout << "Stream rx stopped";
 }
 
@@ -545,22 +543,34 @@ void U220::mcs_finish() {
 	tree->access<int>("/mboards/0/mcs/command").set(3);
 }
 
-void U220::enable_external_lo()
-{
-    if (!usrp) {
-        throw std::runtime_error("U220: USRP not initialized");
-    }
+void U220::enable_external_lo() {
+	if (!usrp) {
+		throw std::runtime_error("U220: USRP not initialized");
+	}
 
-    auto tree = usrp->get_device()->get_tree();
+	auto tree              = usrp->get_device()->get_tree();
 
-    const std::string path = "/mboards/0/lo/external";
+	const std::string path = "/mboards/0/lo/external";
 
-    if (!tree->exists(path)) {
-        throw std::runtime_error(
-            "U220: external LO property not found");
-    }
+	if (!tree->exists(path)) {
+		throw std::runtime_error("U220: external LO property not found");
+	}
 
-    tree->access<int>(path).set(1);
+	tree->access<int>(path).set(1);
 
-    std::cout << "[U220] External LO enabled" << std::endl;
+	std::cout << "[U220] External LO enabled" << std::endl;
+}
+
+void U220::ensm_to_alert() {
+	auto tree              = usrp->get_device()->get_tree();
+	const std::string path = "/mboards/0/mcs/command";
+	tree->access<int>(path).set(4);
+	std::cout << "[U220] ENSM -> ALERT" << std::endl;
+}
+
+void U220::ensm_to_fdd() {
+	auto tree              = usrp->get_device()->get_tree();
+	const std::string path = "/mboards/0/mcs/command";
+	tree->access<int>(path).set(5);
+	std::cout << "[U220] ENSM -> FDD" << std::endl;
 }

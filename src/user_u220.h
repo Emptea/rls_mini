@@ -39,6 +39,8 @@ public:
 	void set_tx_gainon_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples);
 	void set_rx_en_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples);
 
+	uint32_t get_fpga_version();
+
 
 private:
 	enum class WrReg : uint32_t {
@@ -62,25 +64,26 @@ private:
 	};
 
 	enum class RdReg : uint32_t {
-		PLAY_CTRL                 = 0,
-		PLAY_CTRL_EFFECTIVE       = 1,
-		TX_DAC_DELAY              = 2,
-		TX_DAC_DELAY_EFFECTIVE    = 3,
-		RX_ADC_DELAY              = 4,
-		RX_ADC_EFFECTIVE          = 5,
-		RX_EN_DELAY               = 6,
-		RX_EN_DELAY_EFFECTIVE     = 7,
-		RESET_TIME                = 8,
-		RESET_TIME_EFFECTIVE      = 9,
-		PPS_STATUS                = 10,
-		CAT_SYNC_WIDTH            = 11,
-		CAT_SYNC_STATUS           = 12,
-		TX0_GAIN                  = 13,
-		TX0_GAIN_EFFECTIVE        = 14,
-		TX1_GAIN                  = 15,
-		TX1_GAIN_EFFECTIVE        = 16,
-		TX_GAINON_DELAY           = 17,
-		TX_GAINON_DELAY_EFFECTIVE = 18,
+		FPGA_VERSION                 = 0,
+		PLAY_CTRL                 = 1,
+		PLAY_CTRL_EFFECTIVE       = 2,
+		TX_DAC_DELAY              = 3,
+		TX_DAC_DELAY_EFFECTIVE    = 4,
+		RX_ADC_DELAY              = 5,
+		RX_ADC_EFFECTIVE          = 6,
+		RX_EN_DELAY               = 7,
+		RX_EN_DELAY_EFFECTIVE     = 8,
+		RESET_TIME                = 9,
+		RESET_TIME_EFFECTIVE      = 10,
+		PPS_STATUS                = 11,
+		CAT_SYNC_WIDTH            = 12,
+		CAT_SYNC_STATUS           = 13,
+		TX0_GAIN                  = 14,
+		TX0_GAIN_EFFECTIVE        = 15,
+		TX1_GAIN                  = 16,
+		TX1_GAIN_EFFECTIVE        = 17,
+		TX_GAINON_DELAY           = 18,
+		TX_GAINON_DELAY_EFFECTIVE = 19,
 	};
 
 	static constexpr uint32_t reg_addr(WrReg reg) { return static_cast<uint32_t>(reg) << 2; }
@@ -100,15 +103,9 @@ private:
 		uint32_t                   : 20;
 	};
 
-	struct TxDelay {
-		uint32_t del_dac: 16;
-		uint32_t del_pps: 16;
-	};
-
 	uhd::usrp::multi_usrp::sptr usrp_;
 
 	PlayCtrl play_ctrl_{};
-	TxDelay tx_delay_{};
 
 	void write_reg(WrReg reg, uint32_t value);
 	uint64_t read_reg(RdReg reg);
@@ -117,5 +114,4 @@ private:
 	void write_tx_delay();
 
 	static uint32_t to_raw(const PlayCtrl & ctrl);
-	static uint32_t to_raw(const TxDelay & delay);
 };
