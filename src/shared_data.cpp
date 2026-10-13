@@ -43,7 +43,6 @@ void GlobalData::init() {
 			cfg.dma_enabled = false;
 		}
 	}
-
 	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
@@ -288,7 +287,7 @@ void GlobalData::u220_recv() {
 	// void * rx_buffer = dma.get_rx_buffer();
 	auto packet_cnt = u220_ptrs[active_boards[0]]->get_stats().rx_packet_cnt;
 
-	if (packet_cnt > 0 && packet_cnt % (SAMPLES_PER_CYCLE * 20 * 1000) == 0) {
+	if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
 		for (const auto board_index: active_boards) {
 			auto * board = u220_ptrs[board_index];
 			auto ref1    = current_channels.getRef();

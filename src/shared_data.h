@@ -42,7 +42,7 @@ public:
 		.otw_format = "sc12",
 		.pps        = "internal",
 		.tx_spb     = 545200,
-		.rx_spb     = 4640 + 40 //  if you want to print hdr add 40 more samples to buf
+		.rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf
 	};
 	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
 

@@ -200,12 +200,12 @@ void U220::setup_rx_streamer() {
 	}
 	board_config.rx_spb = user_config.rx_spb;
 
-	rx_buffer.resize(2, VectorComplexS(board_config.rx_spb));
+	rx_buffer.resize(4, VectorComplexS(board_config.rx_spb));
 	rx_buffer_ptrs[0].resize(2);
 	rx_buffer_ptrs[1].resize(2);
 	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[ch][0] = &rx_buffer[ch].front();
-		rx_buffer_ptrs[ch][1] = &rx_buffer[ch].front();
+		rx_buffer_ptrs[0][ch] = &rx_buffer[2 * ch].front();
+		rx_buffer_ptrs[1][ch] = &rx_buffer[2 * ch + 1].front();
 	}
 }
 
@@ -356,11 +356,7 @@ void U220::receive() {
 	const auto recv_us    = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - recv_start).count();
 	rx_timeout            = rx_burst_pkt_time; // small timeout for subsequent recv
 
-	for (int ch: {0, 1}) {
-		auto ch_ptr = rx_queue[ch].getRef();
-		ch_ptr->push_back(rx_buffer[ch]);
-	}
-
+	
 	rx_errors_worker(rx_metadata.error_code);
 	if (num_rx_samps) {
 		active_buffer_idx = 1 - active_buffer_idx;
@@ -373,6 +369,10 @@ void U220::receive() {
 	// 	   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[0]) + 1)
 	// 	   << "serial" << serial;
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
+		for (int ch: {0, 1}) {
+			auto ch_ptr = rx_queue[ch].getRef();
+			ch_ptr->push_back(rx_buffer[ch]);
+		}
 		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
 			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6)
 			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
