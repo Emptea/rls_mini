@@ -182,6 +182,8 @@ public:
 	void enable_external_lo();
 	void ensm_to_alert();
 	void ensm_to_fdd();
+	void ensm_enable_external();
+	uint8_t get_ensm_state();
 
 	uhd::usrp::multi_usrp::sptr get_usrp() { return usrp; }
 };

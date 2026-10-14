@@ -28,7 +28,7 @@ public:
 	UHD_UTILS uhd_utils;
 	PIVector<U220 *> u220_ptrs;
 	PIVector<UserU220 *> user_u220_ptrs;
-	fpga_dma dma;
+fpga_dma dma;
 
 	const u220_config_t u220_config = {
 		.rate       = 5e6,
@@ -78,6 +78,11 @@ private:
 	void generate_ad9361_sync_in();
 	void sync_ad9361_mcs();
 	void enable_external_lo_all();
+	void generate_ad9361_cat_enable();
+	void generate_ad9361_cat_disable();
+	void enable_ad9361_external_ensm();
+	void print_ad9361_ensm_states();
+	void toggle_ad9361_cat_enable();
 
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;

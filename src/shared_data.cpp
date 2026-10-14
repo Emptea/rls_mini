@@ -72,7 +72,7 @@ void GlobalData::init() {
 	uint32_t cnt = 0;
 	cnt++;
 	piCout << cnt;
-	for	(size_t i: active_boards) {
+	for (size_t i: active_boards) {
 		const auto ver = user_u220_ptrs[i]->get_fpga_version();
 		const auto ser = u220_ptrs[i]->get_serial();
 		piCout << ser << PICoutManipulators::Hex << ver;
@@ -98,20 +98,28 @@ void GlobalData::init() {
 	piCout << cnt;
 
 	// for (size_t i = 0; i < 10; i++) {
-	// sync_ad9361_mcs();
-	// 5_s .sleep();
+	enable_ad9361_external_ensm();
+	generate_ad9361_cat_disable();
+	print_ad9361_ensm_states();
+	1_s .sleep();
+	sync_ad9361_mcs();
+	generate_ad9361_cat_enable();
+	print_ad9361_ensm_states();
+	5_s .sleep();
 	// }
 	enable_external_lo_all();
 
-	// 5_s .sleep();
-	// for (size_t i = 0; i < 16; i++)
-	// {
-	// 	u220_ptrs[0]->ensm_to_alert();
-	// 	1_s .sleep();
-	// 	u220_ptrs[0]->ensm_to_fdd();
-	// 	5_s .sleep();
+	// enable_ad9361_external_ensm();
+
+	// // 5_s .sleep();
+	// for (size_t i = 0; i < 16; i++) {
+	// 	// u220_ptrs[0]->ensm_to_alert();
+	// 	// 1_s .sleep();
+	// 	// u220_ptrs[0]->ensm_to_fdd();
+	// 	toggle_ad9361_cat_enable();
+	// 	10_s .sleep();
 	// }
-	
+
 
 	cnt++;
 	piCout << cnt;
@@ -443,6 +451,39 @@ void GlobalData::generate_ad9361_sync_in() {
 	}
 }
 
+void GlobalData::generate_ad9361_cat_enable() {
+	// 1. Prepare all FPGA sync generators
+	for (size_t i: active_boards) {
+		user_u220_ptrs[i]->enable_ad9361_stage1();
+	}
+
+	// 2. Arm sync logic on all boards
+	for (size_t i: active_boards) {
+		user_u220_ptrs[i]->enable_ad9361_stage2();
+	}
+
+	// 3. Start sync generation
+	for (size_t i: active_boards) {
+		user_u220_ptrs[i]->enable_ad9361_master();
+	}
+
+	// 4. Return sync logic to idle
+	for (size_t i: active_boards) {
+		user_u220_ptrs[i]->enable_ad9361_finish();
+	}
+}
+
+void GlobalData::generate_ad9361_cat_disable() {
+	// 1. Prepare all FPGA sync generators
+	for (size_t i: active_boards) {
+		user_u220_ptrs[i]->enable_ad9361_stage1();
+	}
+	// 3. Start sync generation
+	for (size_t i: active_boards) {
+		user_u220_ptrs[i]->enable_ad9361_master();
+	}
+}
+
 void GlobalData::sync_ad9361_mcs() {
 	piCout << "AD9361 MCS: stage 1\n";
 
@@ -475,12 +516,73 @@ void GlobalData::sync_ad9361_mcs() {
 	for (size_t i: active_boards) {
 		u220_ptrs[i]->mcs_finish();
 	}
-
-	piCout << "AD9361 MCS: complete\n";
 }
+
+void GlobalData::enable_ad9361_external_ensm() {
+	piCout << "AD9361 ENSM: start";
+
+	// 1. Общий ENABLE = 0
+	generate_ad9361_cat_disable();
+	1_s .sleep();
+
+	piCout << "BEFORE ALERT:";
+	print_ad9361_ensm_states();
+
+	// 2. Переводим все AD9361 в ALERT через SPI
+	for (size_t i: active_boards) {
+		u220_ptrs[i]->ensm_to_alert();
+	}
+
+	1_s .sleep();
+
+	piCout << "AFTER SPI ALERT:";
+	print_ad9361_ensm_states();
+
+	// 3. Включаем аппаратное управление ENSM
+	for (size_t i: active_boards) {
+		u220_ptrs[i]->ensm_enable_external();
+	}
+
+	1_s .sleep();
+
+	piCout << "AFTER EXTERNAL CONTROL:";
+	print_ad9361_ensm_states();
+
+	// 4. Синхронный переход ALERT -> FDD
+	generate_ad9361_cat_enable();
+	1_s .sleep();
+
+	piCout << "AFTER ENABLE = 1:";
+	print_ad9361_ensm_states();
+
+	piCout << "AD9361 ENSM: complete";
+}
+
 
 void GlobalData::enable_external_lo_all() {
 	for (auto i: active_boards) {
 		u220_ptrs[i]->enable_external_lo();
 	}
+}
+
+void GlobalData::print_ad9361_ensm_states() {
+	for (size_t i: active_boards) {
+		const uint8_t state = u220_ptrs[i]->get_ensm_state();
+
+		piCout << "AD9361[" << i << "] ENSM = 0x" << PICoutManipulators::Hex << static_cast<int>(state);
+	}
+}
+
+void GlobalData::toggle_ad9361_cat_enable() {
+	piCout << "Press ENTER to switch ENSM -> ALERT\n";
+	std::cin.get();
+
+	generate_ad9361_cat_disable();
+	print_ad9361_ensm_states();
+
+	piCout << "Press ENTER to switch ENSM -> FDD\n";
+	std::cin.get();
+
+	generate_ad9361_cat_enable();
+	print_ad9361_ensm_states();
 }

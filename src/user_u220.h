@@ -35,6 +35,11 @@ public:
 	void sync_ad9361_master();
 	void sync_ad9361_finish();
 
+	void enable_ad9361_stage1();
+	void enable_ad9361_stage2();
+	void enable_ad9361_master();
+	void enable_ad9361_finish();
+
 	void set_tx_dac_sg(size_t channel, const std::array<std::complex<short>, 232 * 4> & samples);
 	void set_tx_gainon_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples);
 	void set_rx_en_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples);
@@ -64,7 +69,7 @@ private:
 	};
 
 	enum class RdReg : uint32_t {
-		FPGA_VERSION                 = 0,
+		FPGA_VERSION              = 0,
 		PLAY_CTRL                 = 1,
 		PLAY_CTRL_EFFECTIVE       = 2,
 		TX_DAC_DELAY              = 3,
@@ -100,7 +105,11 @@ private:
 		uint32_t cat_sync_enable   : 1;
 		uint32_t start_pulse_40m   : 1;
 		uint32_t rx_insert_count   : 1;
-		uint32_t                   : 20;
+		uint32_t rclk_lock_off     : 1;
+		uint32_t cat_enable_val    : 1;
+		uint32_t cat_enable_we     : 1;
+		uint32_t cat_edge          : 1;
+		uint32_t                   : 16;
 	};
 
 	uhd::usrp::multi_usrp::sptr usrp_;

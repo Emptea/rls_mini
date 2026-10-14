@@ -188,6 +188,46 @@ void UserU220::sync_ad9361_finish() {
 	write_play_ctrl();
 }
 
+void UserU220::enable_ad9361_stage1() {
+	play_ctrl_.enable             = 0;
+	play_ctrl_.start_pulse_enable = 1;
+	play_ctrl_.cat_sync_enable    = 0;
+	play_ctrl_.start_pulse_40m    = 1;
+	play_ctrl_.cat_enable_we      = 1;
+	play_ctrl_.cat_enable_val     = 0;
+	play_ctrl_.cat_edge           = 1;
+
+	write_play_ctrl();
+}
+
+void UserU220::enable_ad9361_stage2() {
+	play_ctrl_.enable             = 0;
+	play_ctrl_.start_pulse_enable = 1;
+	play_ctrl_.cat_sync_enable    = 0;
+	play_ctrl_.start_pulse_40m    = 1;
+	play_ctrl_.cat_enable_we      = 1;
+	play_ctrl_.cat_enable_val     = 1;
+	play_ctrl_.cat_edge           = 1;
+
+	write_play_ctrl();
+}
+
+void UserU220::enable_ad9361_master() {
+	play_ctrl_.enable = 1;
+	write_play_ctrl();
+}
+
+void UserU220::enable_ad9361_finish() {
+	play_ctrl_.enable             = 0;
+	play_ctrl_.start_pulse_enable = 0;
+	play_ctrl_.cat_sync_enable    = 0;
+	play_ctrl_.start_pulse_40m    = 0;
+	play_ctrl_.cat_enable_we      = 0;
+	play_ctrl_.cat_enable_val     = 1;
+
+	write_play_ctrl();
+}
+
 void UserU220::set_tx_dac_sg(size_t channel, const std::array<std::complex<short>, 232 * 4> & samples) {
 	const WrReg reg = channel == 0 ? WrReg::TX0_DAC_MEM : WrReg::TX1_DAC_MEM;
 	write_reg(WrReg::MEM_PTR, 0);
@@ -214,8 +254,8 @@ void UserU220::set_rx_en_sg(size_t channel, const std::array<uint8_t, 232 * 4> &
 }
 
 uint32_t UserU220::get_fpga_version() {
-    const uint64_t value = read_reg(RdReg::FPGA_VERSION);
-    const uint32_t version = (value & 0xFFFFFF);
-    std::cout << "U220 FPGA version: " << std::hex << version << std::dec << std::endl;
+	const uint64_t value   = read_reg(RdReg::FPGA_VERSION);
+	const uint32_t version = (value & 0xFFFFFF);
+	std::cout << "U220 FPGA version: " << std::hex << version << std::dec << std::endl;
 	return version;
 }

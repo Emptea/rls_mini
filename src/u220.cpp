@@ -574,3 +574,18 @@ void U220::ensm_to_fdd() {
 	tree->access<int>(path).set(5);
 	std::cout << "[U220] ENSM -> FDD" << std::endl;
 }
+
+void U220::ensm_enable_external()
+{
+    auto tree = usrp->get_device()->get_tree();
+    tree->access<int>("/mboards/0/mcs/command").set(6);
+}
+
+uint8_t U220::get_ensm_state()
+{
+    auto tree = usrp->get_device()->get_tree();
+
+    return static_cast<uint8_t>(
+        tree->access<int>("/mboards/0/ensm/state").get()
+    );
+}
