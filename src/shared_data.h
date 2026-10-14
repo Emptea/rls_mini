@@ -5,6 +5,7 @@
 #include "fpga_dma.hpp"
 #include "rls.hpp"
 #include "shared_data_eth.h"
+#include "techlaser.h"
 #include "u220.hpp"
 #include "uhd_utils.hpp"
 #include "user_u220.h"
@@ -67,6 +68,15 @@ fpga_dma dma;
 	void received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg);
 	void received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg);
 
+	Protocol_RLS_Mini::POI_Kvit set_POI_Kvit();
+	void received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg);
+	void received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg);
+	void received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg);
+	void received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg);
+	void received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg);
+	void received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg);
+	void received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg);
+
 protected:
 
 private:
@@ -111,6 +121,82 @@ private:
 	double daz_poi   = 0;
 	double time;
 	MiniConfig cfg;
+	PIProtectedVariable<PIVector<uint32_t>> dma_channel_buf;
+	bool req_test_point       = false;
+	uint16_t req_test_channel = 0;
+
+
+	Techlaser techlaser;
+
+	union {
+		uint8_t bits = 0;
+		struct {
+			uint8_t _reserve0: 6;
+			uint8_t sdc      : 1;
+			uint8_t dsa      : 1;
+		};
+	} POI_flags       = {0};
+	uint8_t POI_kan   = 0;
+	uint16_t dsa_vr_n = 0.0; // 1 м/c
+	uint16_t dsa_vr_k = 0.0; // 1 м/c
+	uint16_t apu_k1   = 0;
+	uint16_t apu_k2   = 0;
+	uint32_t zona_k1  = 0;
+	uint32_t zona_k2  = 0;
+
+	void setShtat() {
+		POI_flags.sdc = 1;
+		POI_flags.dsa = 0;
+		POI_kan       = 0b11111111;
+		dsa_vr_n      = 0.0; // 1 м/c
+		dsa_vr_k      = 0.0; // 1 м/c
+		apu_k1        = 36;
+		apu_k2        = 0;
+		zona_k1       = 0;
+		zona_k2       = 0;
+
+		axi_dsp_set_compensation_mode(0);
+		axi_dsp_set_compensation_ref((uint32_t)1575);
+		axi_dsp_set_motion_selector(1, POI_flags.sdc);
+		axi_dsp_set_detector_level(apu_k1, 0);
+		axi_dsp_set_detector_level(apu_k2, 1);
+		axi_dsp_set_channel_mask(POI_kan);
+	}
+
+
+	// TODO work header send
+	uint16_t aztek = 0; // Азимут текущий, незадержанный в ПОИ
+	uint32_t time_delayed     = 0; // Время, задержанное в обработке
+	uint16_t az_delayed    = 0; // Азимут, задержанный в обработке
+	uint16_t zona  = 0; // Дальность отметки "Зона"
+	uint16_t nes   = 0; // Количество эхосигналов
+	                    // Дальность эхосигнала
+	                    // ...
+	                    // uint16_t[nes]
+
+	struct target {
+		uint16_t n     = 0;
+		uint32_t time  = 0;
+		double az    = 0;
+		int16_t um     = 0; // Угол места
+		uint16_t D     = 0; // Дальность, 1 м
+		uint16_t porog = 0; // Порог обнаружения, 0.5 дБ
+		uint16_t sp    = 0; // Отношение сигнал/порог, 0.5 дБ
+		uint16_t amp   = 0; // Амплитуда сигнала цели, 0.5 дБ
+		int16_t vr     = 0; // Радиальная скорость, 1 м/с
+		union {
+			uint8_t bits = 0;
+			struct {
+				uint8_t _reserve0: 6;
+				uint8_t tn       : 1; // Признак тренажной цели
+				uint8_t dum      : 1; // Признак достоверности измерения угла места цели
+			};
+		};
+	};
+
+	void send_KTA_VO(struct target targ);
+	void send_PI();
+
 };
 
 #endif

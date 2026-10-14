@@ -5,6 +5,8 @@
 #include "protocol_rls_mini.h"
 #include "user_u220.h"
 
+#include <algorithm>
+#include <cmath>
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
 #include <pisemaphore.h>
@@ -37,6 +39,8 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
+	const auto & com_conf = main_config.child("com");
+	techlaser.open(com_conf.childValue("techlaser").toString());
 	if (cfg.dma_enabled) {
 		if (dma.init() != 0) {
 			fprintf(stderr, "Failed to initialize FPGA DMA\n");
@@ -249,31 +253,15 @@ void GlobalData::processChannels() {
 	if (ret != 0) {
 		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
 	}
-	// PIMap<int, VectorComplexS> channels;
-	// bool all_channels = true;
-	// { // start work with "getRef"
-	// 	auto ref = current_channels.getRef();
-	// 	for (int ch = 0; ch < 8; ++ch) {
-	// 		if ((*ref)[ch].isEmpty()) {
-	// 			ispr_kan &= ~(1U << ch);
-	// 			all_channels = false;
-	// 		} else {
-	// 			ispr_kan |= (1U << ch);
-	// 		}
-	// 	}
-
-	// 	if (~all_channels) return;
-	// 	channels = *ref; // copy data
-
-	// 	for (int ch = 0; ch < 8; ++ch) {
-	// 		if (!(*ref)[ch].isEmpty()) {
-	// 			(*ref)[ch].clear(); // clear input data
-	// 		}
-	// 	}
-	// } // desctuct "ref", release current_channels
-
-	// work with your data (channels)
-	// adc_channels = channels;
+	if (ret == 0) {
+		const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
+		if (buffer) {
+			const auto * hdr   = reinterpret_cast<const rls::header *>(buffer);
+			const size_t words = std::min<size_t>(rls::get_rx_words_per_buf(hdr->tp), BUFFER_SIZE / sizeof(uint32_t));
+			auto ref           = dma_channel_buf.getRef();
+			*ref               = PIVector<uint32_t>(buffer, words);
+		}
+	}
 }
 
 void GlobalData::u220_recv() {
@@ -317,51 +305,87 @@ void GlobalData::u220_stop_and_drain_rx() {
 	}
 }
 
+
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	piCout << "rec msg" << "received_POI_TK_Zapros";
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
-	piCout << "rec msg kt" << msg.kt;
+	// piCout << "rec msg kt" << msg.kt;
+	if (cfg.dma_enabled) {
+		axi_dsp_set_output_source(msg.kt, msg.nkan, msg.reg_takt);
+		axi_dsp_apply();
+	}
+	req_test_channel = msg.kt;
+	req_test_point   = true;
 
+	int data_cnt     = 0;
 	switch (msg.kt) {
-	case Protocol_RLS_Mini::CTRL: {
+	case rls::TP_WORK: {
+		data_cnt = sizeof(rls::work_posthdr);
 		break;
 	}
-	case Protocol_RLS_Mini::ADC: {
+	case rls::TP_BYPASS: {
+		data_cnt = (rls::N_SAMPS_IN_PACK + rls::HDR_SIZE);
+		break;
+	}
+	case rls::TP_CUT:
+	case rls::TP_FAPCH:
+	case rls::TP_LOU: {
+		data_cnt = (164);
+		break;
+	}
+	case rls::TP_SF:
+	case rls::TP_MAX:
+	case rls::TP_RANK:
+	case rls::TP_APU: {
+		data_cnt = (141);
+		break;
+	}
+	case rls::TP_DDR:
+	case rls::TP_FFT:
+	case rls::TP_WEIGHT_OUT: {
+		data_cnt = 512;
+		break;
+	}
+	case rls::TP_FIND: {
+		data_cnt = 141 * 5;
+		break;
+	}
+	case rls::TP_FAPCH_COEFFS: {
+		data_cnt = (8);
+		break;
+	}
+	default: {
+		break;
+	}
+	}
+
+	const auto set_data = [&](const auto & data, size_t count) {
+		if (data.isEmpty()) {
+			ans.setData(zero_vector);
+			return;
+		}
+		ans.setData(data, std::min(data.size(), count));
+	};
+
+	if (cfg.dma_enabled) {
+		PIVector<uint32_t> data;
+		{
+			auto ref = dma_channel_buf.getRef();
+			data     = *ref;
+		}
+		set_data(data, data_cnt);
+	} else if (msg.kt == rls::TP_BYPASS) {
 		VectorComplexS data;
 		{
 			auto ref = adc_channels.getRef();
 			data     = (*ref)[msg.nkan];
 		}
-		ans.nw = data.size();
-		if (data.isEmpty()) {
-			ans.setData(zero_vector);
-		} else {
-			ans.setData(data, 232 * 3);
-		}
-		break;
+		set_data(data, (232 + 2 * cfg.rx_insert_count) * 3);
+	} else {
+		ans.setData(zero_vector);
 	}
-	case Protocol_RLS_Mini::PHD: {
-		break;
-	}
-	case Protocol_RLS_Mini::PLL: {
-		break;
-	}
-	case Protocol_RLS_Mini::OPH: {
-		break;
-	}
-	case Protocol_RLS_Mini::LOU: {
-		break;
-	}
-	case Protocol_RLS_Mini::KN: {
-		break;
-	}
-	case Protocol_RLS_Mini::AD: {
-		break;
-	}
-	case Protocol_RLS_Mini::APU: {
-		break;
-	}
-	}
+
+	ans.nw = static_cast<uint16_t>(ans.words.size());
 	global->sendMessage(ans);
 }
 
@@ -388,14 +412,26 @@ void GlobalData::received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg) {
 
 void GlobalData::received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg) {
 	piCout << "rec msg" << "received_RR_Vr        ";
-	flags.ant                      = msg.par;
+	flags.kuvr = msg.par;
+
+	if (techlaser.isOpened()) {
+		if (flags.kuvr == 1) {
+			techlaser.start(180);
+		} else {
+			techlaser.stop();
+		}
+		auto techlaser_state = techlaser.getState();
+		flags.vr             = (techlaser_state.motor_status == Techlaser::MotorStatus::Rotating);
+	} else {
+		flags.vr = 0;
+	}
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
 	piCout << "rec msg" << "received_RR_Izl       ";
-	flags.izl                      = msg.par;
+	flags.kuizl                    = msg.par;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
@@ -430,6 +466,128 @@ void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI &
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
+
+void GlobalData::send_KTA_VO(struct target targ) {
+	Protocol_RLS_Mini::KTA_VO ans;
+	ans.az = targ.az;
+	ans.setDegreesUm(targ.um);
+	ans.D     = targ.D;
+	ans.porog = targ.porog;
+	ans.sp    = targ.sp;
+	ans.amp   = targ.amp;
+	ans.vr    = targ.vr;
+	ans.dum   = targ.dum;
+	ans.tn    = targ.tn;
+	global->sendMessage(ans);
+}
+
+
+void GlobalData::send_PI() {
+	Protocol_RLS_Mini::PI ans;
+
+	global->sendMessage(ans);
+}
+
+
+Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
+	Protocol_RLS_Mini::POI_Kvit ans;
+	ans.bits     = POI_flags.bits;
+	ans.kan      = POI_kan;
+	ans.dsa_vr_n = dsa_vr_n;
+	ans.dsa_vr_k = dsa_vr_k;
+	ans.setLevelApuk1(apu_k1);
+	ans.setLevelApuk2(apu_k2);
+	ans.zona_k1 = zona_k1;
+	ans.zona_k2 = zona_k2;
+	piCout << ans.bits;
+	piCout << PICoutManipulators::Bin << ans.kan;
+	piCout << ans.dsa_vr_n;
+	piCout << ans.dsa_vr_k;
+	piCout << ans.apu_k1;
+	piCout << ans.apu_k2;
+	piCout << ans.zona_k1;
+	piCout << ans.zona_k2;
+	return ans;
+}
+
+
+void GlobalData::received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg) {
+	piCout << "rec msg" << "received_POI_Zapros   ";
+	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
+	global->sendMessage(ans);
+}
+
+
+void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
+	piCout << "rec msg" << "received_POI_Shtat    ";
+	setShtat();
+	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
+	global->sendMessage(ans);
+}
+
+
+void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
+	piCout << "rec msg" << "received_POI_SDC      ";
+	if (cfg.dma_enabled) {
+		axi_dsp_set_motion_selector(1, msg.par);
+		auto v = axi_dsp_get_motion_selector();
+		POI_flags.sdc                   = v.ONOFF;
+	}
+
+	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
+	global->sendMessage(ans);
+}
+
+
+void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
+	piCout << "rec msg" << "received_POI_DSA      ";
+	POI_flags.dsa                   = msg.par;
+	dsa_vr_n                        = msg.vr_n;
+	dsa_vr_k                        = msg.vr_k;
+
+	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
+	global->sendMessage(ans);
+}
+
+
+void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
+	piCout << "rec msg" << "received_POI_APU      ";
+	apu_k1 = msg.getLevelk1();
+	apu_k2 = msg.getLevelk2();
+	if (cfg.dma_enabled) {
+		axi_dsp_set_detector_level(apu_k1, 0);
+		axi_dsp_set_detector_level(apu_k2, 1);
+	} else {
+		apu_k1 = 0;
+		apu_k2 = 0;
+	}
+
+	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
+	global->sendMessage(ans);
+}
+
+
+void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
+	piCout << "rec msg" << "received_POI_Zona     ";
+	zona_k1                         = msg.k1;
+	zona_k2                         = msg.k2;
+	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
+	global->sendMessage(ans);
+}
+
+
+void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
+	piCout << "rec msg" << "received_POI_Kan      ";
+	if (cfg.dma_enabled) {
+		axi_dsp_set_channel_mask((uint32_t)msg.kan);
+		POI_kan = (uint8_t)axi_dsp_get_channel_mask();
+	} else {
+		POI_kan = msg.kan;
+	}
+	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
+	global->sendMessage(ans);
+}
+
 
 void GlobalData::generate_ad9361_sync_in() {
 	// 1. Prepare all FPGA sync generators

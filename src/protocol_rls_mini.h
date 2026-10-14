@@ -1,6 +1,7 @@
 #ifndef protocol_rls_mini_H
 #define protocol_rls_mini_H
 
+#include <cstdint>
 #include <piethernet.h>
 
 class Protocol_RLS_Mini {
@@ -10,10 +11,10 @@ public:
 	enum control_point {
 		CTRL = 0x00,
 		ADC  = 0x01,
-		PHD  = 0x02,
+		CUT  = 0x02,
 		PLL  = 0x03,
-		OPH  = 0x04,
-		LOU  = 0x05,
+		LOU  = 0x04,
+		OPH  = 0x05,
 		KN   = 0x06,
 		AD   = 0x07,
 		APU  = 0x08,
@@ -180,6 +181,10 @@ public:
 		POI_APU(): Header(Type, Code) {}
 		uint16_t k1 = 0; // Коэффициент порога 1, цмр 0.5 дБ
 		uint16_t k2 = 0; // Коэффициент порога 2, цмр 0.5 дБ
+		void setLevelk1(uint32_t v) { k1 = (uint16_t)(10 * log10((double)v)); }
+		double getLevelk1() const { return (pow(10, k1) / 10); }
+		void setLevelk2(uint32_t v) { k2 = (uint16_t)(10 * log10((double)v)); }
+		double getLevelk2() const { return (pow(10, k2) / 10); }
 	};
 
 
@@ -225,6 +230,10 @@ public:
 		uint8_t zona_k1   = 0;
 		uint8_t _reserve1;
 		uint16_t zona_k2 = 0;
+		void setLevelApuk1(uint32_t v) { apu_k1 = (uint16_t)(10 * log10((double)v)); }
+		double getLevelApuk1() const { return (pow(10, apu_k1) / 10); }
+		void setLevelApuk2(uint32_t v) { apu_k2 = (uint16_t)(10 * log10((double)v)); }
+		double getLevelApuk2() const { return (pow(10, apu_k2) / 10); }
 	};
 
 
@@ -258,6 +267,10 @@ public:
 		template<typename T>
 		void setData(const PIDeque<T> & d) {
 			setDataInternal(d.data(), d.size());
+		}
+		template<typename T>
+		void setData(const T * d, int cnt) {
+			setDataInternal(d, cnt);
 		}
 
 	private:
