@@ -1,6 +1,7 @@
 #include "mini_config.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <limits>
 #include <sstream>
@@ -10,6 +11,7 @@
 MiniConfig::MiniConfig() {
 	load("mini.ini");
 	load_settings();
+	load_coeffs("tx_coeffs.csv");
 	load_signal("tx_gainon.txt", tx_gainon_sg);
 	load_signal("rx_en.txt", rx_en_sg);
 	load_complex_signal("tx_dac.txt", tx_dac_sg);
@@ -284,4 +286,68 @@ void MiniConfig::load_complex_signal(const std::string & filename, ChannelComple
 	if (sample != SAMPLE_COUNT) {
 		throw std::runtime_error("Invalid signal sample count: " + filename);
 	}
+}
+
+void MiniConfig::load_coeffs(const std::string & filename) {
+	std::ifstream file(filename);
+	if (!file) throw std::runtime_error("Cannot open coefficients file: " + filename);
+
+	std::string line;
+	if (!std::getline(file, line)) throw std::runtime_error("Missing coefficients header: " + filename);
+	trim(line);
+	const auto header_separator = line.find(';');
+	if (header_separator == std::string::npos) throw std::runtime_error("Invalid coefficients header: " + filename);
+	std::string amplitude_header = line.substr(0, header_separator);
+	std::string phase_header     = line.substr(header_separator + 1);
+	trim(amplitude_header);
+	trim(phase_header);
+	if (amplitude_header != "Amplitude" || phase_header != "Phase") {
+		throw std::runtime_error("Invalid coefficients header: " + filename);
+	}
+
+	std::array<double, CHANNEL_COUNT> loaded_amplitudes{};
+	std::array<double, CHANNEL_COUNT> loaded_phases{};
+	std::vector<std::complex<int16_t>> loaded_complex_gains;
+	loaded_complex_gains.reserve(CHANNEL_COUNT);
+	size_t channel     = 0;
+	size_t line_number = 1;
+	while (std::getline(file, line)) {
+		++line_number;
+		trim(line);
+		if (line.empty()) continue;
+		if (channel >= CHANNEL_COUNT) throw std::runtime_error("Too many coefficient rows: " + filename);
+		const auto separator   = line.find(';');
+		const auto invalid_row = "Invalid coefficients at " + filename + ":" + std::to_string(line_number);
+		if (separator == std::string::npos || line.find(';', separator + 1) != std::string::npos) {
+			throw std::runtime_error(invalid_row);
+		}
+		auto parse = [&](std::string value) {
+			trim(value);
+			size_t pos = 0;
+			double result;
+			try {
+				result = std::stod(value, &pos);
+			} catch (const std::exception &) {
+				throw std::runtime_error(invalid_row);
+			}
+			if (pos != value.size() || !std::isfinite(result)) throw std::runtime_error(invalid_row);
+			return result;
+		};
+		loaded_amplitudes[channel] = parse(line.substr(0, separator));
+		loaded_phases[channel]     = parse(line.substr(separator + 1));
+		const double phase_rad     = loaded_phases[channel] * std::acos(-1.0) / 180.0;
+		const double real_gain     = std::round((1 << 13) * loaded_amplitudes[channel] * std::cos(phase_rad));
+		const double imag_gain     = std::round((1 << 13) * loaded_amplitudes[channel] * std::sin(phase_rad));
+		const auto in_range        = [](double value) {
+            return std::isfinite(value) && value >= std::numeric_limits<int16_t>::min() && value <= std::numeric_limits<int16_t>::max();
+		};
+		if (!in_range(real_gain) || !in_range(imag_gain)) throw std::runtime_error("Coefficient gain out of int16_t range: " + invalid_row);
+		loaded_complex_gains.emplace_back(static_cast<int16_t>(real_gain), static_cast<int16_t>(imag_gain));
+		++channel;
+	}
+	if (file.bad()) throw std::runtime_error("Cannot read coefficients file: " + filename);
+	if (channel != CHANNEL_COUNT) throw std::runtime_error("Not enough coefficient rows: " + filename);
+	amplitudes = loaded_amplitudes;
+	phases     = loaded_phases;
+	complex_gains.swap(loaded_complex_gains);
 }
