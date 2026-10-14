@@ -306,57 +306,45 @@ void GlobalData::u220_stop_and_drain_rx() {
 }
 
 
+static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
+	switch (control_point) {
+	case Protocol_RLS_Mini::CTRL: return rls::TP_WORK;
+	case Protocol_RLS_Mini::PHD: return rls::TP_BYPASS;
+	case Protocol_RLS_Mini::FAP: return rls::TP_FAPCH;
+	case Protocol_RLS_Mini::LOU: return rls::TP_LOU;
+	case Protocol_RLS_Mini::SF: return rls::TP_SF;
+	case Protocol_RLS_Mini::KN: return rls::TP_MAX;
+	case Protocol_RLS_Mini::AD: return rls::TP_FFT;
+	case Protocol_RLS_Mini::APU: return rls::TP_APU;
+	case Protocol_RLS_Mini::CUT: return rls::TP_CUT;
+	case Protocol_RLS_Mini::DDR: return rls::TP_DDR;
+	case Protocol_RLS_Mini::FIND: return rls::TP_FIND;
+	case Protocol_RLS_Mini::RANK: return rls::TP_RANK;
+	case Protocol_RLS_Mini::FAP_COEFFS: return rls::TP_FAPCH_COEFFS;
+	case Protocol_RLS_Mini::WEIGHT_OUT: return rls::TP_WEIGHT_OUT;
+	case Protocol_RLS_Mini::MTI: return rls::TP_MTI;
+	default: return rls::TP_WORK;
+	}
+}
+
+
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	piCout << "rec msg" << "received_POI_TK_Zapros";
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	// piCout << "rec msg kt" << msg.kt;
+	const auto test_point = map_kt_to_dsp(msg.kt);
 	if (cfg.dma_enabled) {
-		axi_dsp_set_output_source(msg.kt, msg.nkan, msg.reg_takt);
+		axi_dsp_set_output_source(test_point, msg.nkan, msg.reg_takt);
 		axi_dsp_apply();
 	}
 	req_test_channel = msg.kt;
 	req_test_point   = true;
 
 	int data_cnt     = 0;
-	switch (msg.kt) {
-	case rls::TP_WORK: {
-		data_cnt = sizeof(rls::work_posthdr);
-		break;
-	}
-	case rls::TP_BYPASS: {
-		data_cnt = (rls::N_SAMPS_IN_PACK + rls::HDR_SIZE);
-		break;
-	}
-	case rls::TP_CUT:
-	case rls::TP_FAPCH:
-	case rls::TP_LOU: {
-		data_cnt = (164);
-		break;
-	}
-	case rls::TP_SF:
-	case rls::TP_MAX:
-	case rls::TP_RANK:
-	case rls::TP_APU: {
-		data_cnt = (141);
-		break;
-	}
-	case rls::TP_DDR:
-	case rls::TP_FFT:
-	case rls::TP_WEIGHT_OUT: {
-		data_cnt = 512;
-		break;
-	}
-	case rls::TP_FIND: {
-		data_cnt = 141 * 5;
-		break;
-	}
-	case rls::TP_FAPCH_COEFFS: {
-		data_cnt = (8);
-		break;
-	}
-	default: {
-		break;
-	}
+	if (msg.kt != Protocol_RLS_Mini::CTRL) {
+		rls::get_rx_words_per_buf(test_point);
+	} else {
+		// TODO get all dsp regs state and pack them into one packet
 	}
 
 	const auto set_data = [&](const auto & data, size_t count) {
@@ -374,7 +362,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 			data     = *ref;
 		}
 		set_data(data, data_cnt);
-	} else if (msg.kt == rls::TP_BYPASS) {
+	} else if (test_point == rls::TP_BYPASS) {
 		VectorComplexS data;
 		{
 			auto ref = adc_channels.getRef();
@@ -530,8 +518,8 @@ void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 	piCout << "rec msg" << "received_POI_SDC      ";
 	if (cfg.dma_enabled) {
 		axi_dsp_set_motion_selector(1, msg.par);
-		auto v = axi_dsp_get_motion_selector();
-		POI_flags.sdc                   = v.ONOFF;
+		auto v        = axi_dsp_get_motion_selector();
+		POI_flags.sdc = v.ONOFF;
 	}
 
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();

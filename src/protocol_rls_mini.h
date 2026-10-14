@@ -9,15 +9,21 @@ public:
 #pragma pack(push, 1)
 
 	enum control_point {
-		CTRL = 0x00,
-		ADC  = 0x01,
-		CUT  = 0x02,
-		PLL  = 0x03,
-		LOU  = 0x04,
-		OPH  = 0x05,
-		KN   = 0x06,
-		AD   = 0x07,
-		APU  = 0x08,
+		CTRL       = 0x00,
+		PHD        = 0x01,
+		FAP        = 0x02,
+		LOU        = 0x03,
+		SF         = 0x04,
+		KN         = 0x05, // TP_MAX
+		AD         = 0x06, // TP_FFT for now
+		APU        = 0x07, // NIIRT tp ends here
+		CUT        = 0x08, // our tp starts here
+		DDR        = 0x09,
+		FIND       = 0x0A,
+		RANK       = 0x0B,
+		FAP_COEFFS = 0x0C,
+		WEIGHT_OUT = 0x0D,
+		MTI        = 0x0F,
 	};
 
 	struct Header PIMETA(no-stream) {
