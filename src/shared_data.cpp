@@ -91,6 +91,8 @@ void GlobalData::init() {
 		// user_u220_ptrs[i]->set_tx_gainon_sg(1, cfg.tx_gainon_sg[i * 2 + 1]);
 		// user_u220_ptrs[i]->set_tx_dac_sg(0, cfg.tx_dac_sg[i * 2]);
 		// user_u220_ptrs[i]->set_tx_dac_sg(1, cfg.tx_dac_sg[i * 2 + 1]);
+		user_u220_ptrs[i]->set_tx_complex_gain(0, cfg.complex_gains[i * 2]);
+		user_u220_ptrs[i]->set_tx_complex_gain(1, cfg.complex_gains[i * 2 + 1]);
 	}
 
 	// 5_s .sleep();

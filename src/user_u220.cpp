@@ -219,3 +219,9 @@ uint32_t UserU220::get_fpga_version() {
     std::cout << "U220 FPGA version: " << std::hex << version << std::dec << std::endl;
 	return version;
 }
+
+void UserU220::set_tx_complex_gain(size_t channel, const std::complex<short> gain) {
+	const WrReg reg = channel == 0 ? WrReg::TX0_GAIN : WrReg::TX1_GAIN;
+	const uint32_t value = static_cast<uint16_t>(gain.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(gain.imag())) << 16);
+	write_reg(reg, value);
+}

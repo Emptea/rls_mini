@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <vector>
 
 class MiniConfig {
 public:
@@ -13,6 +14,11 @@ public:
 	static constexpr size_t CHANNEL_COUNT = 8;
 
 	explicit MiniConfig();
+	void load_coeffs(const std::string & filename);
+
+	std::array<double, CHANNEL_COUNT> amplitudes{};
+	std::array<double, CHANNEL_COUNT> phases{};
+	std::vector<std::complex<int16_t>> complex_gains;
 
 	std::array<uint32_t, CHANNEL_COUNT> tx_dac_delay{};
 	std::array<uint32_t, CHANNEL_COUNT> tx_gpio_delay{};

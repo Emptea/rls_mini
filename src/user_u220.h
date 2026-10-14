@@ -38,6 +38,7 @@ public:
 	void set_tx_dac_sg(size_t channel, const std::array<std::complex<short>, 232 * 4> & samples);
 	void set_tx_gainon_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples);
 	void set_rx_en_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples);
+	void set_tx_complex_gain(size_t channel, const std::complex<short> gain);
 
 	uint32_t get_fpga_version();
 
@@ -64,7 +65,7 @@ private:
 	};
 
 	enum class RdReg : uint32_t {
-		FPGA_VERSION                 = 0,
+		FPGA_VERSION              = 0,
 		PLAY_CTRL                 = 1,
 		PLAY_CTRL_EFFECTIVE       = 2,
 		TX_DAC_DELAY              = 3,
