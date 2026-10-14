@@ -203,9 +203,9 @@ void U220::setup_rx_streamer() {
 	rx_buffer.resize(4, VectorComplexS(board_config.rx_spb));
 	rx_buffer_ptrs[0].resize(2);
 	rx_buffer_ptrs[1].resize(2);
-	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[0][ch] = &rx_buffer[2 * ch].front();
-		rx_buffer_ptrs[1][ch] = &rx_buffer[2 * ch + 1].front();
+	for (size_t n_buf = 0; n_buf < 2; n_buf++) {
+		rx_buffer_ptrs[n_buf][0] = &rx_buffer[2 * n_buf].front();
+		rx_buffer_ptrs[n_buf][1] = &rx_buffer[2 * n_buf + 1].front();
 	}
 }
 
