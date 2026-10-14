@@ -90,6 +90,7 @@ void U220::initialize_usrp() {
 	std::cout << boost::format("Creating the usrp device with: %s...") % device_args << std::endl;
 
 	usrp = uhd::usrp::multi_usrp::make(PIString2StdString(device_args));
+	usrp->set_master_clock_rate(20e6);
 
 	if (!user_config.ref.isEmpty()) {
 		usrp->set_clock_source(PIString2StdString(user_config.ref));
