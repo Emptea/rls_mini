@@ -261,7 +261,12 @@ uint32_t UserU220::get_fpga_version() {
 }
 
 void UserU220::set_tx_complex_gain(size_t channel, const std::complex<short> gain) {
-	const WrReg reg = channel == 0 ? WrReg::TX0_GAIN : WrReg::TX1_GAIN;
+	const WrReg wr_reg           = channel == 0 ? WrReg::TX0_GAIN : WrReg::TX1_GAIN;
+	const RdReg rd_reg           = channel == 0 ? RdReg::TX0_GAIN : RdReg::TX1_GAIN;
+	const RdReg rd_reg_effective = channel == 0 ? RdReg::TX0_GAIN_EFFECTIVE : RdReg::TX1_GAIN_EFFECTIVE;
+
 	const uint32_t value = static_cast<uint16_t>(gain.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(gain.imag())) << 16);
-	write_reg(reg, value);
+	write_reg(wr_reg, value);
+	const uint64_t raw     = read_reg(rd_reg);
+	const uint64_t raw_eff = read_reg(rd_reg_effective);
 }
