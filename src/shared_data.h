@@ -9,6 +9,7 @@
 #include "shared_data_eth.h"
 #include "techlaser.h"
 #include "u220.hpp"
+#include "u220_group.h"
 #include "uhd_utils.hpp"
 #include "user_u220.h"
 
@@ -25,12 +26,17 @@ private:
 	PISystemTime t_start;
 	PISystemTime t_end;
 	bool first_transfer = false;
+	MiniConfig cfg;
 
 public:
+	const PIString u220_args =
+		"recv_frame_size=16360,num_recv_frames=64,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
 	UHD_UTILS uhd_utils;
 	PIVector<U220 *> u220_ptrs;
 	PIVector<UserU220 *> user_u220_ptrs;
 	PIVector<ImitatorU220 *> imitator_u220_ptrs;
+	PIVector<size_t> active_boards;
+	U220Group u220_group;
 	fpga_dma dma;
 
 	const u220_config_t u220_config = {
@@ -47,10 +53,7 @@ public:
 		.tx_spb     = 545200,
 		.rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf
 	};
-	const PIString u220_args =
-		"recv_frame_size=16360,num_recv_frames=64,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
 
-	PIVector<size_t> active_boards;
 	static GlobalData * instance();
 
 	void init();
@@ -88,13 +91,6 @@ private:
 
 	void u220_stop_and_drain_rx();
 	void u220_recv();
-	void generate_ad9361_sync_in();
-	void sync_ad9361_mcs();
-	void enable_external_lo_all();
-	void generate_ad9361_cat_enable();
-	void generate_ad9361_cat_disable();
-	void enable_ad9361_external_ensm();
-	void print_ad9361_ensm_states();
 
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
@@ -122,7 +118,6 @@ private:
 	int16_t dd_poi   = 0; // 1 м
 	double daz_poi   = 0;
 	double time;
-	MiniConfig cfg;
 	PIProtectedVariable<PIVector<uint32_t>> dma_channel_buf;
 	bool req_test_point       = false;
 	uint16_t req_test_channel = 0;

@@ -15,7 +15,11 @@
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
 
-GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220_args)), cfg() {
+GlobalData::GlobalData()
+	: GlobalDataEth(this)
+	, cfg()
+	, uhd_utils(PIString2StdString(u220_args))
+	, u220_group(u220_ptrs, user_u220_ptrs, active_boards, cfg) {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
 
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
@@ -23,6 +27,7 @@ GlobalData::GlobalData(): GlobalDataEth(this), uhd_utils(PIString2StdString(u220
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
 		u220_ptrs << u;
 		user_u220_ptrs << nullptr;
+		imitator_u220_ptrs << nullptr;
 	}
 
 	process_thread.start([this] { processChannels(); });
@@ -36,7 +41,6 @@ GlobalData * GlobalData::instance() {
 	static GlobalData ret;
 	return &ret;
 }
-
 
 void GlobalData::init() {
 	initEth();
@@ -75,50 +79,16 @@ void GlobalData::init() {
 		}
 	}
 
-	for (size_t i: active_boards) {
-		const auto ver = user_u220_ptrs[i]->get_fpga_version();
-		const auto ser = u220_ptrs[i]->get_serial();
-		piCout << ser << PICoutManipulators::Hex << ver;
-	}
-
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->set_tx_dac_delay(cfg.tx_dac_delay[i * 2], cfg.tx_dac_delay[i * 2 + 1]);
-		user_u220_ptrs[i]->set_tx_gainon_delay(cfg.tx_gpio_delay[i * 2], cfg.tx_gpio_delay[i * 2 + 1]);
-		user_u220_ptrs[i]->set_rx_adc_delay(cfg.rx_adc_delay[i * 2], cfg.rx_adc_delay[i * 2 + 1]);
-		user_u220_ptrs[i]->set_rx_en_delay(cfg.rx_en_delay[i * 2], cfg.rx_en_delay[i * 2 + 1]);
-		user_u220_ptrs[i]->set_play_gpio_tx_enable(0b11);
-		user_u220_ptrs[i]->set_play_gpio_rx_enable(0b11);
-		user_u220_ptrs[i]->set_play_rx_insert_count(1);
-		user_u220_ptrs[i]->set_tx_gainon_sg(0, cfg.tx_gainon_sg[i * 2]);
-		user_u220_ptrs[i]->set_tx_gainon_sg(1, cfg.tx_gainon_sg[i * 2 + 1]);
-		if (cfg.use_ext_file_sg[i * 2]) {
-			user_u220_ptrs[i]->set_tx_dac_sg(0, cfg.tx_dac_sg[i * 2]);
-		}
-		if (cfg.use_ext_file_sg[i * 2 + 1]) {
-			user_u220_ptrs[i]->set_tx_dac_sg(1, cfg.tx_dac_sg[i * 2 + 1]);
-		}
-		user_u220_ptrs[i]->set_tx_complex_gain(0, cfg.complex_gains[i * 2]);
-		user_u220_ptrs[i]->set_tx_complex_gain(1, cfg.complex_gains[i * 2 + 1]);
-	}
-
-	enable_ad9361_external_ensm();
-	generate_ad9361_cat_disable();
-	1_s .sleep();
-	sync_ad9361_mcs();
-	generate_ad9361_cat_enable();
-	print_ad9361_ensm_states();
-	enable_external_lo_all();
-
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->reset_time(0x05DC);
-	}
+	u220_group.setup();
+	u220_group.sync_ad9361();
+	u220_group.reset_time(0x05DC);
 
 	if (cfg.dma_enabled) {
 		axi_dsp_init();
 		axi_dsp_configure();
 		axi_dsp_set_output_source(1, 0, 0);
 		auto v = axi_dsp_get_output_source();
-		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE << "\n";
+		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE;
 		axi_dsp_set_channel_mask((uint32_t)ispr_kan);
 		axi_dsp_apply();
 	}
@@ -544,149 +514,4 @@ void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
 	}
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
-}
-
-
-void GlobalData::generate_ad9361_sync_in() {
-	// 1. Prepare all FPGA sync generators
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->sync_ad9361_stage1();
-	}
-
-	// 2. Arm sync logic on all boards
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->sync_ad9361_stage2();
-	}
-
-	// 3. Start sync generation
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->sync_ad9361_master();
-	}
-
-	// 4. Return sync logic to idle
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->sync_ad9361_finish();
-	}
-}
-
-void GlobalData::generate_ad9361_cat_enable() {
-	// 1. Prepare all FPGA sync generators
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->enable_ad9361_stage1();
-	}
-
-	// 2. Arm sync logic on all boards
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->enable_ad9361_stage2();
-	}
-
-	// 3. Start sync generation
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->enable_ad9361_master();
-	}
-
-	// 4. Return sync logic to idle
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->enable_ad9361_finish();
-	}
-}
-
-void GlobalData::generate_ad9361_cat_disable() {
-	// 1. Prepare all FPGA sync generators
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->enable_ad9361_stage1();
-	}
-	// 3. Start sync generation
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->enable_ad9361_master();
-	}
-}
-
-void GlobalData::sync_ad9361_mcs() {
-	piCout << "AD9361 MCS: stage 1\n";
-
-	for (size_t i: active_boards) {
-		u220_ptrs[i]->mcs_stage1();
-	}
-
-	piCout << "AD9361 MCS: SYNC #1\n";
-
-	generate_ad9361_sync_in();
-	1_s .sleep();
-	// generate_ad9361_sync_in();
-	// 1_s .sleep();
-
-	piCout << "AD9361 MCS: stage 2\n";
-
-	for (size_t i: active_boards) {
-		u220_ptrs[i]->mcs_stage2();
-	}
-
-	piCout << "AD9361 MCS: SYNC #2\n";
-
-	generate_ad9361_sync_in();
-	1_s .sleep();
-	// generate_ad9361_sync_in();
-	// 1_s .sleep();
-
-	piCout << "AD9361 MCS: finish\n";
-
-	for (size_t i: active_boards) {
-		u220_ptrs[i]->mcs_finish();
-	}
-}
-
-void GlobalData::enable_ad9361_external_ensm() {
-	piCout << "AD9361 ENSM: start";
-
-	// 1. Общий ENABLE = 0
-	generate_ad9361_cat_disable();
-	1_s .sleep();
-
-	piCout << "BEFORE ALERT:";
-	print_ad9361_ensm_states();
-
-	// 2. Переводим все AD9361 в ALERT через SPI
-	for (size_t i: active_boards) {
-		u220_ptrs[i]->ensm_to_alert();
-	}
-
-	1_s .sleep();
-
-	piCout << "AFTER SPI ALERT:";
-	print_ad9361_ensm_states();
-
-	// 3. Включаем аппаратное управление ENSM
-	for (size_t i: active_boards) {
-		u220_ptrs[i]->ensm_enable_external();
-	}
-
-	1_s .sleep();
-
-	piCout << "AFTER EXTERNAL CONTROL:";
-	print_ad9361_ensm_states();
-
-	// 4. Синхронный переход ALERT -> FDD
-	generate_ad9361_cat_enable();
-	1_s .sleep();
-
-	piCout << "AFTER ENABLE = 1:";
-	print_ad9361_ensm_states();
-
-	piCout << "AD9361 ENSM: complete";
-}
-
-
-void GlobalData::enable_external_lo_all() {
-	for (auto i: active_boards) {
-		u220_ptrs[i]->enable_external_lo();
-	}
-}
-
-void GlobalData::print_ad9361_ensm_states() {
-	for (size_t i: active_boards) {
-		const uint8_t state = u220_ptrs[i]->get_ensm_state();
-
-		piCout << "AD9361[" << i << "] ENSM = 0x" << PICoutManipulators::Hex << static_cast<int>(state);
-	}
 }
