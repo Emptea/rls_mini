@@ -1,6 +1,7 @@
 #include "shared_data.h"
 
 #include "../rls_fpga/dma-proxy.h"
+#include "imitator_u220.h"
 #include "mini_config.hpp"
 #include "protocol_rls_mini.h"
 #include "user_u220.h"
@@ -58,6 +59,7 @@ void GlobalData::init() {
 			active_boards.push_back(i);
 			u220_ptrs[i]->init();
 			user_u220_ptrs[i] = new UserU220(u220_ptrs[i]->get_usrp());
+			imitator_u220_ptrs[i] = new ImitatorU220(u220_ptrs[i]->get_usrp());
 			dit++;
 			ispr_kan |= (1 << 2 * i) | (1 << 2 * i + 1);
 		}

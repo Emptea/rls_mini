@@ -3,13 +3,14 @@
 
 #include "axi_dsp.h"
 #include "fpga_dma.hpp"
+#include "imitator_u220.h"
+#include "mini_config.hpp"
 #include "rls.hpp"
 #include "shared_data_eth.h"
 #include "techlaser.h"
 #include "u220.hpp"
 #include "uhd_utils.hpp"
 #include "user_u220.h"
-#include "mini_config.hpp"
 
 #include <pivaluetree.h>
 
@@ -29,6 +30,7 @@ public:
 	UHD_UTILS uhd_utils;
 	PIVector<U220 *> u220_ptrs;
 	PIVector<UserU220 *> user_u220_ptrs;
+	PIVector<ImitatorU220 *> imitator_u220_ptrs;
 fpga_dma dma;
 
 	const u220_config_t u220_config = {

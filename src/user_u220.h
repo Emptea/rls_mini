@@ -49,41 +49,6 @@ public:
 	void set_tx_complex_gain(size_t channel, const std::complex<short> gain);
 
 
-	// radio: 0..1; playback: 0..3. All accesses use radio 0's user interface.
-	enum class RxPlaybackReg : uint32_t {
-		ENABLE = 0, MEM_PTR = 1, CORRECTION_RE = 2, CORRECTION_IM = 3,
-		DELAY = 8, PHASE = 12, AMPLITUDE = 16, SAMPLE_MEM = 20,
-		AMPLITUDE2_MEM = 24, AMPLITUDE2_OFFSET = 28,
-	};
-	struct RxPlaybackStatus {
-		bool waiting;
-		bool playing;
-		uint16_t amplitude2_counter;
-	};
-
-	// For per-playback registers, add playback to the enum's offset.
-	void write_rx_playback_reg(size_t radio, uint32_t offset, uint32_t value);
-	// Memory contents cannot be read back; SAMPLE_MEM slots return status.
-	uint64_t read_rx_playback_reg(size_t radio, uint32_t offset);
-	void set_rx_playback_enable(size_t radio, uint8_t mask);
-	void set_rx_playback_correction(size_t radio, std::complex<int32_t> correction);
-	void set_rx_playback_delay(size_t radio, size_t playback, uint16_t distance_m);
-	void set_rx_playback_phase(size_t radio, size_t playback, uint16_t distance_m,
-	                           size_t channel, uint16_t angle, int16_t velocity_mps);
-	// Positive attenuation reduces RCS: 0 dB = 1.0, 10 dB = 0.1.
-	static double rx_playback_rcs_from_attenuation(double attenuation_db);
-	// distance_m must be nonzero; channel is the n_chan in the gain formula.
-	void set_rx_playback_amplitude(size_t radio, size_t playback, uint16_t distance_m,
-	                               size_t channel, uint16_t angle, double attenuation_db = 0.0);
-	void set_rx_playback_samples(size_t radio, size_t playback,
-	                             const std::array<std::complex<int16_t>, 928> & samples);
-	void set_rx_playback_amplitude2(size_t radio, size_t playback,
-	                                const std::array<int16_t, 4096> & samples);
-	// angle: 65536 units per revolution; counter start: degrees, wrapped at 360.
-	void set_rx_playback_amplitude2_offset(size_t radio, size_t playback, uint16_t angle);
-	void set_rx_playback_amplitude2_counter_start(double angle_degrees);
-	uint16_t get_rx_playback_amplitude2_counter_start();
-	RxPlaybackStatus get_rx_playback_status(size_t radio, size_t playback);
 
 	uint32_t get_fpga_version();
 
@@ -104,7 +69,6 @@ private:
 		TX1_GAIN          = 11,
 		TX1_DAC_MEM       = 12,
 		TX_GAINON_DELAY   = 13,
-		RX_PLAYBACK_START = 14,
 		TX1_GAINON_MEM    = 15,
 		RX1_EN_MEM        = 16,
 	};
@@ -164,13 +128,6 @@ private:
 	void write_tx_delay();
 
 
-	static uint32_t rx_playback_offset(RxPlaybackReg reg, size_t playback);
-	// Phase: 2^32 units/revolution; currently uses velocity only.
-	// Amplitude: signed complex Q14; angle: 65536 units/revolution.
-	static uint32_t convert_rx_playback_phase(uint16_t distance_m, size_t channel,
-	                                          uint16_t angle, int16_t velocity_mps);
-	static std::complex<int16_t> convert_rx_playback_amplitude(uint16_t distance_m, size_t channel,
-	                                                               uint16_t angle, double attenuation_db);
 
 	static uint32_t to_raw(const PlayCtrl & ctrl);
 };
