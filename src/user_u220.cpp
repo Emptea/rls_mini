@@ -30,8 +30,8 @@ void UserU220::write_reg(WrReg reg, uint32_t value) {
 	const uint32_t addr = reg_addr(reg);
 	user_regs->poke32(addr, value);
 
-	std::cout << "Write reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(8) << std::setfill('0')
-			  << value << std::dec << std::endl;
+	// std::cout << "Write reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(8) << std::setfill('0')
+	// 		  << value << std::dec << std::endl;
 }
 
 uint64_t UserU220::read_reg(RdReg reg) {
@@ -44,15 +44,14 @@ uint64_t UserU220::read_reg(RdReg reg) {
 	const uint32_t addr  = reg_addr(reg);
 	const uint64_t value = user_regs->peek64(addr);
 
-	std::cout << "Read reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(16) << std::setfill('0')
-			  << value << std::dec << std::endl;
+	// std::cout << "Read reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(16) << std::setfill('0')
+	// 		  << value << std::dec << std::endl;
 
 	return value;
 }
 
 void UserU220::write_play_ctrl() {
 	write_reg(WrReg::PLAY_CTRL, to_raw(play_ctrl_));
-	read_reg(RdReg::PLAY_CTRL);
 }
 
 void UserU220::set_play(uint32_t enable, uint32_t trigger_src, uint32_t gain_on_enable, uint32_t rx_enable) {
@@ -261,12 +260,7 @@ uint32_t UserU220::get_fpga_version() {
 }
 
 void UserU220::set_tx_complex_gain(size_t channel, const std::complex<short> gain) {
-	const WrReg wr_reg           = channel == 0 ? WrReg::TX0_GAIN : WrReg::TX1_GAIN;
-	const RdReg rd_reg           = channel == 0 ? RdReg::TX0_GAIN : RdReg::TX1_GAIN;
-	const RdReg rd_reg_effective = channel == 0 ? RdReg::TX0_GAIN_EFFECTIVE : RdReg::TX1_GAIN_EFFECTIVE;
-
+	const WrReg wr_reg   = channel == 0 ? WrReg::TX0_GAIN : WrReg::TX1_GAIN;
 	const uint32_t value = static_cast<uint16_t>(gain.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(gain.imag())) << 16);
 	write_reg(wr_reg, value);
-	const uint64_t raw     = read_reg(rd_reg);
-	const uint64_t raw_eff = read_reg(rd_reg_effective);
 }

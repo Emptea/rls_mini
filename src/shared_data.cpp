@@ -58,7 +58,7 @@ void GlobalData::init() {
 		if (dit != devices.end() && StdString2PIString(dit->first) == u220_ptrs[i]->get_serial()) {
 			active_boards.push_back(i);
 			u220_ptrs[i]->init();
-			user_u220_ptrs[i] = new UserU220(u220_ptrs[i]->get_usrp());
+			user_u220_ptrs[i]     = new UserU220(u220_ptrs[i]->get_usrp());
 			imitator_u220_ptrs[i] = new ImitatorU220(u220_ptrs[i]->get_usrp());
 			dit++;
 			ispr_kan |= (1 << 2 * i) | (1 << 2 * i + 1);
@@ -75,15 +75,11 @@ void GlobalData::init() {
 		}
 	}
 
-	uint32_t cnt = 0;
-	cnt++;
-	piCout << cnt;
 	for (size_t i: active_boards) {
 		const auto ver = user_u220_ptrs[i]->get_fpga_version();
 		const auto ser = u220_ptrs[i]->get_serial();
 		piCout << ser << PICoutManipulators::Hex << ver;
 	}
-	5_s .sleep();
 
 	for (size_t i: active_boards) {
 		user_u220_ptrs[i]->set_tx_dac_delay(cfg.tx_dac_delay[i * 2], cfg.tx_dac_delay[i * 2 + 1]);
@@ -93,8 +89,8 @@ void GlobalData::init() {
 		user_u220_ptrs[i]->set_play_gpio_tx_enable(0b11);
 		user_u220_ptrs[i]->set_play_gpio_rx_enable(0b11);
 		user_u220_ptrs[i]->set_play_rx_insert_count(1);
-		// user_u220_ptrs[i]->set_tx_gainon_sg(0, cfg.tx_gainon_sg[i * 2]);
-		// user_u220_ptrs[i]->set_tx_gainon_sg(1, cfg.tx_gainon_sg[i * 2 + 1]);
+		user_u220_ptrs[i]->set_tx_gainon_sg(0, cfg.tx_gainon_sg[i * 2]);
+		user_u220_ptrs[i]->set_tx_gainon_sg(1, cfg.tx_gainon_sg[i * 2 + 1]);
 		if (cfg.use_ext_file_sg[i * 2]) {
 			user_u220_ptrs[i]->set_tx_dac_sg(0, cfg.tx_dac_sg[i * 2]);
 		}
@@ -105,48 +101,17 @@ void GlobalData::init() {
 		user_u220_ptrs[i]->set_tx_complex_gain(1, cfg.complex_gains[i * 2 + 1]);
 	}
 
-	// 5_s .sleep();
-	cnt++;
-	piCout << cnt;
-
-	// for (size_t i = 0; i < 10; i++) {
 	enable_ad9361_external_ensm();
 	generate_ad9361_cat_disable();
-	print_ad9361_ensm_states();
 	1_s .sleep();
 	sync_ad9361_mcs();
 	generate_ad9361_cat_enable();
 	print_ad9361_ensm_states();
-	5_s .sleep();
-	// }
 	enable_external_lo_all();
-
-	// enable_ad9361_external_ensm();
-
-	// // 5_s .sleep();
-	// for (size_t i = 0; i < 16; i++) {
-	// 	// u220_ptrs[0]->ensm_to_alert();
-	// 	// 1_s .sleep();
-	// 	// u220_ptrs[0]->ensm_to_fdd();
-	// 	toggle_ad9361_cat_enable();
-	// 	10_s .sleep();
-	// }
-
-
-	cnt++;
-	piCout << cnt;
 
 	for (size_t i: active_boards) {
 		user_u220_ptrs[i]->reset_time(0x05DC);
 	}
-	for (size_t i: active_boards) {
-		// user_u220_ptrs[i]->set_play_start_tx();
-		// user_u220_ptrs[i]->set_play_rx_enable(1);
-	}
-
-	5_s .sleep();
-	cnt++;
-	piCout << cnt;
 
 	if (cfg.dma_enabled) {
 		axi_dsp_init();
@@ -158,7 +123,6 @@ void GlobalData::init() {
 		axi_dsp_apply();
 	}
 	first_transfer = false;
-	// sync();
 }
 
 
@@ -725,18 +689,4 @@ void GlobalData::print_ad9361_ensm_states() {
 
 		piCout << "AD9361[" << i << "] ENSM = 0x" << PICoutManipulators::Hex << static_cast<int>(state);
 	}
-}
-
-void GlobalData::toggle_ad9361_cat_enable() {
-	piCout << "Press ENTER to switch ENSM -> ALERT\n";
-	std::cin.get();
-
-	generate_ad9361_cat_disable();
-	print_ad9361_ensm_states();
-
-	piCout << "Press ENTER to switch ENSM -> FDD\n";
-	std::cin.get();
-
-	generate_ad9361_cat_enable();
-	print_ad9361_ensm_states();
 }

@@ -86,11 +86,12 @@ void U220::setup() {
 void U220::initialize_usrp() {
 	device_args.append(",serial=");
 	device_args.append(serial);
+	device_args.append(",master_clock_rate=20e6");
 	std::cout << std::endl;
 	std::cout << boost::format("Creating the usrp device with: %s...") % device_args << std::endl;
 
 	usrp = uhd::usrp::multi_usrp::make(PIString2StdString(device_args));
-	usrp->set_master_clock_rate(20e6);
+	// usrp->set_master_clock_rate(20e6);
 
 	if (!user_config.ref.isEmpty()) {
 		usrp->set_clock_source(PIString2StdString(user_config.ref));
@@ -357,7 +358,7 @@ void U220::receive() {
 	const auto recv_us    = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - recv_start).count();
 	rx_timeout            = rx_burst_pkt_time; // small timeout for subsequent recv
 
-	
+
 	rx_errors_worker(rx_metadata.error_code);
 	if (num_rx_samps) {
 		active_buffer_idx = 1 - active_buffer_idx;
@@ -376,7 +377,8 @@ void U220::receive() {
 		}
 		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
 			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6)
-			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
+			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0])
+			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
 		// PRINT_U220_STATS(stats);
 	}
 }
@@ -576,17 +578,13 @@ void U220::ensm_to_fdd() {
 	std::cout << "[U220] ENSM -> FDD" << std::endl;
 }
 
-void U220::ensm_enable_external()
-{
-    auto tree = usrp->get_device()->get_tree();
-    tree->access<int>("/mboards/0/mcs/command").set(6);
+void U220::ensm_enable_external() {
+	auto tree = usrp->get_device()->get_tree();
+	tree->access<int>("/mboards/0/mcs/command").set(6);
 }
 
-uint8_t U220::get_ensm_state()
-{
-    auto tree = usrp->get_device()->get_tree();
+uint8_t U220::get_ensm_state() {
+	auto tree = usrp->get_device()->get_tree();
 
-    return static_cast<uint8_t>(
-        tree->access<int>("/mboards/0/ensm/state").get()
-    );
+	return static_cast<uint8_t>(tree->access<int>("/mboards/0/ensm/state").get());
 }

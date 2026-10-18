@@ -17,8 +17,8 @@
 #define GLOBAL (GlobalData::instance())
 
 class GlobalData
-    : public PIObject
-    , public GlobalDataEth {
+	: public PIObject
+	, public GlobalDataEth {
 	PIOBJECT(GlobalData)
 
 private:
@@ -31,7 +31,7 @@ public:
 	PIVector<U220 *> u220_ptrs;
 	PIVector<UserU220 *> user_u220_ptrs;
 	PIVector<ImitatorU220 *> imitator_u220_ptrs;
-fpga_dma dma;
+	fpga_dma dma;
 
 	const u220_config_t u220_config = {
 		.rate       = 5e6,
@@ -47,7 +47,8 @@ fpga_dma dma;
 		.tx_spb     = 545200,
 		.rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf
 	};
-	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
+	const PIString u220_args =
+		"recv_frame_size=16360,num_recv_frames=64,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
 
 	PIVector<size_t> active_boards;
 	static GlobalData * instance();
@@ -94,7 +95,6 @@ private:
 	void generate_ad9361_cat_disable();
 	void enable_ad9361_external_ensm();
 	void print_ad9361_ensm_states();
-	void toggle_ad9361_cat_enable();
 
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
@@ -167,19 +167,19 @@ private:
 
 
 	// TODO work header send
-	uint16_t aztek = 0; // Азимут текущий, незадержанный в ПОИ
-	uint32_t time_delayed     = 0; // Время, задержанное в обработке
-	uint16_t az_delayed    = 0; // Азимут, задержанный в обработке
-	uint16_t zona  = 0; // Дальность отметки "Зона"
-	uint16_t nes   = 0; // Количество эхосигналов
-	                    // Дальность эхосигнала
-	                    // ...
-	                    // uint16_t[nes]
+	uint16_t aztek        = 0; // Азимут текущий, незадержанный в ПОИ
+	uint32_t time_delayed = 0; // Время, задержанное в обработке
+	uint16_t az_delayed   = 0; // Азимут, задержанный в обработке
+	uint16_t zona         = 0; // Дальность отметки "Зона"
+	uint16_t nes          = 0; // Количество эхосигналов
+	                           // Дальность эхосигнала
+	                           // ...
+	                           // uint16_t[nes]
 
 	struct target {
 		uint16_t n     = 0;
 		uint32_t time  = 0;
-		double az    = 0;
+		double az      = 0;
 		int16_t um     = 0; // Угол места
 		uint16_t D     = 0; // Дальность, 1 м
 		uint16_t porog = 0; // Порог обнаружения, 0.5 дБ
@@ -198,7 +198,6 @@ private:
 
 	void send_KTA_VO(struct target targ);
 	void send_PI();
-
 };
 
 #endif
