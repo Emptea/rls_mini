@@ -257,6 +257,18 @@ VectorComplexS U220::take_rx_queue_and_clear(int index) {
 	return ret;
 }
 
+VectorComplexS U220::take_dump_queue_and_clear(int index) {
+	if (index < 0 || index >= 2) return {};
+	auto ref = dump_queue[index].getRef();
+	VectorComplexS result;
+	while (!ref->isEmpty()) {
+		const auto block = ref->dequeue();
+		for (const auto & sample: block)
+			result.push_back(sample);
+	}
+	return result;
+}
+
 
 VectorComplexS U220::take_rx_queue(int index) {
 	if (index < 0 || index >= 2) return {};
@@ -354,7 +366,9 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 
 void U220::receive() {
 	const auto recv_start = std::chrono::steady_clock::now();
-	size_t num_rx_samps   = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout) * 2;
+	const int received_buffer        = active_buffer_idx.load();
+	const size_t samples_per_channel = rx_stream->recv(rx_buffer_ptrs[received_buffer], board_config.rx_spb, rx_metadata, rx_timeout);
+	size_t num_rx_samps              = samples_per_channel * 2;
 	const auto recv_us    = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - recv_start).count();
 	rx_timeout            = rx_burst_pkt_time; // small timeout for subsequent recv
 
@@ -370,11 +384,19 @@ void U220::receive() {
 	// piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
 	// 	   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[0]) + 1)
 	// 	   << "serial" << serial;
+	if (samples_per_channel > 0 && stats.rx_packet_cnt < (2 * board_config.rx_spb * 101)) {
+		for (int ch: {0, 1}) {
+			auto ch_ptr = dump_queue[ch].getRef();
+			ch_ptr->push_back(VectorComplexS(rx_buffer_ptrs[received_buffer][ch], samples_per_channel));
+		}
+	}
+
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
 		for (int ch: {0, 1}) {
 			auto ch_ptr = rx_queue[ch].getRef();
 			ch_ptr->push_back(rx_buffer[ch]);
 		}
+
 		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
 			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6)
 			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0])

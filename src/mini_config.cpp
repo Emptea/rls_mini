@@ -11,6 +11,7 @@
 MiniConfig::MiniConfig() {
 	load("mini.ini");
 	load_settings();
+	load_imitator();
 	load_coeffs("tx_coeffs.csv");
 	load_signal("tx_gainon.txt", tx_gainon_sg);
 	load_signal("rx_en.txt", rx_en_sg);
@@ -309,6 +310,8 @@ void MiniConfig::load_coeffs(const std::string & filename) {
 	std::array<double, CHANNEL_COUNT> loaded_phases{};
 	std::vector<std::complex<int16_t>> loaded_complex_gains;
 	loaded_complex_gains.reserve(CHANNEL_COUNT);
+	std::vector<std::complex<int32_t>> loaded_corrections;
+	loaded_corrections.reserve(CHANNEL_COUNT);
 	size_t channel     = 0;
 	size_t line_number = 1;
 	while (std::getline(file, line)) {
@@ -336,13 +339,18 @@ void MiniConfig::load_coeffs(const std::string & filename) {
 		loaded_amplitudes[channel] = parse(line.substr(0, separator));
 		loaded_phases[channel]     = parse(line.substr(separator + 1));
 		const double phase_rad     = loaded_phases[channel] * std::acos(-1.0) / 180.0;
-		const double real_gain     = std::round((1 << 13) * loaded_amplitudes[channel] * std::cos(phase_rad));
-		const double imag_gain     = std::round((1 << 13) * loaded_amplitudes[channel] * std::sin(phase_rad));
-		const auto in_range        = [](double value) {
+		const std::complex<double> gain =
+			std::complex(loaded_amplitudes[channel] * std::cos(phase_rad), loaded_amplitudes[channel] * std::sin(phase_rad));
+		const std::complex<double> correction = 1.0 / gain;
+		const double real_gain                = std::round((1 << 13) * gain.real());
+		const double imag_gain                = std::round((1 << 13) * gain.imag());
+		const auto in_range                   = [](double value) {
             return std::isfinite(value) && value >= std::numeric_limits<int16_t>::min() && value <= std::numeric_limits<int16_t>::max();
 		};
 		if (!in_range(real_gain) || !in_range(imag_gain)) throw std::runtime_error("Coefficient gain out of int16_t range: " + invalid_row);
 		loaded_complex_gains.emplace_back(static_cast<int16_t>(real_gain), static_cast<int16_t>(imag_gain));
+		loaded_corrections.emplace_back(static_cast<int32_t>(std::round(1 << 14) * correction.real()),
+		                                static_cast<int32_t>(std::round(1 << 14) * correction.imag()));
 		++channel;
 	}
 	if (file.bad()) throw std::runtime_error("Cannot read coefficients file: " + filename);
@@ -350,4 +358,66 @@ void MiniConfig::load_coeffs(const std::string & filename) {
 	amplitudes = loaded_amplitudes;
 	phases     = loaded_phases;
 	complex_gains.swap(loaded_complex_gains);
+	complex_corrections.swap(loaded_corrections);
+}
+
+
+void MiniConfig::load_imitator() {
+	const auto section_it = data_.find("imitator");
+	if (section_it == data_.end()) {
+		throw std::runtime_error("mini.ini: missing [imitator] section; update the runtime config from config/mini.ini");
+	}
+	const auto & section = section_it->second;
+	const auto get_value = [&](const std::string & key) -> const std::string & {
+		const auto it = section.find(key);
+		if (it == section.end()) {
+			throw std::runtime_error("mini.ini: missing config key: imitator." + key);
+		}
+		return it->second;
+	};
+	const auto parse     = [](const std::string & text) {
+        size_t end         = 0;
+        const double value = std::stod(text, &end);
+        if (text.find_first_not_of(" \t\r\n", end) != std::string::npos || !std::isfinite(value)) {
+            throw std::runtime_error("Invalid imitator value: " + text);
+        }
+        return value;
+	};
+	const auto load_targets = [&](const std::string & key, std::array<double, TARGET_COUNT> & values) {
+		std::istringstream stream(get_value(key));
+		std::string item;
+		for (auto & value: values) {
+			if (!std::getline(stream, item, ',')) throw std::runtime_error("Not enough values: imitator." + key);
+			value = parse(item);
+		}
+		if (std::getline(stream, item, ',') || (!get_value(key).empty() && get_value(key).back() == ',')) {
+			throw std::runtime_error("Too many values: imitator." + key);
+		}
+	};
+	load_targets("target_az", target_az);
+	load_targets("target_um", target_um);
+	load_targets("target_dist", target_dist);
+	std::array<double, TARGET_COUNT> velocities{};
+	load_targets("target_vel", velocities);
+	for (size_t target = 0; target < TARGET_COUNT; ++target) {
+		const double velocity = velocities[target];
+		if (std::trunc(velocity) != velocity || velocity < std::numeric_limits<int16_t>::min() ||
+		    velocity > std::numeric_limits<int16_t>::max()) {
+			throw std::runtime_error("Invalid imitator.target_vel: expected int16_t velocity in m/s");
+		}
+		target_vel[target] = static_cast<int16_t>(velocity);
+	}
+	load_targets("target_osl", target_osl);
+	opu_az = parse(get_value("opu_az"));
+	std::array<double, TARGET_COUNT> values{};
+	load_targets("enable", values);
+	for (size_t n_targ = 0; n_targ < TARGET_COUNT; ++n_targ) {
+		if (values[n_targ] != 0 && values[n_targ] != 1) throw std::runtime_error("Invalid imitator.enable");
+		imitator_enabled[n_targ] = values[n_targ] == 1;
+	}
+	const auto channels = get_uint_array("imitator", "channels_enable");
+	for (size_t channel = 0; channel < CHANNEL_COUNT; ++channel) {
+		if (channels[channel] > 1) throw std::runtime_error("Invalid imitator.channels_enable");
+		imitator_channels_en[channel] = channels[channel] == 1;
+	}
 }

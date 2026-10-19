@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <fstream>
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
 #include <pisemaphore.h>
@@ -113,6 +115,41 @@ void GlobalData::start() {
 	for (const auto board_index: u220_group.active_boards()) {
 		u220_group.fpga(board_index)->set_play_start_tx();
 	}
+
+	piCout << "Imitator init";
+	std::bitset<4> enable_bits;
+	for (std::size_t i = 0; i < 4; ++i) {
+		enable_bits[i] = cfg.imitator_enabled[i];
+	}
+	for (const auto board_index: u220_group.active_boards()) {
+		imitator_u220_ptrs[board_index]->set_rx_playback_correction(0, cfg.complex_corrections[2 * board_index]);
+		imitator_u220_ptrs[board_index]->set_rx_playback_correction(1, cfg.complex_corrections[2 * board_index + 1]);
+		imitator_u220_ptrs[board_index]
+			->set_params(cfg.target_az, cfg.target_um, cfg.target_dist, cfg.target_vel, cfg.target_osl, cfg.opu_az);
+		for (size_t radio = 0; radio < 2; ++radio) {
+			const auto mask = cfg.imitator_channels_en[2 * board_index + radio] ? static_cast<uint8_t>(enable_bits.to_ulong()) : uint8_t{0};
+			imitator_u220_ptrs[board_index]->set_rx_playback_enable(radio, mask);
+		}
+	}
+
+	auto set_time = u220_group.board(0)->get_usrp()->get_time_now();
+	piCout << "Imitator start at" << set_time.get_full_secs();
+	for (const auto board_index: u220_group.active_boards()) {
+		u220_group.board(board_index)->get_usrp()->set_command_time(set_time);
+		imitator_u220_ptrs[board_index]->apply_rx_playback();
+	}
+	for (const auto board_index: u220_group.active_boards()) {
+		u220_group.board(board_index)->get_usrp()->clear_command_time();
+	}
+	1_ms .sleep();
+
+	t_start         = PISystemTime::current();
+	auto start_time = u220_group.board(0)->get_usrp()->get_time_now();
+	piCout << "TX start at" << start_time.get_full_secs();
+
+	for (const auto board_index: u220_group.active_boards()) {
+		u220_group.fpga(board_index)->set_play_start_tx();
+	}
 }
 
 
@@ -132,6 +169,21 @@ void GlobalData::stop() {
 	for (size_t i: u220_group.active_boards()) {
 		u220_group.fpga(i)->set_play_stop_tx();
 	}
+
+	for (auto & channel: dump_channels) {
+		channel.clear();
+	}
+	for (size_t i: u220_group.active_boards()) {
+		u220_group.fpga(i)->set_play_stop_tx();
+		for (int channel = 0; channel < 2; ++channel) {
+			const size_t global_channel = 2 * i + channel;
+			if (global_channel < dump_channels.size()) {
+				dump_channels[global_channel] = u220_group.board(i)->take_dump_queue_and_clear(channel);
+			}
+		}
+	}
+	write_dump_hex("rx_dump.hex");
+	const auto cycles_completed = u220_group.active_boards().isEmpty() ? 0 : u220_group.board(0)->get_stats().cycles_completed;
 
 	if (cfg.dma_enabled) {
 		axi_dsp_deinit();
@@ -155,6 +207,38 @@ void GlobalData::stop() {
 	if (cfg.dma_enabled) {
 		dma.cleanup();
 	}
+}
+
+void GlobalData::write_dump_hex(const char * filename) const {
+	std::ofstream file(filename, std::ios::binary | std::ios::trunc);
+	if (!file) {
+		piCout << "Cannot open RX dump:" << filename;
+		return;
+	}
+	size_t count = 0;
+	for (const auto & channel: dump_channels)
+		count = std::max(count, static_cast<size_t>(channel.size()));
+	constexpr char hex[] = "0123456789abcdef";
+	std::array<char, 65> line{};
+	line[64] = '\n';
+	for (size_t sample = 0; sample < count; ++sample) {
+		size_t pos = 0;
+		for (int channel = 7; channel >= 0; --channel) {
+			uint16_t parts[2]{};
+			if (sample < static_cast<size_t>(dump_channels[channel].size())) {
+				// sc16 buffer layout is real int16 followed by imaginary int16.
+				static_assert(sizeof(complexs) == sizeof(parts), "Expected packed sc16 samples");
+				std::memcpy(parts, &dump_channels[channel][sample], sizeof(parts));
+			}
+			for (int part: {1, 0}) {
+				for (int shift = 12; shift >= 0; shift -= 4)
+					line[pos++] = hex[(parts[part] >> shift) & 0xF];
+			}
+		}
+		file.write(line.data(), line.size());
+	}
+	file.close();
+	if (!file) piCout << "Failed writing RX dump:" << filename;
 }
 
 void GlobalData::processChannels() {

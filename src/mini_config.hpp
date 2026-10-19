@@ -12,6 +12,7 @@ class MiniConfig {
 public:
 	static constexpr size_t SAMPLE_COUNT  = 232 * 4;
 	static constexpr size_t CHANNEL_COUNT = 8;
+	static constexpr size_t TARGET_COUNT  = 4;
 
 	explicit MiniConfig();
 	void load_coeffs(const std::string & filename);
@@ -19,6 +20,7 @@ public:
 	std::array<double, CHANNEL_COUNT> amplitudes{};
 	std::array<double, CHANNEL_COUNT> phases{};
 	std::vector<std::complex<int16_t>> complex_gains;
+	std::vector<std::complex<int32_t>> complex_corrections;
 
 	std::array<uint32_t, CHANNEL_COUNT> tx_dac_delay{};
 	std::array<uint32_t, CHANNEL_COUNT> tx_gpio_delay{};
@@ -32,6 +34,15 @@ public:
 	uint32_t pps_dead_zone_ms   = 0;
 
 	bool dma_enabled            = false;
+
+	std::array<double, TARGET_COUNT> target_az{};
+	std::array<double, TARGET_COUNT> target_um{};
+	std::array<double, TARGET_COUNT> target_dist{};
+	std::array<int16_t, TARGET_COUNT> target_vel{};
+	std::array<double, TARGET_COUNT> target_osl{};
+	double opu_az               = 0.0;
+	std::array<bool, TARGET_COUNT> imitator_enabled{};
+	std::array<bool, CHANNEL_COUNT> imitator_channels_en{};
 
 	using Signal                = std::array<uint8_t, SAMPLE_COUNT>;
 	using ComplexSignal         = std::array<std::complex<int16_t>, SAMPLE_COUNT>;
@@ -51,6 +62,7 @@ private:
 	void load_settings();
 	void load_signal(const std::string & filename, ChannelSignals & signals);
 	void load_complex_signal(const std::string & filename, ChannelComplexSignals & signals);
+	void load_imitator();
 
 	uint32_t get_uint(const std::string & section, const std::string & key) const;
 	int32_t get_int(const std::string & section, const std::string & key) const;

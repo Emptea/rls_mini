@@ -11,6 +11,14 @@ class ImitatorU220 {
 public:
 	explicit ImitatorU220(uhd::usrp::multi_usrp::sptr usrp);
 
+	// Four targets, both radios. Angles in degrees, distances in metres.
+	void set_params(const std::array<double, 4> & target_az,
+	                const std::array<double, 4> & target_um,
+	                const std::array<double, 4> & target_dist,
+	                const std::array<int16_t, 4> & target_vel,
+	                const std::array<double, 4> & target_osl,
+	                double opu_az);
+
 	// radio: 0..1; playback: 0..3. All accesses use radio 0's user interface.
 	enum class RxPlaybackReg : uint32_t {
 		ENABLE            = 0,
@@ -34,6 +42,11 @@ public:
 	void write_rx_playback_reg(size_t radio, uint32_t offset, uint32_t value);
 	// Memory contents cannot be read back; SAMPLE_MEM slots return status.
 	uint64_t read_rx_playback_reg(size_t radio, uint32_t offset);
+	// Parameter setters stage values until an apply (both radios together).
+	void apply_rx_playback();
+	// Sends a pulse only; requires RX_PLAY_APPLY_OUT wired to each board
+	// RX_PLAY_APPLY_IN, including this board, to apply across boards.
+	void pulse_rx_playback_apply();
 	void set_rx_playback_enable(size_t radio, uint8_t mask);
 	void set_rx_playback_correction(size_t radio, std::complex<int32_t> correction);
 	void set_rx_playback_delay(size_t radio, size_t playback, uint16_t distance_m);
@@ -58,6 +71,7 @@ public:
 private:
 	static constexpr double LIGHT_SPEED = 299792458.0;
 	static constexpr double LAMBDA      = 0.032480222968581;
+	static constexpr double FREQ        = 9.23e9;
 	static constexpr double PT          = 80.0;
 	static constexpr double GAIN_IF     = 3162.2776601683795; // 10^(35/10)
 	static constexpr double GAIN_SDR    = 10000000.0;         // 10^(70/10)
@@ -68,7 +82,9 @@ private:
 	static const double ENERGY_CONST;
 
 	enum class WrReg : uint32_t {
-		RX_PLAYBACK_START = 14
+		RX_PLAYBACK_START       = 14,
+		RX_PLAYBACK_APPLY       = 18,
+		RX_PLAYBACK_APPLY_PULSE = 19
 	};
 	enum class RdReg : uint32_t {
 		RX_PLAYBACK_START = 22
