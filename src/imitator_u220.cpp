@@ -83,6 +83,14 @@ uint64_t ImitatorU220::read_rx_playback_reg(size_t radio, uint32_t offset) {
 	return read_reg(static_cast<RdReg>(32 + 32 * radio + offset));
 }
 
+void ImitatorU220::apply_rx_playback() {
+	write_reg(WrReg::RX_PLAYBACK_APPLY, 1);
+}
+
+void ImitatorU220::pulse_rx_playback_apply() {
+	write_reg(WrReg::RX_PLAYBACK_APPLY_PULSE, 0);
+}
+
 void ImitatorU220::set_rx_playback_enable(size_t radio, uint8_t mask) {
 	if (mask > 0xF) {
 		throw std::out_of_range("RX playback enable mask must be 4 bits");

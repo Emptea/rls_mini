@@ -384,7 +384,7 @@ void U220::receive() {
 	// piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
 	// 	   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[0]) + 1)
 	// 	   << "serial" << serial;
-	if (samples_per_channel > 0 && stats.rx_packet_cnt < (board_config.rx_spb * 100)) {
+	if (samples_per_channel > 0 && stats.rx_packet_cnt < (2 * board_config.rx_spb * 101)) {
 		for (int ch: {0, 1}) {
 			auto ch_ptr = dump_queue[ch].getRef();
 			ch_ptr->push_back(VectorComplexS(rx_buffer_ptrs[received_buffer][ch], samples_per_channel));

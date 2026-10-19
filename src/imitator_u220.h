@@ -42,6 +42,11 @@ public:
 	void write_rx_playback_reg(size_t radio, uint32_t offset, uint32_t value);
 	// Memory contents cannot be read back; SAMPLE_MEM slots return status.
 	uint64_t read_rx_playback_reg(size_t radio, uint32_t offset);
+	// Parameter setters stage values until an apply (both radios together).
+	void apply_rx_playback();
+	// Sends a pulse only; requires RX_PLAY_APPLY_OUT wired to each board
+	// RX_PLAY_APPLY_IN, including this board, to apply across boards.
+	void pulse_rx_playback_apply();
 	void set_rx_playback_enable(size_t radio, uint8_t mask);
 	void set_rx_playback_correction(size_t radio, std::complex<int32_t> correction);
 	void set_rx_playback_delay(size_t radio, size_t playback, uint16_t distance_m);
@@ -77,7 +82,9 @@ private:
 	static const double ENERGY_CONST;
 
 	enum class WrReg : uint32_t {
-		RX_PLAYBACK_START = 14
+		RX_PLAYBACK_START       = 14,
+		RX_PLAYBACK_APPLY       = 18,
+		RX_PLAYBACK_APPLY_PULSE = 19
 	};
 	enum class RdReg : uint32_t {
 		RX_PLAYBACK_START = 22

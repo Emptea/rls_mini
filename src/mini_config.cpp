@@ -409,4 +409,15 @@ void MiniConfig::load_imitator() {
 	}
 	load_targets("target_osl", target_osl);
 	opu_az = parse(get_value("opu_az"));
+	std::array<double, TARGET_COUNT> values{};
+	load_targets("enable", values);
+	for (size_t n_targ = 0; n_targ < TARGET_COUNT; ++n_targ) {
+		if (values[n_targ] != 0 && values[n_targ] != 1) throw std::runtime_error("Invalid imitator.enable");
+		imitator_enabled[n_targ] = values[n_targ] == 1;
+	}
+	const auto channels = get_uint_array("imitator", "channels_enable");
+	for (size_t channel = 0; channel < CHANNEL_COUNT; ++channel) {
+		if (channels[channel] > 1) throw std::runtime_error("Invalid imitator.channels_enable");
+		imitator_channels_en[channel] = channels[channel] == 1;
+	}
 }

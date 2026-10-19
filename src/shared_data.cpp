@@ -142,26 +142,40 @@ void GlobalData::start() {
 			if (u220_recv_thread.isStopping()) u220_stop_and_drain_rx();
 		});
 	}
-	t_start = PISystemTime::current();
-	for (const auto board_index: active_boards) {
-		user_u220_ptrs[board_index]->set_play_start_tx();
-	}
 
+	piCout << "Imitator init";
+	std::bitset<4> enable_bits;
+	for (std::size_t i = 0; i < 4; ++i) {
+		enable_bits[i] = cfg.imitator_enabled[i];
+	}
 	for (const auto board_index: active_boards) {
 		imitator_u220_ptrs[board_index]->set_rx_playback_correction(0, cfg.complex_corrections[2 * board_index]);
 		imitator_u220_ptrs[board_index]->set_rx_playback_correction(1, cfg.complex_corrections[2 * board_index + 1]);
 		imitator_u220_ptrs[board_index]
 			->set_params(cfg.target_az, cfg.target_um, cfg.target_dist, cfg.target_vel, cfg.target_osl, cfg.opu_az);
+		for (size_t radio = 0; radio < 2; ++radio) {
+			const auto mask = cfg.imitator_channels_en[2 * board_index + radio]
+			                      ? static_cast<uint8_t>(enable_bits.to_ulong())
+			                      : uint8_t{0};
+			imitator_u220_ptrs[board_index]->set_rx_playback_enable(radio, mask);
+		}
 	}
-	auto curr_time = u220_ptrs[active_boards[0]]->get_usrp()->get_time_now();
-	auto set_time  = curr_time + 1.0;
+
+	auto set_time = u220_ptrs[active_boards[0]]->get_usrp()->get_time_now();
+	piCout << "Imitator start at" << set_time.get_full_secs();
 	for (const auto board_index: active_boards) {
-		u220_ptrs[active_boards[0]]->get_usrp()->set_command_time(set_time);
-		imitator_u220_ptrs[board_index]->set_rx_playback_enable(0, 0b0001);
-		imitator_u220_ptrs[board_index]->set_rx_playback_enable(1, 0b0001);
+		u220_ptrs[board_index]->get_usrp()->set_command_time(set_time);
+		imitator_u220_ptrs[board_index]->apply_rx_playback();
 	}
 	for (const auto board_index: active_boards) {
 		u220_ptrs[board_index]->get_usrp()->clear_command_time();
+	}
+	1_ms .sleep();
+	t_start = PISystemTime::current();
+	auto start_time = u220_ptrs[active_boards[0]]->get_usrp()->get_time_now();
+	piCout << "TX start at" << start_time.get_full_secs();
+	for (const auto board_index: active_boards) {
+		user_u220_ptrs[board_index]->set_play_start_tx();
 	}
 }
 
