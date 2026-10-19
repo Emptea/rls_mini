@@ -1,10 +1,8 @@
-
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
 #include <pivector.h>
-#include <vector>
 
 class U220;
 class UserU220;
@@ -12,19 +10,30 @@ class MiniConfig;
 
 class U220Group {
 public:
-	U220Group(const PIVector<U220 *> & boards,
-	          const PIVector<UserU220 *> & fpga,
-	          const PIVector<size_t> & active_boards,
-	          const MiniConfig & cfg);
+	explicit U220Group(const MiniConfig & cfg);
+	~U220Group();
+
+	U220Group(const U220Group &)             = delete;
+	U220Group & operator=(const U220Group &) = delete;
+
+	void add_board(U220 * board);
+	void activate_board(size_t i);
+
+	U220 * board(size_t i) const { return boards_[i]; }
+	UserU220 * fpga(size_t i) const { return fpga_[i]; }
+
+	const PIVector<size_t> & active_boards() const { return active_boards_; }
 
 	void setup();
-	void sync_ad9361();
+	void stop_and_drain_rx();
 	void reset_time(uint32_t value);
+	void sync_ad9361();
 
 private:
-	const PIVector<U220 *> & boards_;
-	const PIVector<UserU220 *> & fpga_;
-	const PIVector<size_t> & active_boards_;
+	PIVector<U220 *> boards_;
+	PIVector<UserU220 *> fpga_;
+	PIVector<size_t> active_boards_;
+
 	const MiniConfig & cfg_;
 
 	void setup_one_board(size_t board_index);

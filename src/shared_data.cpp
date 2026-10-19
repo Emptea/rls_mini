@@ -15,18 +15,13 @@
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
 
-GlobalData::GlobalData()
-	: GlobalDataEth(this)
-	, cfg()
-	, uhd_utils(PIString2StdString(u220_args))
-	, u220_group(u220_ptrs, user_u220_ptrs, active_boards, cfg) {
+GlobalData::GlobalData(): GlobalDataEth(this), cfg(), u220_group(cfg) {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
 
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
 	for (int i = 0; i < serial_list.size(); i++) {
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
-		u220_ptrs << u;
-		user_u220_ptrs << nullptr;
+		u220_group.add_board(u);
 		imitator_u220_ptrs << nullptr;
 	}
 
@@ -58,24 +53,22 @@ void GlobalData::init() {
 	void * tx0_buf[TX_BUFFER_COUNT];
 	void * tx1_buf[TX_BUFFER_COUNT];
 
-	for (size_t i = 0; i < u220_ptrs.size(); i++) {
-		if (dit != devices.end() && StdString2PIString(dit->first) == u220_ptrs[i]->get_serial()) {
-			active_boards.push_back(i);
-			u220_ptrs[i]->init();
-			user_u220_ptrs[i]     = new UserU220(u220_ptrs[i]->get_usrp());
-			imitator_u220_ptrs[i] = new ImitatorU220(u220_ptrs[i]->get_usrp());
+	for (size_t i = 0; i < imitator_u220_ptrs.size(); i++) {
+		if (dit != devices.end() && StdString2PIString(dit->first) == u220_group.board(i)->get_serial()) {
+			u220_group.activate_board(i);
+			imitator_u220_ptrs[i] = new ImitatorU220(u220_group.board(i)->get_usrp());
 			dit++;
-			ispr_kan |= (1 << 2 * i) | (1 << 2 * i + 1);
+			ispr_kan |= (1 << (2 * i)) | (1 << (2 * i + 1));
 		}
 	}
-
-	for (const auto board_index: active_boards) {
+	for (const auto board_index: u220_group.active_boards()) {
 		if (cfg.dma_enabled) {
 			dma.get_all_tx_buffers(2 * board_index, tx0_buf);
 			dma.get_all_tx_buffers(2 * board_index + 1, tx1_buf);
-			u220_ptrs[board_index]->setup(tx0_buf, tx1_buf);
+
+			u220_group.board(board_index)->setup(tx0_buf, tx1_buf);
 		} else {
-			u220_ptrs[board_index]->setup();
+			u220_group.board(board_index)->setup();
 		}
 	}
 
@@ -95,54 +88,30 @@ void GlobalData::init() {
 	first_transfer = false;
 }
 
-
-bool GlobalData::sync() {
-	PISemaphore sem;
-	PIVector<PIThread *> sync_threads;
-	PIVector<bool> results(active_boards.size(), false);
-	for (const auto board_index: active_boards) {
-		auto * u  = u220_ptrs[board_index];
-		// create thread with this functor
-		// capture "i" and "u" as values, "sem" and "results" as reference (we want modify it)
-		auto * st = new PIThread([board_index, u, &sem, &results] {
-			sem.acquire();                    // wait for 1 resource from semaphore
-			results[board_index] = u->sync(); // sync and store result to results by index
-		});
-		st->startOnce();    // start thread with up functor
-		st->waitForStart(); // wait for thread actually starts
-		sync_threads << st; // save for future delete
-	}
-	(100_ms).sleep();                   // ensure that all threads waits on "sem.acquire()"
-	sem.release(sync_threads.size_s()); // release 4 resources (all threads, waits on "sem.acquire()", now go next)
-	for (auto * t: sync_threads)        // wait for all thread to finish their functors
-		t->stopAndWait();
-	piDeleteAll(sync_threads); // delete threads
-
-
-	return results.every([](bool r) { return r == true; }); // shortcut for check all items in "results" ( RTFM :-) )
-}
-
-
 void GlobalData::start() {
 	startEth();
-	for (const auto board_index: active_boards) {
-		// u220_ptrs[board_index]->start_reception(4.64+180*0.2e-6);
-		u220_ptrs[board_index]->set_time_sync();
+
+	for (const auto board_index: u220_group.active_boards()) {
+		// u220_group.board(board_index)->start_reception(4.64+180*0.2e-6);
+		u220_group.board(board_index)->set_time_sync();
 		double start_time = 0.05;
-		user_u220_ptrs[board_index]->set_play_rx_enable(1);
-		u220_ptrs[board_index]->start_reception(start_time);
+		u220_group.fpga(board_index)->set_play_rx_enable(1);
+		u220_group.board(board_index)->start_reception(start_time);
 	}
+
 	// 0.1_s .sleep();
 
-	if (!active_boards.isEmpty()) {
+	if (!u220_group.active_boards().isEmpty()) {
 		u220_recv_thread.start([this] {
 			u220_recv();
-			if (u220_recv_thread.isStopping()) u220_stop_and_drain_rx();
+			if (u220_recv_thread.isStopping()) u220_group.stop_and_drain_rx();
 		});
 	}
+
 	t_start = PISystemTime::current();
-	for (const auto board_index: active_boards) {
-		user_u220_ptrs[board_index]->set_play_start_tx();
+
+	for (const auto board_index: u220_group.active_boards()) {
+		u220_group.fpga(board_index)->set_play_start_tx();
 	}
 }
 
@@ -152,30 +121,40 @@ void GlobalData::stop() {
 	process_thread.stop();          // mark thread for stop
 	notifier_channels.notify();     // notify thread
 	process_thread.waitForFinish(); // wait for thread really finish
+
 	stopEth();
-	for (const auto board_index: active_boards) {
-		u220_ptrs[board_index]->stop_reception();
-		u220_ptrs[board_index]->stop_transmission();
+
+	for (const auto board_index: u220_group.active_boards()) {
+		u220_group.board(board_index)->stop_reception();
+		u220_group.board(board_index)->stop_transmission();
 	}
 
-	for (size_t i: active_boards) {
-		user_u220_ptrs[i]->set_play_stop_tx();
-		// user_u220_ptrs[i]->reset_time(0)
+	for (size_t i: u220_group.active_boards()) {
+		u220_group.fpga(i)->set_play_stop_tx();
 	}
 
-	piDeleteAllAndClear(u220_ptrs);
-	active_boards.clear();
 	if (cfg.dma_enabled) {
 		axi_dsp_deinit();
 	}
+
 	t_end = PISystemTime::current();
+
 	piCout << "====";
-	auto cycles_completed = u220_ptrs[active_boards[0]]->get_stats().cycles_completed;
-	if (cycles_completed > 0) {
-		piCout << "Mean: transfer time = " << (t_end - t_start) / cycles_completed;
+
+	if (!u220_group.active_boards().isEmpty()) {
+		const size_t i        = u220_group.active_boards()[0];
+		auto cycles_completed = u220_group.board(i)->get_stats().cycles_completed;
+
+		if (cycles_completed > 0) {
+			piCout << "Mean: transfer time = " << (t_end - t_start) / cycles_completed;
+		}
 	}
+
 	piCout << "====";
-	if (cfg.dma_enabled) dma.cleanup();
+
+	if (cfg.dma_enabled) {
+		dma.cleanup();
+	}
 }
 
 void GlobalData::processChannels() {
@@ -205,8 +184,8 @@ void GlobalData::processChannels() {
 }
 
 void GlobalData::u220_recv() {
-	for (const auto board_index: active_boards) {
-		u220_ptrs[board_index]->receive();
+	for (const auto board_index: u220_group.active_boards()) {
+		u220_group.board(board_index)->receive();
 	}
 
 	// int ret = dma.send();
@@ -223,28 +202,26 @@ void GlobalData::u220_recv() {
 	// 	}
 	// }
 	// void * rx_buffer = dma.get_rx_buffer();
-	auto packet_cnt = u220_ptrs[active_boards[0]]->get_stats().rx_packet_cnt;
+	if (u220_group.active_boards().isEmpty()) return;
+
+	const size_t first_board = u220_group.active_boards()[0];
+	auto packet_cnt          = u220_group.board(first_board)->get_stats().rx_packet_cnt;
 
 	if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
-		for (const auto board_index: active_boards) {
-			auto * board = u220_ptrs[board_index];
+		for (const auto board_index: u220_group.active_boards()) {
+			auto * board = u220_group.board(board_index);
 			auto ref1    = current_channels.getRef();
 			auto ref2    = adc_channels.getRef();
+
 			for (int channel: {0, 1}) {
 				const int global_channel = 2 * board_index + channel;
 				(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
 			}
 		}
+
 		notifier_channels.notify();
 	}
 }
-
-void GlobalData::u220_stop_and_drain_rx() {
-	for (const auto board_index: active_boards) {
-		u220_ptrs[board_index]->stop_and_drain_rx();
-	}
-}
-
 
 static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
 	switch (control_point) {

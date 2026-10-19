@@ -7,14 +7,17 @@
 
 #include <piliterals_time.h>
 
-U220Group::U220Group(const PIVector<U220 *> & boards,
-                     const PIVector<UserU220 *> & fpga,
-                     const PIVector<size_t> & active_boards,
-                     const MiniConfig & cfg)
-	: boards_(boards)
-	, fpga_(fpga)
-	, active_boards_(active_boards)
-	, cfg_(cfg) {}
+U220Group::U220Group(const MiniConfig & cfg): cfg_(cfg) {}
+
+U220Group::~U220Group() {
+	for (auto * u: fpga_) {
+		delete u;
+	}
+
+	for (auto * u: boards_) {
+		delete u;
+	}
+}
 
 void U220Group::setup() {
 	for (size_t i: active_boards_) {
@@ -24,6 +27,17 @@ void U220Group::setup() {
 	for (size_t i: active_boards_) {
 		setup_one_board(i);
 	}
+}
+
+void U220Group::stop_and_drain_rx() {
+	for (size_t i: active_boards_) {
+		boards_[i]->stop_and_drain_rx();
+	}
+}
+
+void U220Group::add_board(U220 * board) {
+	boards_ << board;
+	fpga_ << nullptr;
 }
 
 void U220Group::setup_one_board(size_t i) {
@@ -195,4 +209,12 @@ void U220Group::print_ad9361_ensm_states() {
 
 		piCout << "AD9361[" << i << "] ENSM = 0x" << PICoutManipulators::Hex << static_cast<int>(state);
 	}
+}
+
+void U220Group::activate_board(size_t i) {
+	if (fpga_[i] != nullptr) return;
+
+	boards_[i]->init();
+	fpga_[i] = new UserU220(boards_[i]->get_usrp());
+	active_boards_.push_back(i);
 }

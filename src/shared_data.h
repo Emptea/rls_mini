@@ -32,10 +32,7 @@ public:
 	const PIString u220_args =
 		"recv_frame_size=16360,num_recv_frames=64,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
 	UHD_UTILS uhd_utils;
-	PIVector<U220 *> u220_ptrs;
-	PIVector<UserU220 *> user_u220_ptrs;
 	PIVector<ImitatorU220 *> imitator_u220_ptrs;
-	PIVector<size_t> active_boards;
 	U220Group u220_group;
 	fpga_dma dma;
 
@@ -89,7 +86,6 @@ private:
 	GlobalData();
 	~GlobalData();
 
-	void u220_stop_and_drain_rx();
 	void u220_recv();
 
 	PIValueTree main_config;
