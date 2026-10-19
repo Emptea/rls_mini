@@ -14,6 +14,7 @@
 #include "user_u220.h"
 
 #include <pivaluetree.h>
+#include <array>
 
 #define GLOBAL (GlobalData::instance())
 
@@ -38,6 +39,8 @@ public:
 	PIVector<size_t> active_boards;
 	U220Group u220_group;
 	fpga_dma dma;
+	// Retained after stop; index = 2 * board_index + local channel.
+	std::array<VectorComplexS, 8> dump_channels;
 
 	const u220_config_t u220_config = {
 		.rate       = 5e6,
@@ -89,6 +92,7 @@ private:
 	GlobalData();
 	~GlobalData();
 
+	void write_dump_hex(const char * filename) const;
 	void u220_stop_and_drain_rx();
 	void u220_recv();
 

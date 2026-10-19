@@ -11,6 +11,14 @@ class ImitatorU220 {
 public:
 	explicit ImitatorU220(uhd::usrp::multi_usrp::sptr usrp);
 
+	// Four targets, both radios. Angles in degrees, distances in metres.
+	void set_params(const std::array<double, 4> & target_az,
+	                const std::array<double, 4> & target_um,
+	                const std::array<double, 4> & target_dist,
+	                const std::array<int16_t, 4> & target_vel,
+	                const std::array<double, 4> & target_osl,
+	                double opu_az);
+
 	// radio: 0..1; playback: 0..3. All accesses use radio 0's user interface.
 	enum class RxPlaybackReg : uint32_t {
 		ENABLE            = 0,
@@ -58,6 +66,7 @@ public:
 private:
 	static constexpr double LIGHT_SPEED = 299792458.0;
 	static constexpr double LAMBDA      = 0.032480222968581;
+	static constexpr double FREQ        = 9.23e9;
 	static constexpr double PT          = 80.0;
 	static constexpr double GAIN_IF     = 3162.2776601683795; // 10^(35/10)
 	static constexpr double GAIN_SDR    = 10000000.0;         // 10^(70/10)

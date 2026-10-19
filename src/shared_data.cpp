@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <fstream>
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
 #include <pisemaphore.h>
@@ -144,6 +146,23 @@ void GlobalData::start() {
 	for (const auto board_index: active_boards) {
 		user_u220_ptrs[board_index]->set_play_start_tx();
 	}
+
+	for (const auto board_index: active_boards) {
+		imitator_u220_ptrs[board_index]->set_rx_playback_correction(0, cfg.complex_corrections[2 * board_index]);
+		imitator_u220_ptrs[board_index]->set_rx_playback_correction(1, cfg.complex_corrections[2 * board_index + 1]);
+		imitator_u220_ptrs[board_index]
+			->set_params(cfg.target_az, cfg.target_um, cfg.target_dist, cfg.target_vel, cfg.target_osl, cfg.opu_az);
+	}
+	auto curr_time = u220_ptrs[active_boards[0]]->get_usrp()->get_time_now();
+	auto set_time  = curr_time + 1.0;
+	for (const auto board_index: active_boards) {
+		u220_ptrs[active_boards[0]]->get_usrp()->set_command_time(set_time);
+		imitator_u220_ptrs[board_index]->set_rx_playback_enable(0, 0b0001);
+		imitator_u220_ptrs[board_index]->set_rx_playback_enable(1, 0b0001);
+	}
+	for (const auto board_index: active_boards) {
+		u220_ptrs[board_index]->get_usrp()->clear_command_time();
+	}
 }
 
 
@@ -158,10 +177,18 @@ void GlobalData::stop() {
 		u220_ptrs[board_index]->stop_transmission();
 	}
 
+	for (auto & channel : dump_channels) channel.clear();
 	for (size_t i: active_boards) {
 		user_u220_ptrs[i]->set_play_stop_tx();
-		// user_u220_ptrs[i]->reset_time(0)
+		for (int channel = 0; channel < 2; ++channel) {
+			const size_t global_channel = 2 * i + channel;
+			if (global_channel < dump_channels.size()) {
+				dump_channels[global_channel] = u220_ptrs[i]->take_dump_queue_and_clear(channel);
+			}
+		}
 	}
+	write_dump_hex("rx_dump.hex");
+	const auto cycles_completed = active_boards.isEmpty() ? 0 : u220_ptrs[active_boards[0]]->get_stats().cycles_completed;
 
 	piDeleteAllAndClear(u220_ptrs);
 	active_boards.clear();
@@ -170,12 +197,41 @@ void GlobalData::stop() {
 	}
 	t_end = PISystemTime::current();
 	piCout << "====";
-	auto cycles_completed = u220_ptrs[active_boards[0]]->get_stats().cycles_completed;
 	if (cycles_completed > 0) {
 		piCout << "Mean: transfer time = " << (t_end - t_start) / cycles_completed;
 	}
 	piCout << "====";
 	if (cfg.dma_enabled) dma.cleanup();
+}
+
+void GlobalData::write_dump_hex(const char * filename) const {
+	std::ofstream file(filename, std::ios::binary | std::ios::trunc);
+	if (!file) {
+		piCout << "Cannot open RX dump:" << filename;
+		return;
+	}
+	size_t count = 0;
+	for (const auto & channel : dump_channels) count = std::max(count, static_cast<size_t>(channel.size()));
+	constexpr char hex[] = "0123456789abcdef";
+	std::array<char, 65> line{};
+	line[64] = '\n';
+	for (size_t sample = 0; sample < count; ++sample) {
+		size_t pos = 0;
+		for (int channel = 7; channel >= 0; --channel) {
+			uint16_t parts[2]{};
+			if (sample < static_cast<size_t>(dump_channels[channel].size())) {
+				// sc16 buffer layout is real int16 followed by imaginary int16.
+				static_assert(sizeof(complexs) == sizeof(parts), "Expected packed sc16 samples");
+				std::memcpy(parts, &dump_channels[channel][sample], sizeof(parts));
+			}
+			for (int part : {1, 0}) {
+				for (int shift = 12; shift >= 0; shift -= 4) line[pos++] = hex[(parts[part] >> shift) & 0xF];
+			}
+		}
+		file.write(line.data(), line.size());
+	}
+	file.close();
+	if (!file) piCout << "Failed writing RX dump:" << filename;
 }
 
 void GlobalData::processChannels() {

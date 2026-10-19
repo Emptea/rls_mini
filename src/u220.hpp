@@ -67,6 +67,7 @@ private:
 	uhd::rx_streamer::sptr rx_stream;
 	PIVector<VectorComplexS> rx_buffer;
 	PIProtectedVariable<PIQueue<VectorComplexS>> rx_queue[2];
+	PIProtectedVariable<PIQueue<VectorComplexS>> dump_queue[2];
 	PIVector<complexs *> rx_buffer_ptrs[2];
 	std::atomic_int active_buffer_idx{0};
 	uhd::rx_metadata_t rx_metadata;
@@ -158,6 +159,7 @@ public:
 	double get_rx_freq_for_ch(size_t channel) const { return usrp ? usrp->get_rx_freq(channel) : 0; };
 	double get_rx_gain_for_ch(size_t channel) const { return usrp ? usrp->get_rx_gain(channel) : 0; };
 	VectorComplexS take_rx_queue_and_clear(int index);
+	VectorComplexS take_dump_queue_and_clear(int index);
 	VectorComplexS take_rx_queue(int index);
 	VectorComplexS get_rx_queue(int index);
 

@@ -29,6 +29,21 @@ void ImitatorU220::write_reg(WrReg reg, uint32_t value) {
 
 	std::cout << "Write reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(8) << std::setfill('0')
 			  << value << std::dec << std::endl;
+
+	// Debug readback: write addresses use 4*register, reads use 8*slot.
+	if (reg == WrReg::RX_PLAYBACK_START) {
+		read_reg(RdReg::RX_PLAYBACK_START);
+	} else {
+		const uint32_t local = static_cast<uint32_t>(reg);
+		if (local >= 32 && local <= 95) {
+			const uint32_t offset = (local - 32) % 32;
+			// Memory data cannot be read back: slots 20..23 contain live status,
+			// and slots 24..27 have no readback.
+			if (offset < 4 || (offset >= 8 && offset < 20) || offset >= 28) {
+				read_reg(static_cast<RdReg>(local));
+			}
+		}
+	}
 }
 
 uint64_t ImitatorU220::read_reg(RdReg reg) {
@@ -96,8 +111,8 @@ void ImitatorU220::set_rx_playback_delay(size_t radio, size_t playback, uint16_t
 uint32_t ImitatorU220::convert_rx_playback_phase(uint16_t, size_t, uint16_t, int16_t velocity_mps) {
 	constexpr double period_s = static_cast<double>(rls::N_SAMPS_IN_PACK) / 5000000.0;
 	// phase = -4*pi*velocity*period/c radians; divide by 2*pi to get turns.
-	const double phase_turns  = -2.0 * static_cast<double>(velocity_mps) * period_s / LIGHT_SPEED;
-	const int64_t phase_units = std::llround(phase_turns * 4294967296.0);
+	const double phase_turns  = -2.0 * static_cast<double>(velocity_mps) * FREQ * period_s / LIGHT_SPEED;
+	const int64_t phase_units = std::llround(phase_turns * 4294967296.0); // * 2^32
 	// Integer conversion wraps negative phase modulo 2^32.
 	return static_cast<uint32_t>(phase_units);
 }
@@ -200,4 +215,35 @@ uint16_t ImitatorU220::get_rx_playback_amplitude2_counter_start() {
 ImitatorU220::RxPlaybackStatus ImitatorU220::get_rx_playback_status(size_t radio, size_t playback) {
 	const auto raw = read_rx_playback_reg(radio, rx_playback_offset(RxPlaybackReg::SAMPLE_MEM, playback));
 	return {bool(raw & 1), bool(raw & 2), static_cast<uint16_t>((raw >> 2) & 0xFFF)};
+}
+
+void ImitatorU220::set_params(const std::array<double, 4> & target_az,
+                              const std::array<double, 4> & target_um,
+                              const std::array<double, 4> & target_dist,
+                              const std::array<int16_t, 4> & target_vel,
+                              const std::array<double, 4> & target_osl,
+                              double opu_az) {
+	const auto angle_units = [](double degrees) -> uint16_t {
+		if (!std::isfinite(degrees)) throw std::invalid_argument("Target angle must be finite");
+		return static_cast<uint16_t>(std::llround(std::fmod(degrees, 360.0) * (65536.0 / 360.0)));
+	};
+	if (!std::isfinite(opu_az)) throw std::invalid_argument("OPU azimuth must be finite");
+	std::array<uint16_t, 4> distances{}, elevations{}, offsets{};
+	for (size_t k = 0; k < 4; ++k) {
+		if (!std::isfinite(target_dist[k]) || target_dist[k] < 0.5 || target_dist[k] >= 65535.5) {
+			throw std::out_of_range("Target distance must round to 1..65535 metres");
+		}
+		distances[k]  = static_cast<uint16_t>(std::llround(target_dist[k]));
+		elevations[k] = angle_units(target_um[k]);
+		offsets[k]    = angle_units(-target_az[k]);
+	}
+	for (size_t radio = 0; radio < 2; ++radio) {
+		for (size_t k = 0; k < 4; ++k) {
+			set_rx_playback_delay(radio, k, distances[k]);
+			set_rx_playback_phase(radio, k, distances[k], radio + 1, elevations[k], target_vel[k]);
+			set_rx_playback_amplitude(radio, k, distances[k], radio + 1, elevations[k], target_osl[k]);
+			set_rx_playback_amplitude2_offset(radio, k, offsets[k]);
+		}
+	}
+	set_rx_playback_amplitude2_counter_start(opu_az);
 }
