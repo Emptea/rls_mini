@@ -76,6 +76,8 @@ void GlobalData::init() {
 
 	u220_group.setup();
 	u220_group.sync_ad9361();
+	// нужна задержка чтобы pps сбросился иначе в reset_time не сработает
+	2_s .sleep();
 	u220_group.reset_time(0x05DC);
 
 	if (cfg.dma_enabled) {
