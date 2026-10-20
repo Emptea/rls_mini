@@ -1,6 +1,7 @@
 #include "imitator_u220.h"
 
 #include "../rls_fpga/rls.hpp"
+#include "rlso_const.hpp"
 
 #include <cmath>
 #include <iomanip>
@@ -112,8 +113,14 @@ void ImitatorU220::set_rx_playback_delay(size_t radio, size_t playback, uint16_t
 	if (!std::isfinite(bias) || bias < 0 || bias >= 65535.5) {
 		throw std::out_of_range("RX playback delay exceeds 16 bits");
 	}
+	uint32_t bias2set = static_cast<uint32_t>(std::llround(bias));
+	if (playback < 2) {
+		bias2set -= SAMPLES_FAR * 4;
+	} else {
+		bias2set -= SAMPLES_CLOSE * 4;
+	}
 	// Use the requested propagation delay directly, without subtracting pipeline latency.
-	write_rx_playback_reg(radio, offset, static_cast<uint32_t>(std::llround(bias)));
+	write_rx_playback_reg(radio, offset, bias2set);
 }
 
 uint32_t ImitatorU220::convert_rx_playback_phase(uint16_t, size_t, uint16_t, int16_t velocity_mps) {
@@ -204,7 +211,7 @@ void ImitatorU220::set_rx_playback_amplitude2_offset(size_t radio, size_t playba
 	write_rx_playback_reg(radio, rx_playback_offset(RxPlaybackReg::AMPLITUDE2_OFFSET, playback), angle >> 4);
 }
 
-void ImitatorU220::set_rx_playback_amplitude2_counter_start(double angle_degrees) {
+void ImitatorU220::set_rx_playback_amplitude2_counter_start(double angle_degrees, double speed) {
 	if (!std::isfinite(angle_degrees)) {
 		throw std::invalid_argument("Counter start angle must be finite");
 	}
@@ -213,7 +220,20 @@ void ImitatorU220::set_rx_playback_amplitude2_counter_start(double angle_degrees
 		wrapped += 360.0;
 	}
 	const auto n_samp = static_cast<uint32_t>(wrapped * (4096.0 / 360.0)) & 0xFFF;
-	write_reg(WrReg::RX_PLAYBACK_START, n_samp);
+	if (!std::isfinite(speed)) {
+		throw std::invalid_argument("Counter rotation period must be finite");
+	}
+	constexpr double capture_period_s = static_cast<double>(rls::N_SAMPS_IN_PACK) / 5000000.0;
+	int32_t step                      = 0;
+	if (speed != 0.0) {
+		const double rounded_step = std::round(1048576.0 * capture_period_s / speed);
+		if (!std::isfinite(rounded_step) || rounded_step < -524288.0 || rounded_step > 524287.0) {
+			throw std::out_of_range("Counter rotation period exceeds signed 20-bit step range");
+		}
+		step = static_cast<int32_t>(rounded_step);
+	}
+	const uint32_t packed_step = static_cast<uint32_t>(step) & 0xFFFFF;
+	write_reg(WrReg::RX_PLAYBACK_START, (packed_step << 12) | n_samp);
 }
 
 uint16_t ImitatorU220::get_rx_playback_amplitude2_counter_start() {
@@ -253,5 +273,5 @@ void ImitatorU220::set_params(const std::array<double, 4> & target_az,
 			set_rx_playback_amplitude2_offset(radio, k, offsets[k]);
 		}
 	}
-	set_rx_playback_amplitude2_counter_start(opu_az);
+	set_rx_playback_amplitude2_counter_start(opu_az, 0.0);
 }

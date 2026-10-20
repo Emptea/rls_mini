@@ -30,8 +30,8 @@ void UserU220::write_reg(WrReg reg, uint32_t value) {
 	const uint32_t addr = reg_addr(reg);
 	user_regs->poke32(addr, value);
 
-	// std::cout << "Write reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(8) << std::setfill('0')
-	// 		  << value << std::dec << std::endl;
+	std::cout << "Write reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(8) << std::setfill('0')
+			  << value << std::dec << std::endl;
 }
 
 uint64_t UserU220::read_reg(RdReg reg) {
@@ -44,8 +44,8 @@ uint64_t UserU220::read_reg(RdReg reg) {
 	const uint32_t addr  = reg_addr(reg);
 	const uint64_t value = user_regs->peek64(addr);
 
-	// std::cout << "Read reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(16) << std::setfill('0')
-	// 		  << value << std::dec << std::endl;
+	std::cout << "Read reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(16) << std::setfill('0')
+			  << value << std::dec << std::endl;
 
 	return value;
 }

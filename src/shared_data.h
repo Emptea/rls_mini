@@ -48,7 +48,7 @@ public:
 		.rx_bw      = {56e6, 56e6},
 		.ref        = "internal",
 		.cpu_format = "sc16",
-		.otw_format = "sc12",
+		.otw_format = "sc16",
 		.pps        = "internal",
 		.tx_spb     = 545200,
 		.rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf

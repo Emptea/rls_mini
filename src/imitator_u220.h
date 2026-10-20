@@ -64,7 +64,10 @@ public:
 	void set_rx_playback_amplitude2(size_t radio, size_t playback, const std::array<int16_t, 4096> & samples);
 	// angle: 65536 units per revolution; counter start: degrees, wrapped at 360.
 	void set_rx_playback_amplitude2_offset(size_t radio, size_t playback, uint16_t angle);
-	void set_rx_playback_amplitude2_counter_start(double angle_degrees);
+	// Writes start and speed together; next apply reloads all eight counters.
+	// Speed: seconds per revolution; zero holds, negative runs backwards.
+	// Encoded step: signed 20-bit, 1/256 entry per capture; out of range throws.
+	void set_rx_playback_amplitude2_counter_start(double angle_degrees, double speed = 0.0);
 	uint16_t get_rx_playback_amplitude2_counter_start();
 	RxPlaybackStatus get_rx_playback_status(size_t radio, size_t playback);
 

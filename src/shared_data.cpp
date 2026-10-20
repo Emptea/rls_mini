@@ -112,12 +112,6 @@ void GlobalData::start() {
 		});
 	}
 
-	t_start = PISystemTime::current();
-
-	for (const auto board_index: u220_group.active_boards()) {
-		u220_group.fpga(board_index)->set_play_start_tx();
-	}
-
 	piCout << "Imitator init";
 	std::bitset<4> enable_bits;
 	for (std::size_t i = 0; i < 4; ++i) {
@@ -149,6 +143,7 @@ void GlobalData::start() {
 	auto start_time = u220_group.board(0)->get_usrp()->get_time_now();
 	piCout << "TX start at" << start_time.get_full_secs();
 
+	t_start = PISystemTime::current();
 	for (const auto board_index: u220_group.active_boards()) {
 		u220_group.fpga(board_index)->set_play_start_tx();
 	}
