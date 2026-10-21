@@ -50,6 +50,14 @@ static bool initializeRs485(const PIString & device) {
 		return false;
 	}
 
+	serial_rs485 disabled{};
+
+	if (::ioctl(fd, TIOCSRS485, &disabled) < 0) {
+		std::perror("TIOCSRS485 disable");
+		::close(fd);
+		return false;
+	}
+
 	serial_rs485 config{};
 	config.flags = SER_RS485_ENABLED | SER_RS485_RTS_ON_SEND;
 
@@ -119,6 +127,7 @@ bool Techlaser::open(const PIString & serial) {
 	if (!ser.isThreadedRead()) ser.startThreadedRead();
 
 	req_thread.start(20_Hz);
+	piCout << "Techlaser: open port";
 	return true;
 }
 
@@ -239,17 +248,17 @@ void Techlaser::processExchange() {
 	}
 
 	// Отправляем без удержания mutex, чтобы приём мог работать.
-	if (!ser.send(request.bytes)) {
+	// Отправляем ровно один раз.
+	const bool sent = ser.send(request.bytes);
+
+	if (!sent) {
 		std::lock_guard<std::mutex> lock(exchange_mutex);
 
 		waiting_reply  = false;
 		expected_reply = '\0';
 
-		// polling и control_queue не меняем.
 		std::fprintf(stderr, "Techlaser: failed to send '%c'; continuing\n", request.command);
 	}
-
-	std::fprintf(stderr, "Techlaser: failed to send '%c'; exchange suspended\n", request.command);
 }
 
 

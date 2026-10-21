@@ -62,6 +62,12 @@ void GlobalData::init() {
 		}
 	}
 
+	if (u220_group.active_boards().isEmpty()) {
+		piCout << "No active U220 boards";
+		t_start = PISystemTime::current();
+		return;
+	}
+
 	for (const auto board_index: u220_group.active_boards()) {
 		if (cfg.dma_enabled) {
 			dma.get_all_tx_buffers(2 * board_index, tx0_buf);
@@ -93,6 +99,10 @@ void GlobalData::init() {
 
 void GlobalData::start() {
 	startEth();
+
+	if (u220_group.active_boards().isEmpty()) {
+		return;
+	}
 
 	for (const auto board_index: u220_group.active_boards()) {
 		// u220_group.board(board_index)->start_reception(4.64+180*0.2e-6);
