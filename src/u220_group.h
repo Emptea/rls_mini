@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <pivector.h>
 
+#include "user_reg_logger.h"
+
 class U220;
 class UserU220;
 class MiniConfig;
@@ -35,6 +37,7 @@ private:
 	PIVector<size_t> active_boards_;
 
 	const MiniConfig & cfg_;
+	UserRegLogger reg_logger_;
 
 	void setup_one_board(size_t board_index);
 

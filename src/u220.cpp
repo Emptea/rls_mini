@@ -588,21 +588,18 @@ void U220::enable_external_lo() {
 
 	tree->access<int>(path).set(1);
 
-	std::cout << "[U220] External LO enabled" << std::endl;
 }
 
 void U220::ensm_to_alert() {
 	auto tree              = usrp->get_device()->get_tree();
 	const std::string path = "/mboards/0/mcs/command";
 	tree->access<int>(path).set(4);
-	std::cout << "[U220] ENSM -> ALERT" << std::endl;
 }
 
 void U220::ensm_to_fdd() {
 	auto tree              = usrp->get_device()->get_tree();
 	const std::string path = "/mboards/0/mcs/command";
 	tree->access<int>(path).set(5);
-	std::cout << "[U220] ENSM -> FDD" << std::endl;
 }
 
 void U220::ensm_enable_external() {

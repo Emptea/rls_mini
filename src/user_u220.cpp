@@ -1,5 +1,7 @@
 #include "user_u220.h"
 
+#include "user_reg_logger.h"
+
 #include <boost/format.hpp>
 #include <cstring>
 #include <iomanip>
@@ -20,7 +22,7 @@ uint32_t UserU220::to_raw(const PlayCtrl & ctrl) {
 	return raw;
 }
 
-void UserU220::write_reg(WrReg reg, uint32_t value) {
+void UserU220::write_reg(WrReg reg, uint32_t value, bool log) {
 	auto user_regs = usrp_->get_user_settings_iface();
 
 	if (!user_regs) {
@@ -30,8 +32,9 @@ void UserU220::write_reg(WrReg reg, uint32_t value) {
 	const uint32_t addr = reg_addr(reg);
 	user_regs->poke32(addr, value);
 
-	std::cout << "Write reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(8) << std::setfill('0')
-			  << value << std::dec << std::endl;
+	if (log && reg_logger_) {
+		reg_logger_->log(board_index_, addr, value);
+	}
 }
 
 uint64_t UserU220::read_reg(RdReg reg) {
@@ -44,8 +47,8 @@ uint64_t UserU220::read_reg(RdReg reg) {
 	const uint32_t addr  = reg_addr(reg);
 	const uint64_t value = user_regs->peek64(addr);
 
-	std::cout << "Read reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(16) << std::setfill('0')
-			  << value << std::dec << std::endl;
+	// std::cout << "Read reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(16) << std::setfill('0')
+	// 		  << value << std::dec << std::endl;
 
 	return value;
 }
@@ -134,7 +137,6 @@ void UserU220::set_play_rx_insert_count(uint32_t rx_insert_count) {
 
 void UserU220::reset_time(uint32_t vita_time) {
 	write_reg(WrReg::RESET_TIME, vita_time << 16 | 0x1);
-	const uint64_t raw = read_reg(RdReg::RESET_TIME);
 }
 
 void UserU220::set_play_start_tx() {
@@ -232,7 +234,7 @@ void UserU220::set_tx_dac_sg(size_t channel, const std::array<std::complex<short
 	write_reg(WrReg::MEM_PTR, 0);
 	for (const auto & sample: samples) {
 		const uint32_t value = static_cast<uint16_t>(sample.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(sample.imag())) << 16);
-		write_reg(reg, value);
+		write_reg(reg, value, false);
 	}
 }
 
@@ -240,7 +242,7 @@ void UserU220::set_tx_gainon_sg(size_t channel, const std::array<uint8_t, 232 * 
 	const WrReg reg = channel == 0 ? WrReg::TX0_GAINON_MEM : WrReg::TX1_GAINON_MEM;
 	write_reg(WrReg::MEM_PTR, 0);
 	for (uint8_t sample: samples) {
-		write_reg(reg, sample);
+		write_reg(reg, sample, false);
 	}
 }
 
@@ -248,14 +250,13 @@ void UserU220::set_rx_en_sg(size_t channel, const std::array<uint8_t, 232 * 4> &
 	const WrReg reg = channel == 0 ? WrReg::RX0_EN_MEM : WrReg::RX1_EN_MEM;
 	write_reg(WrReg::MEM_PTR, 0);
 	for (uint8_t sample: samples) {
-		write_reg(reg, sample);
+		write_reg(reg, sample, false);
 	}
 }
 
 uint32_t UserU220::get_fpga_version() {
 	const uint64_t value   = read_reg(RdReg::FPGA_VERSION);
 	const uint32_t version = (value & 0xFFFFFF);
-	std::cout << "U220 FPGA version: " << std::hex << version << std::dec << std::endl;
 	return version;
 }
 

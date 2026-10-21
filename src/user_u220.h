@@ -6,10 +6,15 @@
 #include <cstdint>
 #include <memory>
 #include <uhd/usrp/multi_usrp.hpp>
-
+class UserRegLogger;
 class UserU220 {
 public:
 	explicit UserU220(uhd::usrp::multi_usrp::sptr usrp);
+
+	void set_reg_logger(UserRegLogger * logger, size_t board_index) {
+		reg_logger_  = logger;
+		board_index_ = board_index;
+	}
 
 	void set_play(uint32_t enable, uint32_t trigger_src, uint32_t gain_on_enable, uint32_t rx_enable);
 
@@ -49,28 +54,27 @@ public:
 	void set_tx_complex_gain(size_t channel, const std::complex<short> gain);
 
 
-
 	uint32_t get_fpga_version();
 
 
 private:
 	enum class WrReg : uint32_t {
-		PLAY_CTRL         = 0,
-		MEM_PTR           = 1,
-		TX0_DAC_MEM       = 2,
-		TX0_GAINON_MEM    = 3,
-		TX_DAC_DELAY      = 4,
-		RX_ADC_DELAY      = 5,
-		RX_EN_DELAY       = 6,
-		RX0_EN_MEM        = 7,
-		RESET_TIME        = 8,
-		CAT_SYNC_WIDTH    = 9,
-		TX0_GAIN          = 10,
-		TX1_GAIN          = 11,
-		TX1_DAC_MEM       = 12,
-		TX_GAINON_DELAY   = 13,
-		TX1_GAINON_MEM    = 15,
-		RX1_EN_MEM        = 16,
+		PLAY_CTRL       = 0,
+		MEM_PTR         = 1,
+		TX0_DAC_MEM     = 2,
+		TX0_GAINON_MEM  = 3,
+		TX_DAC_DELAY    = 4,
+		RX_ADC_DELAY    = 5,
+		RX_EN_DELAY     = 6,
+		RX0_EN_MEM      = 7,
+		RESET_TIME      = 8,
+		CAT_SYNC_WIDTH  = 9,
+		TX0_GAIN        = 10,
+		TX1_GAIN        = 11,
+		TX1_DAC_MEM     = 12,
+		TX_GAINON_DELAY = 13,
+		TX1_GAINON_MEM  = 15,
+		RX1_EN_MEM      = 16,
 	};
 
 	enum class RdReg : uint32_t {
@@ -118,15 +122,15 @@ private:
 	};
 
 	uhd::usrp::multi_usrp::sptr usrp_;
-
+	UserRegLogger * reg_logger_ = nullptr;
+	size_t board_index_         = 0;
 	PlayCtrl play_ctrl_{};
 
-	void write_reg(WrReg reg, uint32_t value);
+	void write_reg(WrReg reg, uint32_t value, bool log = true);
 	uint64_t read_reg(RdReg reg);
 
 	void write_play_ctrl();
 	void write_tx_delay();
-
 
 
 	static uint32_t to_raw(const PlayCtrl & ctrl);

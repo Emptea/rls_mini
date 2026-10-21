@@ -3,6 +3,7 @@
 
 #include "mini_config.hpp"
 #include "u220.hpp"
+#include "user_reg_logger.h"
 #include "user_u220.h"
 
 #include <piliterals_time.h>
@@ -21,7 +22,7 @@ U220Group::~U220Group() {
 
 void U220Group::setup() {
 	for (size_t i: active_boards_) {
-		piCout << boards_[i]->get_serial() << PICoutManipulators::Hex << fpga_[i]->get_fpga_version();
+		piCout << boards_[i]->get_serial() << "FPGA Version: " << PICoutManipulators::Hex << fpga_[i]->get_fpga_version();
 	}
 
 	for (size_t i: active_boards_) {
@@ -76,12 +77,15 @@ void U220Group::reset_time(uint32_t value) {
 
 
 void U220Group::sync_ad9361() {
+	piCout << "AD9361: Start sync";
 	enable_ad9361_external_ensm();
 	generate_ad9361_cat_disable();
 	1_s .sleep();
 	sync_ad9361_mcs();
 	generate_ad9361_cat_enable();
 	print_ad9361_ensm_states();
+	piCout << "AD9361: Complete sync";
+	piCout << "AD9361: Enable ext LO";
 	enable_external_lo_all();
 }
 
@@ -132,43 +136,25 @@ void U220Group::generate_ad9361_cat_disable() {
 }
 
 void U220Group::sync_ad9361_mcs() {
-	piCout << "AD9361 MCS: stage 1";
-
 	for (size_t i: active_boards_) {
 		boards_[i]->mcs_stage1();
 	}
-
-	piCout << "AD9361 MCS: SYNC #1";
-
 	generate_ad9361_sync_in();
 	1_s .sleep();
-
-	piCout << "AD9361 MCS: stage 2";
-
 	for (size_t i: active_boards_) {
 		boards_[i]->mcs_stage2();
 	}
-
-	piCout << "AD9361 MCS: SYNC #2";
-
 	generate_ad9361_sync_in();
 	1_s .sleep();
-
-	piCout << "AD9361 MCS: finish";
-
 	for (size_t i: active_boards_) {
 		boards_[i]->mcs_finish();
 	}
 }
 
 void U220Group::enable_ad9361_external_ensm() {
-	piCout << "AD9361 ENSM: start";
-
 	generate_ad9361_cat_disable();
 	1_s .sleep();
-
-	piCout << "BEFORE ALERT:";
-	print_ad9361_ensm_states();
+	// print_ad9361_ensm_states();
 
 	for (size_t i: active_boards_) {
 		boards_[i]->ensm_to_alert();
@@ -176,8 +162,7 @@ void U220Group::enable_ad9361_external_ensm() {
 
 	1_s .sleep();
 
-	piCout << "AFTER SPI ALERT:";
-	print_ad9361_ensm_states();
+	// print_ad9361_ensm_states();
 
 	for (size_t i: active_boards_) {
 		boards_[i]->ensm_enable_external();
@@ -185,16 +170,12 @@ void U220Group::enable_ad9361_external_ensm() {
 
 	1_s .sleep();
 
-	piCout << "AFTER EXTERNAL CONTROL:";
-	print_ad9361_ensm_states();
+	// print_ad9361_ensm_states();
 
 	generate_ad9361_cat_enable();
 	1_s .sleep();
 
-	piCout << "AFTER ENABLE = 1:";
-	print_ad9361_ensm_states();
-
-	piCout << "AD9361 ENSM: complete";
+	// print_ad9361_ensm_states();
 }
 
 void U220Group::enable_external_lo_all() {
@@ -206,8 +187,6 @@ void U220Group::enable_external_lo_all() {
 void U220Group::print_ad9361_ensm_states() {
 	for (size_t i: active_boards_) {
 		const uint8_t state = boards_[i]->get_ensm_state();
-
-		piCout << "AD9361[" << i << "] ENSM = 0x" << PICoutManipulators::Hex << static_cast<int>(state);
 	}
 }
 
@@ -215,6 +194,9 @@ void U220Group::activate_board(size_t i) {
 	if (fpga_[i] != nullptr) return;
 
 	boards_[i]->init();
-	fpga_[i] = new UserU220(boards_[i]->get_usrp());
+	fpga_[i]                  = new UserU220(boards_[i]->get_usrp());
+	const PIString & serial   = boards_[i]->get_serial();
+	const size_t board_number = static_cast<size_t>(std::stoul(serial.mid(4).data()));
+	fpga_[i]->set_reg_logger(&reg_logger_, i);
 	active_boards_.push_back(i);
 }
