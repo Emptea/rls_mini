@@ -1,6 +1,9 @@
 #ifndef techlaser_h
 #define techlaser_h
 
+#include <chrono>
+#include <deque>
+#include <mutex>
 #include <pipacketextractor.h>
 #include <piprotectedvariable.h>
 #include <piserial.h>
@@ -13,11 +16,11 @@ public:
 	~Techlaser();
 
 	enum class DeviceStatus {
-		Invalid  = -1,
+		Invalid = -1,
 		NotReady = 0, // Не готов (устройство переходит в него после возникновения ошибок, которые можно получить по команде $b#)
 		SelfDiag = 1, // Идет процесс самодиагностики
-		Ready    = 2, // Готов (может принимать команды позиционирования, в остальных состояниях они отбрасываются)
-		Heating  = 3, // Обогрев
+		Ready = 2, // Готов (может принимать команды позиционирования, в остальных состояниях они отбрасываются)
+		Heating = 3, // Обогрев
 	};
 
 	enum class MotorStatus {
@@ -59,7 +62,31 @@ public:
 	double getAngleAgo(PISystemTime ago) const;
 
 private:
+	using Clock = std::chrono::steady_clock;
+
+	struct Request {
+		PIByteArray bytes;
+		char command;
+	};
+
 	void packetReceived(PIByteArray msg);
+	void processExchange();
+
+	std::mutex exchange_mutex;
+	std::deque<Request> control_queue;
+
+	bool polling        = false;
+	bool waiting_reply  = false;
+	char expected_reply = '\0';
+	unsigned poll_index = 0;
+
+	Clock::time_point reply_deadline{};
+	Clock::time_point next_poll_cycle{};
+
+	// Начальные значения для проверки.
+	// 200 мс — выбранный нами тайм-аут, не значение из руководства.
+	std::chrono::milliseconds reply_timeout{200};
+	std::chrono::milliseconds poll_period{50};
 
 	PIThread req_thread;
 	PISerial ser;
