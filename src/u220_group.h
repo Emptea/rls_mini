@@ -1,10 +1,11 @@
 #pragma once
 
+#include "imitator_u220.h"
+#include "user_reg_logger.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <pivector.h>
-
-#include "user_reg_logger.h"
 
 class U220;
 class UserU220;
@@ -23,8 +24,9 @@ public:
 
 	U220 * board(size_t i) const { return boards_[i]; }
 	UserU220 * fpga(size_t i) const { return fpga_[i]; }
-
+	ImitatorU220 * imitator(size_t i) const { return imitators_[i]; }
 	const PIVector<size_t> & active_boards() const { return active_boards_; }
+	size_t board_count() const { return boards_.size(); }
 
 	void setup();
 	void stop_and_drain_rx();
@@ -35,6 +37,7 @@ private:
 	PIVector<U220 *> boards_;
 	PIVector<UserU220 *> fpga_;
 	PIVector<size_t> active_boards_;
+	PIVector<ImitatorU220 *> imitators_;
 
 	const MiniConfig & cfg_;
 	UserRegLogger reg_logger_;

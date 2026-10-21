@@ -11,6 +11,9 @@
 U220Group::U220Group(const MiniConfig & cfg): cfg_(cfg) {}
 
 U220Group::~U220Group() {
+	for (auto * imitator: imitators_) {
+		delete imitator;
+	}
 	for (auto * u: fpga_) {
 		delete u;
 	}
@@ -39,6 +42,7 @@ void U220Group::stop_and_drain_rx() {
 void U220Group::add_board(U220 * board) {
 	boards_ << board;
 	fpga_ << nullptr;
+	imitators_ << nullptr;
 }
 
 void U220Group::setup_one_board(size_t i) {
@@ -195,6 +199,7 @@ void U220Group::activate_board(size_t i) {
 
 	boards_[i]->init();
 	fpga_[i]                  = new UserU220(boards_[i]->get_usrp());
+	imitators_[i]             = new ImitatorU220(*fpga_[i]);
 	const PIString & serial   = boards_[i]->get_serial();
 	const size_t board_number = static_cast<size_t>(std::stoul(serial.mid(4).data()));
 	fpga_[i]->set_reg_logger(&reg_logger_, i);

@@ -24,7 +24,6 @@ GlobalData::GlobalData(): GlobalDataEth(this), cfg(), u220_group(cfg) {
 	for (int i = 0; i < serial_list.size(); i++) {
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
 		u220_group.add_board(u);
-		imitator_u220_ptrs << nullptr;
 	}
 
 	process_thread.start([this] { processChannels(); });
@@ -55,14 +54,14 @@ void GlobalData::init() {
 	void * tx0_buf[TX_BUFFER_COUNT];
 	void * tx1_buf[TX_BUFFER_COUNT];
 
-	for (size_t i = 0; i < imitator_u220_ptrs.size(); i++) {
+	for (size_t i = 0; i < u220_group.board_count(); ++i) {
 		if (dit != devices.end() && StdString2PIString(dit->first) == u220_group.board(i)->get_serial()) {
 			u220_group.activate_board(i);
-			imitator_u220_ptrs[i] = new ImitatorU220(*u220_group.fpga(i));
-			dit++;
+			++dit;
 			ispr_kan |= (1 << (2 * i)) | (1 << (2 * i + 1));
 		}
 	}
+
 	for (const auto board_index: u220_group.active_boards()) {
 		if (cfg.dma_enabled) {
 			dma.get_all_tx_buffers(2 * board_index, tx0_buf);
@@ -126,7 +125,7 @@ void GlobalData::start() {
 	}
 
 	for (const auto board_index: u220_group.active_boards()) {
-		auto * imitator = imitator_u220_ptrs[board_index];
+		auto * imitator = u220_group.imitator(board_index);
 		auto * fpga     = u220_group.fpga(board_index);
 
 		fpga->set_rx_playback_correction(0, cfg.complex_corrections[2 * board_index]);
