@@ -53,6 +53,20 @@ uint64_t UserU220::read_reg(RdReg reg) {
 	return value;
 }
 
+void UserU220::write_rx_playback_reg(size_t channel, RxPlaybackReg reg, uint32_t value, bool log) {
+	const uint32_t offset = static_cast<uint32_t>(reg);
+	if (channel >= 2 || offset >= 32 || (offset >= 4 && offset < 8)) throw std::out_of_range("Invalid RX playback register");
+	write_reg(static_cast<WrReg>(32 + 32 * channel + offset), value, log);
+}
+
+uint64_t UserU220::read_rx_playback_reg(size_t channel, RxPlaybackReg reg) {
+	const uint32_t offset = static_cast<uint32_t>(reg);
+	if (channel >= 2 || offset >= 32 || (offset >= 4 && offset < 8) || (offset >= 24 && offset < 28))
+		throw std::out_of_range("Invalid RX playback readback slot");
+
+	return read_reg(static_cast<RdReg>(32 + 32 * channel + offset));
+}
+
 void UserU220::write_play_ctrl() {
 	write_reg(WrReg::PLAY_CTRL, to_raw(play_ctrl_));
 }
@@ -264,4 +278,111 @@ void UserU220::set_tx_complex_gain(size_t channel, const std::complex<short> gai
 	const WrReg wr_reg   = channel == 0 ? WrReg::TX0_GAIN : WrReg::TX1_GAIN;
 	const uint32_t value = static_cast<uint16_t>(gain.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(gain.imag())) << 16);
 	write_reg(wr_reg, value);
+}
+
+void UserU220::apply_rx_playback() {
+	write_reg(WrReg::RX_PLAYBACK_APPLY, 1);
+}
+
+void UserU220::pulse_rx_playback_apply() {
+	write_reg(WrReg::RX_PLAYBACK_APPLY_PULSE, 0);
+}
+
+void UserU220::set_rx_playback_enable(size_t radio, uint8_t mask) {
+	if (mask > 0xF) throw std::out_of_range("RX playback enable mask must be 4 bits");
+
+	write_rx_playback_reg(radio, RxPlaybackReg::ENABLE, mask);
+}
+
+void UserU220::set_rx_playback_correction(size_t radio, std::complex<int32_t> correction) {
+	if (correction.real() < -8388608 || correction.real() > 8388607 || correction.imag() < -8388608 || correction.imag() > 8388607) {
+		throw std::out_of_range("RX playback correction must be signed 24-bit Q14");
+	}
+	write_rx_playback_reg(radio, RxPlaybackReg::CORRECTION_RE, static_cast<uint32_t>(correction.real()) & 0xFFFFFF);
+	write_rx_playback_reg(radio, RxPlaybackReg::CORRECTION_IM, static_cast<uint32_t>(correction.imag()) & 0xFFFFFF);
+}
+
+void UserU220::set_rx_playback_delay(size_t radio, const std::array<uint32_t, 4> & values) {
+	for (size_t k = 0; k < values.size(); ++k) {
+		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::DELAY) + k);
+
+		write_rx_playback_reg(radio, reg, values[k]);
+	}
+}
+
+void UserU220::set_rx_playback_phase(size_t radio, const std::array<uint32_t, 4> & values) {
+	for (size_t k = 0; k < values.size(); ++k) {
+		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::PHASE) + k);
+
+		write_rx_playback_reg(radio, reg, values[k]);
+	}
+}
+
+void UserU220::set_rx_playback_amplitude(size_t radio, const std::array<uint32_t, 4> & values) {
+	for (size_t k = 0; k < values.size(); ++k) {
+		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::AMPLITUDE) + k);
+
+		write_rx_playback_reg(radio, reg, values[k]);
+	}
+}
+
+void UserU220::set_rx_playback_samples(size_t radio, size_t playback, const std::array<std::complex<int16_t>, 928> & samples) {
+	if (playback >= 4) throw std::out_of_range("RX playback must be 0..3");
+
+	const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::SAMPLE_MEM) + playback);
+
+	write_rx_playback_reg(radio, RxPlaybackReg::MEM_PTR, 0);
+
+	for (const auto & sample: samples) {
+		const uint32_t value = (static_cast<uint32_t>(static_cast<uint16_t>(sample.real())) << 16) | static_cast<uint16_t>(sample.imag());
+
+		write_rx_playback_reg(radio, reg, value, false);
+	}
+}
+
+void UserU220::set_rx_playback_dn(size_t radio, size_t playback, const std::array<int16_t, 4096> & samples) {
+	if (playback >= 4) throw std::out_of_range("RX playback must be 0..3");
+
+	const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::AMPLITUDE2_MEM) + playback);
+
+	write_rx_playback_reg(radio, RxPlaybackReg::MEM_PTR, 0);
+
+	for (int16_t sample: samples)
+		write_rx_playback_reg(radio, reg, static_cast<uint16_t>(sample), false);
+}
+
+void UserU220::set_rx_playback_dn_offset(size_t radio, const std::array<uint32_t, 4> & values) {
+	for (uint32_t value: values) {
+		if (value > 0xFFF) throw std::out_of_range("DN offset must be 12 bits");
+	}
+
+	for (size_t k = 0; k < values.size(); ++k) {
+		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::AMPLITUDE2_OFFSET) + k);
+
+		write_rx_playback_reg(radio, reg, values[k]);
+	}
+}
+
+void UserU220::set_rx_playback_dn_counter(uint16_t start, int32_t step) {
+	if (start > 0xFFF) throw std::out_of_range("DN counter start must be 12 bits");
+
+	if (step < -524288 || step > 524287) throw std::out_of_range("DN counter step must be signed 20-bit");
+
+	const uint32_t value = ((static_cast<uint32_t>(step) & 0xFFFFF) << 12) | start;
+
+	write_reg(WrReg::RX_PLAYBACK_START, value);
+}
+
+uint16_t UserU220::get_rx_playback_dn_counter_start() {
+	return static_cast<uint16_t>(read_reg(RdReg::RX_PLAYBACK_START) & 0xFFF);
+}
+
+UserU220::RxPlaybackStatus UserU220::get_rx_playback_status(size_t radio, size_t playback) {
+	if (playback >= 4) throw std::out_of_range("RX playback must be 0..3");
+
+	const auto reg     = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::SAMPLE_MEM) + playback);
+
+	const uint64_t raw = read_rx_playback_reg(radio, reg);
+
+	return {bool(raw & 1), bool(raw & 2), static_cast<uint32_t>((raw >> 2) & 0xFFFFF)};
 }

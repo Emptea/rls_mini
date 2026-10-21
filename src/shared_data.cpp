@@ -58,7 +58,7 @@ void GlobalData::init() {
 	for (size_t i = 0; i < imitator_u220_ptrs.size(); i++) {
 		if (dit != devices.end() && StdString2PIString(dit->first) == u220_group.board(i)->get_serial()) {
 			u220_group.activate_board(i);
-			imitator_u220_ptrs[i] = new ImitatorU220(u220_group.board(i)->get_usrp());
+			imitator_u220_ptrs[i] = new ImitatorU220(*u220_group.fpga(i));
 			dit++;
 			ispr_kan |= (1 << (2 * i)) | (1 << (2 * i + 1));
 		}
@@ -113,18 +113,33 @@ void GlobalData::start() {
 	}
 
 	piCout << "Imitator init";
+
 	std::bitset<4> enable_bits;
 	for (std::size_t i = 0; i < 4; ++i) {
 		enable_bits[i] = cfg.imitator_enabled[i];
 	}
+
+	std::array<ImitatorU220::TargetParams, 4> targets{};
+
+	for (size_t i = 0; i < 4; ++i) {
+		targets[i] = {cfg.target_az[i], cfg.target_um[i], cfg.target_dist[i], cfg.target_vel[i], cfg.target_osl[i]};
+	}
+
 	for (const auto board_index: u220_group.active_boards()) {
-		imitator_u220_ptrs[board_index]->set_rx_playback_correction(0, cfg.complex_corrections[2 * board_index]);
-		imitator_u220_ptrs[board_index]->set_rx_playback_correction(1, cfg.complex_corrections[2 * board_index + 1]);
-		imitator_u220_ptrs[board_index]
-			->set_params(cfg.target_az, cfg.target_um, cfg.target_dist, cfg.target_vel, cfg.target_osl, cfg.opu_az);
+		auto * imitator = imitator_u220_ptrs[board_index];
+		auto * fpga     = u220_group.fpga(board_index);
+
+		fpga->set_rx_playback_correction(0, cfg.complex_corrections[2 * board_index]);
+
+		fpga->set_rx_playback_correction(1, cfg.complex_corrections[2 * board_index + 1]);
+
+		imitator->set_params(targets);
+		imitator->set_opu(cfg.opu_az);
+
 		for (size_t radio = 0; radio < 2; ++radio) {
 			const auto mask = cfg.imitator_channels_en[2 * board_index + radio] ? static_cast<uint8_t>(enable_bits.to_ulong()) : uint8_t{0};
-			imitator_u220_ptrs[board_index]->set_rx_playback_enable(radio, mask);
+
+			fpga->set_rx_playback_enable(radio, mask);
 		}
 	}
 
@@ -132,7 +147,7 @@ void GlobalData::start() {
 	piCout << "Imitator start at" << set_time.get_full_secs();
 	for (const auto board_index: u220_group.active_boards()) {
 		u220_group.board(board_index)->get_usrp()->set_command_time(set_time);
-		imitator_u220_ptrs[board_index]->apply_rx_playback();
+		u220_group.fpga(board_index)->apply_rx_playback();
 	}
 	for (const auto board_index: u220_group.active_boards()) {
 		u220_group.board(board_index)->get_usrp()->clear_command_time();

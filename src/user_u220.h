@@ -54,27 +54,57 @@ public:
 	void set_tx_complex_gain(size_t channel, const std::complex<short> gain);
 
 
+	void apply_rx_playback();
+	void pulse_rx_playback_apply();
+	void set_rx_playback_enable(size_t radio, uint8_t mask);
+	void set_rx_playback_correction(size_t radio, std::complex<int32_t> correction);
+	void set_rx_playback_delay(size_t radio, const std::array<uint32_t, 4> & values);
+	void set_rx_playback_phase(size_t radio, const std::array<uint32_t, 4> & values);
+	void set_rx_playback_amplitude(size_t radio, const std::array<uint32_t, 4> & values);
+	void set_rx_playback_samples(size_t radio, size_t playback, const std::array<std::complex<int16_t>, 928> & samples);
+	void set_rx_playback_dn(size_t radio, size_t playback, const std::array<int16_t, 4096> & samples);
+	void set_rx_playback_dn_offset(size_t radio, const std::array<uint32_t, 4> & values);
+	void set_rx_playback_dn_counter(uint16_t start, int32_t step);
+	
+	// Чтение состояния
+	uint16_t get_rx_playback_dn_counter_start();
+
+	struct RxPlaybackStatus {
+		bool waiting;
+		bool playing;
+		uint32_t dn_counter; // 20 бит, включая дробную часть
+	};
+
+	RxPlaybackStatus get_rx_playback_status(size_t radio, size_t playback);
+
 	uint32_t get_fpga_version();
 
 
 private:
 	enum class WrReg : uint32_t {
-		PLAY_CTRL       = 0,
-		MEM_PTR         = 1,
-		TX0_DAC_MEM     = 2,
-		TX0_GAINON_MEM  = 3,
-		TX_DAC_DELAY    = 4,
-		RX_ADC_DELAY    = 5,
-		RX_EN_DELAY     = 6,
-		RX0_EN_MEM      = 7,
-		RESET_TIME      = 8,
-		CAT_SYNC_WIDTH  = 9,
-		TX0_GAIN        = 10,
-		TX1_GAIN        = 11,
-		TX1_DAC_MEM     = 12,
-		TX_GAINON_DELAY = 13,
-		TX1_GAINON_MEM  = 15,
-		RX1_EN_MEM      = 16,
+		PLAY_CTRL               = 0,
+		MEM_PTR                 = 1,
+		TX0_DAC_MEM             = 2,
+		TX0_GAINON_MEM          = 3,
+		TX_DAC_DELAY            = 4,
+		RX_ADC_DELAY            = 5,
+		RX_EN_DELAY             = 6,
+		RX0_EN_MEM              = 7,
+		RESET_TIME              = 8,
+		CAT_SYNC_WIDTH          = 9,
+		TX0_GAIN                = 10,
+		TX1_GAIN                = 11,
+		TX1_DAC_MEM             = 12,
+		TX_GAINON_DELAY         = 13,
+		TX1_GAINON_MEM          = 15,
+		RX1_EN_MEM              = 16,
+
+		RX_PLAYBACK_START       = 14,
+		RX_PLAYBACK_APPLY       = 18,
+		RX_PLAYBACK_APPLY_PULSE = 19,
+
+		RX0_PLAYBACK_BASE       = 32,
+		RX1_PLAYBACK_BASE       = 64,
 	};
 
 	enum class RdReg : uint32_t {
@@ -98,6 +128,23 @@ private:
 		TX1_GAIN_EFFECTIVE        = 17,
 		TX_GAINON_DELAY           = 18,
 		TX_GAINON_DELAY_EFFECTIVE = 19,
+
+		RX_PLAYBACK_START         = 22,
+		RX0_PLAYBACK_BASE         = 32,
+		RX1_PLAYBACK_BASE         = 64,
+	};
+
+	enum class RxPlaybackReg : uint32_t {
+		ENABLE            = 0,
+		MEM_PTR           = 1,
+		CORRECTION_RE     = 2,
+		CORRECTION_IM     = 3,
+		DELAY             = 8,
+		PHASE             = 12,
+		AMPLITUDE         = 16,
+		SAMPLE_MEM        = 20,
+		AMPLITUDE2_MEM    = 24,
+		AMPLITUDE2_OFFSET = 28,
 	};
 
 	static constexpr uint32_t reg_addr(WrReg reg) { return static_cast<uint32_t>(reg) << 2; }
@@ -127,7 +174,10 @@ private:
 	PlayCtrl play_ctrl_{};
 
 	void write_reg(WrReg reg, uint32_t value, bool log = true);
+	void write_rx_playback_reg(size_t channel, RxPlaybackReg reg, uint32_t value, bool log = true);
 	uint64_t read_reg(RdReg reg);
+	uint64_t read_rx_playback_reg(size_t channel, RxPlaybackReg reg);
+
 
 	void write_play_ctrl();
 	void write_tx_delay();
