@@ -218,7 +218,7 @@ void GlobalData::stop() {
 	if (!u220_group.active_boards().isEmpty()) {
 		const size_t i        = u220_group.active_boards()[0];
 		auto cycles_completed = u220_group.board(i)->get_stats().cycles_completed;
-
+		piCout << "U220 cycles completed:" << cycles_completed;
 		if (cycles_completed > 0) {
 			piCout << "Mean: transfer time = " << (t_end - t_start) / cycles_completed;
 		}
@@ -267,25 +267,12 @@ void GlobalData::processChannels() {
 	notifier_channels.wait();
 	if (process_thread.isStopping()) return; // if stop() called simply leave
 	if (!cfg.dma_enabled) return;
-	while (!dma.can_send())
-		;
-	int ret = dma.send();
-	if (ret != 0) {
-		fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
-	}
-
-	ret = dma.receive();
-	if (ret != 0) {
-		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
-	}
-	if (ret == 0) {
-		const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
-		if (buffer) {
-			const auto * hdr   = reinterpret_cast<const rls::header *>(buffer);
-			const size_t words = std::min<size_t>(rls::get_rx_words_per_buf(hdr->tp), BUFFER_SIZE / sizeof(uint32_t));
-			auto ref           = dma_channel_buf.getRef();
-			*ref               = PIVector<uint32_t>(buffer, words);
-		}
+	const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
+	if (buffer) {
+		const auto * hdr   = reinterpret_cast<const rls::header *>(buffer);
+		const size_t words = std::min<size_t>(rls::get_rx_words_per_buf(hdr->tp), BUFFER_SIZE / sizeof(uint32_t));
+		auto ref           = dma_channel_buf.getRef();
+		*ref               = PIVector<uint32_t>(buffer, words);
 	}
 }
 
@@ -294,20 +281,22 @@ void GlobalData::u220_recv() {
 		u220_group.board(board_index)->receive();
 	}
 
-	// int ret = dma.send();
-	// if (ret != 0) {
-	// 	fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
-	// }
+	// while (!dma.can_send())
+	// 	;
+	int ret = dma.send();
+	if (ret != 0) {
+		fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
+	}
 
-	// if (!first_transfer) {
-	// 	first_transfer = true;
-	// } else {
-	// 	int ret = dma.receive();
-	// 	if (ret != 0) {
-	// 		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
-	// 	}
-	// }
-	// void * rx_buffer = dma.get_rx_buffer();
+	if (!first_transfer) {
+		first_transfer = true;
+	} else {
+		ret = dma.receive();
+		if (ret != 0) {
+			fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
+		}
+	}
+
 	if (u220_group.active_boards().isEmpty()) return;
 
 	const size_t first_board = u220_group.active_boards()[0];
@@ -324,9 +313,8 @@ void GlobalData::u220_recv() {
 				(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
 			}
 		}
-
-		notifier_channels.notify();
 	}
+	notifier_channels.notify();
 }
 
 static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
