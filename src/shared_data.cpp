@@ -152,7 +152,7 @@ void GlobalData::start() {
 		}
 	}
 
-	auto set_time = u220_group.board(0)->get_usrp()->get_time_now();
+	auto set_time = u220_group.board(u220_group.active_boards()[0])->get_usrp()->get_time_now();
 	piCout << "Imitator start at" << set_time.get_full_secs();
 	for (const auto board_index: u220_group.active_boards()) {
 		u220_group.board(board_index)->get_usrp()->set_command_time(set_time);
@@ -164,7 +164,7 @@ void GlobalData::start() {
 	1_ms .sleep();
 
 	t_start         = PISystemTime::current();
-	auto start_time = u220_group.board(0)->get_usrp()->get_time_now();
+	auto start_time = u220_group.board(u220_group.active_boards()[0])->get_usrp()->get_time_now();
 	piCout << "TX start at" << start_time.get_full_secs();
 
 	t_start = PISystemTime::current();
@@ -204,12 +204,13 @@ void GlobalData::stop() {
 		}
 	}
 	write_dump_hex("rx_dump.hex");
-	const auto cycles_completed = u220_group.active_boards().isEmpty() ? 0 : u220_group.board(0)->get_stats().cycles_completed;
+	const auto cycles_completed =
+		u220_group.active_boards().isEmpty() ? 0 : u220_group.board(u220_group.active_boards()[0])->get_stats().cycles_completed;
 
 	if (cfg.dma_enabled) {
 		axi_dsp_deinit();
 	}
-
+	
 	t_end = PISystemTime::current();
 
 	piCout << "====";
