@@ -36,17 +36,27 @@
             }
         },
         {
-            "label": "RLS Mini: Copy to board",
+            "label": "RLS Mini: Copy to mini2",
             "type": "process",
             "command": "scp",
             "args": [
                 "${workspaceFolder}/bin/rls_mini",
-                "ubuntu@172.16.0.123:~/rls_mini/bin"
+                "mini2:~/rls_mini/bin"
             ],
             "problemMatcher": []
         },
         {
-            "label": "RLS Mini: Copy config to board",
+            "label": "RLS Mini: Copy to mini",
+            "type": "process",
+            "command": "scp",
+            "args": [
+                "${workspaceFolder}/bin/rls_mini",
+                "mini:~/rls_mini/bin"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "RLS Mini: Copy config to mini2",
             "type": "process",
             "command": "scp",
             "args": [
@@ -55,7 +65,21 @@
                 "${workspaceFolder}/config/tx_dac.txt",
                 "${workspaceFolder}/config/rx_en.txt",
                 "${workspaceFolder}/config/tx_coeffs.csv",
-                "ubuntu@172.16.0.123:~/rls_mini/bin/"
+                "mini2:~/rls_mini/bin/"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "RLS Mini: Copy config to mini",
+            "type": "process",
+            "command": "scp",
+            "args": [
+                "${workspaceFolder}/config/mini.ini",
+                "${workspaceFolder}/config/tx_gainon.txt",
+                "${workspaceFolder}/config/tx_dac.txt",
+                "${workspaceFolder}/config/rx_en.txt",
+                "${workspaceFolder}/config/tx_coeffs.csv",
+                "mini:~/rls_mini/bin/"
             ],
             "problemMatcher": []
         }
