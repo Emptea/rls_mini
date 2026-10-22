@@ -365,7 +365,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 
 	int data_cnt     = 0;
 	if (msg.kt != Protocol_RLS_Mini::CTRL) {
-		rls::get_rx_words_per_buf(test_point);
+		data_cnt = rls::get_rx_words_per_buf(test_point);
 	} else {
 		// TODO get all dsp regs state and pack them into one packet
 	}

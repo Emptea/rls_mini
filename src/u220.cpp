@@ -183,9 +183,9 @@ void U220::setup_rx_streamer(void ** tx0_buf, void ** tx1_buf) {
 	rx_buffer_ptrs[0].resize(2);
 	rx_buffer_ptrs[1].resize(2);
 
-	for (size_t ch = 0; ch < 2; ch++) {
-		rx_buffer_ptrs[0][ch] = static_cast<complexs *>(tx0_buf[ch]);
-		rx_buffer_ptrs[1][ch] = static_cast<complexs *>(tx1_buf[ch]);
+	for (size_t n_buf = 0; n_buf < 2; n_buf++) {
+		rx_buffer_ptrs[n_buf][0] = static_cast<complexs *>(tx0_buf[n_buf]);
+		rx_buffer_ptrs[n_buf][1] = static_cast<complexs *>(tx1_buf[n_buf]);
 	}
 }
 
@@ -402,7 +402,7 @@ void U220::receive() {
 			ch_ptr->push_back(rx_buffer[ch]);
 		}
 
-		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
+		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.cycles_completed
 			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6)
 			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0])
 			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
