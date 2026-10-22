@@ -68,7 +68,7 @@ private:
 	PIVector<VectorComplexS> rx_buffer;
 	PIProtectedVariable<PIQueue<VectorComplexS>> rx_queue[2];
 	PIProtectedVariable<PIQueue<VectorComplexS>> dump_queue[2];
-	PIVector<complexs *> rx_buffer_ptrs[2];
+	PIVector<complexs *> rx_buffer_ptrs[TX_BUFFER_COUNT];
 	std::atomic_int active_buffer_idx{0};
 	uhd::rx_metadata_t rx_metadata;
 	double rx_timeout;

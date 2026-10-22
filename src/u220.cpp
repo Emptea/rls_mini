@@ -179,11 +179,8 @@ void U220::setup_rx_streamer(void ** tx0_buf, void ** tx1_buf) {
 	}
 	board_config.rx_spb = user_config.rx_spb;
 
-	rx_buffer.resize(4, VectorComplexS(board_config.rx_spb));
-	rx_buffer_ptrs[0].resize(2);
-	rx_buffer_ptrs[1].resize(2);
-
-	for (size_t n_buf = 0; n_buf < 2; n_buf++) {
+	for (size_t n_buf = 0; n_buf < TX_BUFFER_COUNT; n_buf++) {
+		rx_buffer_ptrs[n_buf].resize(2);
 		rx_buffer_ptrs[n_buf][0] = static_cast<complexs *>(tx0_buf[n_buf]);
 		rx_buffer_ptrs[n_buf][1] = static_cast<complexs *>(tx1_buf[n_buf]);
 	}
@@ -202,10 +199,9 @@ void U220::setup_rx_streamer() {
 	}
 	board_config.rx_spb = user_config.rx_spb;
 
-	rx_buffer.resize(4, VectorComplexS(board_config.rx_spb));
-	rx_buffer_ptrs[0].resize(2);
-	rx_buffer_ptrs[1].resize(2);
-	for (size_t n_buf = 0; n_buf < 2; n_buf++) {
+	rx_buffer.resize(2 * TX_BUFFER_COUNT, VectorComplexS(board_config.rx_spb));
+	for (size_t n_buf = 0; n_buf < TX_BUFFER_COUNT; n_buf++) {
+		rx_buffer_ptrs[n_buf].resize(2);
 		rx_buffer_ptrs[n_buf][0] = &rx_buffer[2 * n_buf].front();
 		rx_buffer_ptrs[n_buf][1] = &rx_buffer[2 * n_buf + 1].front();
 	}
@@ -375,7 +371,7 @@ void U220::receive() {
 
 	rx_errors_worker(rx_metadata.error_code);
 	if (num_rx_samps) {
-		active_buffer_idx = 1 - active_buffer_idx;
+		active_buffer_idx = (received_buffer + 1) % TX_BUFFER_COUNT;
 		stats.cycles_completed++;
 		stats.rx_recv_total_us += recv_us;
 		stats.rx_recv_max_us = std::max<uint64_t>(stats.rx_recv_max_us, recv_us);
@@ -399,13 +395,13 @@ void U220::receive() {
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
 		for (int ch: {0, 1}) {
 			auto ch_ptr = rx_queue[ch].getRef();
-			ch_ptr->push_back(rx_buffer[ch]);
+			ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[received_buffer][ch], samples_per_channel));
 		}
 
 		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.cycles_completed
 			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6)
-			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0])
-			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
+			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[received_buffer][0])
+			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[received_buffer][0]) + 1);
 		// PRINT_U220_STATS(stats);
 	}
 }
