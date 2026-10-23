@@ -5,11 +5,11 @@
 #include <cstddef>
 #include <cstdint>
 
-class UserU220;
+class U220Group;
 
 class ImitatorU220 {
 public:
-	explicit ImitatorU220(UserU220 & fpga);
+	explicit ImitatorU220(U220Group & group);
 
 	struct TargetParams {
 		double az;
@@ -41,6 +41,7 @@ public:
 	// Angle in degrees, rotation speed in degrees per second.
 	// Zero speed holds the specified angle.
 	void set_opu(double angle_degrees, double speed_degps = 0.0);
+	void apply(double delay_seconds);
 
 private:
 	static constexpr double LIGHT_SPEED = 299792458.0;
@@ -56,7 +57,7 @@ private:
 	static const double ENERGY_CONST;
 	static constexpr double CLOCK_RATE = 40e6;
 
-	UserU220 & fpga_;
+	U220Group & group_;
 
 	static double attenuation_to_rcs(double attenuation_db);
 	static uint32_t velocity_to_phase(int16_t velocity_mps);

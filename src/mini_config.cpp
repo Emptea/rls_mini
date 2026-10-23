@@ -413,7 +413,7 @@ void MiniConfig::load_imitator() {
 	load_targets("enable", values);
 	for (size_t n_targ = 0; n_targ < TARGET_COUNT; ++n_targ) {
 		if (values[n_targ] != 0 && values[n_targ] != 1) throw std::runtime_error("Invalid imitator.enable");
-		imitator_enabled[n_targ] = values[n_targ] == 1;
+		imitator_target_en[n_targ] = values[n_targ] == 1;
 	}
 	const auto channels = get_uint_array("imitator", "channels_enable");
 	for (size_t channel = 0; channel < CHANNEL_COUNT; ++channel) {

@@ -17,7 +17,7 @@
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
 
-GlobalData::GlobalData(): GlobalDataEth(this), cfg(), u220_group(cfg) {
+GlobalData::GlobalData(): GlobalDataEth(this), cfg(), u220_group(cfg), imitator_u220(u220_group) {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
 
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
@@ -40,7 +40,8 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
-	const auto & com_conf = main_config.child("com");
+	cpm_rr.on_state_changed = [this]() { global->sendMessage(set_RR_Kvit()); };
+	const auto & com_conf   = main_config.child("com");
 	techlaser.open(com_conf.childValue("techlaser").toString());
 	if (cfg.dma_enabled) {
 		if (dma.init(cfg.rx_insert_count) != 0) {
@@ -54,6 +55,8 @@ void GlobalData::init() {
 	void * tx0_buf[TX_BUFFER_COUNT];
 	void * tx1_buf[TX_BUFFER_COUNT];
 
+
+	uint8_t ispr_kan = 0;
 	for (size_t i = 0; i < u220_group.board_count(); ++i) {
 		if (dit != devices.end() && StdString2PIString(dit->first) == u220_group.board(i)->get_serial()) {
 			u220_group.activate_board(i);
@@ -61,6 +64,7 @@ void GlobalData::init() {
 			ispr_kan |= (1 << (2 * i)) | (1 << (2 * i + 1));
 		}
 	}
+	cpm_rr.set_ispr_kan(ispr_kan);
 
 	if (u220_group.active_boards().isEmpty()) {
 		piCout << "No active U220 boards";
@@ -92,7 +96,7 @@ void GlobalData::init() {
 		axi_dsp_set_output_source(1, 0, 0);
 		auto v = axi_dsp_get_output_source();
 		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE;
-		axi_dsp_set_channel_mask((uint32_t)ispr_kan);
+		axi_dsp_set_channel_mask((uint32_t)cpm_rr.get_ispr_kan());
 		axi_dsp_apply();
 	}
 	first_transfer = false;
@@ -100,6 +104,7 @@ void GlobalData::init() {
 
 void GlobalData::start() {
 	startEth();
+	cpm_rr.start();
 
 	if (u220_group.active_boards().isEmpty()) {
 		return;
@@ -115,19 +120,12 @@ void GlobalData::start() {
 
 	// 0.1_s .sleep();
 
-	if (!u220_group.active_boards().isEmpty()) {
-		u220_recv_thread.start([this] {
-			u220_recv();
-			if (u220_recv_thread.isStopping()) u220_group.stop_and_drain_rx();
-		});
-	}
+	u220_recv_thread.start([this] {
+		u220_recv();
+		if (u220_recv_thread.isStopping()) u220_group.stop_and_drain_rx();
+	});
 
 	piCout << "Imitator init";
-
-	std::bitset<4> enable_bits;
-	for (std::size_t i = 0; i < 4; ++i) {
-		enable_bits[i] = cfg.imitator_enabled[i];
-	}
 
 	std::array<ImitatorU220::TargetParams, 4> targets{};
 
@@ -135,36 +133,10 @@ void GlobalData::start() {
 		targets[i] = {cfg.target_az[i], cfg.target_um[i], cfg.target_dist[i], cfg.target_vel[i], cfg.target_osl[i]};
 	}
 
-	for (const auto board_index: u220_group.active_boards()) {
-		auto * imitator = u220_group.imitator(board_index);
-		auto * fpga     = u220_group.fpga(board_index);
+	imitator_u220.set_params(targets);
+	imitator_u220.set_opu(cfg.opu_az, 180.0);
+	imitator_u220.apply(0.0);
 
-		fpga->set_rx_playback_correction(0, cfg.complex_corrections[2 * board_index]);
-
-		fpga->set_rx_playback_correction(1, cfg.complex_corrections[2 * board_index + 1]);
-
-		imitator->set_params(targets);
-		imitator->set_opu(cfg.opu_az);
-
-		for (size_t radio = 0; radio < 2; ++radio) {
-			const auto mask = cfg.imitator_channels_en[2 * board_index + radio] ? static_cast<uint8_t>(enable_bits.to_ulong()) : uint8_t{0};
-
-			fpga->set_rx_playback_enable(radio, mask);
-		}
-	}
-
-	auto set_time = u220_group.board(u220_group.active_boards()[0])->get_usrp()->get_time_now();
-	piCout << "Imitator start at" << set_time.get_full_secs();
-	for (const auto board_index: u220_group.active_boards()) {
-		u220_group.board(board_index)->get_usrp()->set_command_time(set_time);
-		u220_group.fpga(board_index)->apply_rx_playback();
-	}
-	for (const auto board_index: u220_group.active_boards()) {
-		u220_group.board(board_index)->get_usrp()->clear_command_time();
-	}
-	1_ms .sleep();
-
-	t_start         = PISystemTime::current();
 	auto start_time = u220_group.board(u220_group.active_boards()[0])->get_usrp()->get_time_now();
 	piCout << "TX start at" << start_time.get_full_secs();
 
@@ -176,6 +148,7 @@ void GlobalData::start() {
 
 
 void GlobalData::stop() {
+	cpm_rr.stop();
 	u220_recv_thread.stopAndWait();
 	process_thread.stop();          // mark thread for stop
 	notifier_channels.notify();     // notify thread
@@ -211,7 +184,7 @@ void GlobalData::stop() {
 	if (cfg.dma_enabled) {
 		axi_dsp_deinit();
 	}
-	
+
 	t_end = PISystemTime::current();
 
 	piCout << "====";
@@ -343,6 +316,7 @@ static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	piCout << "rec msg" << "received_POI_TK_Zapros";
+	piCout << msg;
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	// piCout << "rec msg kt" << msg.kt;
 	const auto test_point = map_kt_to_dsp(msg.kt);
@@ -393,79 +367,82 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 }
 
 Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
-	Protocol_RLS_Mini::RR_Kvit ans;
-	ans.bits     = flags.bits;
-	ans.ispr_kan = ispr_kan;
-	ans.setDegreesDaz(daz);
-	ans.dd_poi = dd_poi;
-	ans.setDegreesDazPOI(daz_poi);
-	piCout << ans.bits;
-	piCout << PICoutManipulators::Bin << ans.ispr_kan;
-	piCout << ans.daz;
-	piCout << ans.dd_poi;
-	piCout << ans.daz_poi;
-	return ans;
+	Protocol_RLS_Mini::RR_Kvit kvit;
+
+	kvit.kuvr     = static_cast<uint8_t>(cpm_rr.get_kuvr());
+	kvit.vr       = static_cast<uint8_t>(cpm_rr.get_vr());
+
+	kvit.kuizl    = cpm_rr.get_kuizl();
+	kvit.izl      = cpm_rr.get_izl();
+	kvit.ant      = cpm_rr.get_ant();
+
+	kvit.ispr_kan = cpm_rr.get_ispr_kan();
+
+	kvit.setDegreesDaz(cpm_rr.get_daz());
+	kvit.dd_poi = static_cast<int16_t>(cpm_rr.get_dd_poi());
+	kvit.setDegreesDazPOI(cpm_rr.get_daz_poi());
+
+	piCout << kvit;
+
+	return kvit;
 }
 
 void GlobalData::received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg) {
 	piCout << "rec msg" << "received_RR_Zapros    ";
+	piCout << msg;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg) {
 	piCout << "rec msg" << "received_RR_Vr        ";
-	flags.kuvr = msg.par;
-
-	if (techlaser.isOpened()) {
-		if (flags.kuvr == 1) {
-			techlaser.start(180);
-		} else {
-			techlaser.stop();
-		}
-		auto techlaser_state = techlaser.getState();
-		flags.vr             = (techlaser_state.motor_status == Techlaser::MotorStatus::Rotating);
-	} else {
-		flags.vr = 0;
-	}
+	piCout << msg;
+	cpm_rr.set_vr(static_cast<CpmRr::RotationCommand>(msg.par));
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
 	piCout << "rec msg" << "received_RR_Izl       ";
-	flags.kuizl                    = msg.par;
+	piCout << msg;
+	cpm_rr.set_izl(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
+
 void GlobalData::received_RR_Ant(const Protocol_RLS_Mini::RR_Ant & msg) {
 	piCout << "rec msg" << "received_RR_Ant       ";
-	flags.ant                      = msg.par;
+	piCout << msg;
+	cpm_rr.set_ant(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_TTek(const Protocol_RLS_Mini::RR_TTek & msg) {
 	piCout << "rec msg" << "received_RR_TTek      ";
-	time                           = msg.getSeconds();
+	piCout << msg;
+	cpm_rr.set_time(msg.getSeconds());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_AzPopr(const Protocol_RLS_Mini::RR_AzPopr & msg) {
 	piCout << "rec msg" << "received_RR_AzPopr    ";
-	daz                            = msg.getDegrees();
+	piCout << msg;
+	cpm_rr.set_daz(msg.getDegrees());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg) {
 	piCout << "rec msg" << "received_RR_DPopr_POI ";
-	dd_poi                         = msg.dd;
+	piCout << msg;
+	cpm_rr.set_dd_poi(msg.dd);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg) {
 	piCout << "rec msg" << "received_RR_AzPopr_POI";
-	daz_poi                        = msg.getDegrees();
+	piCout << msg;
+	cpm_rr.set_daz_poi(msg.getDegrees());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
@@ -516,6 +493,7 @@ Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 
 void GlobalData::received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg) {
 	piCout << "rec msg" << "received_POI_Zapros   ";
+	piCout << msg;
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
@@ -523,6 +501,7 @@ void GlobalData::received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg) 
 
 void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
 	piCout << "rec msg" << "received_POI_Shtat    ";
+	piCout << msg;
 	setShtat();
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
@@ -531,6 +510,7 @@ void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
 
 void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 	piCout << "rec msg" << "received_POI_SDC      ";
+	piCout << msg;
 	if (cfg.dma_enabled) {
 		axi_dsp_set_motion_selector(1, msg.par);
 		auto v        = axi_dsp_get_motion_selector();
@@ -544,6 +524,7 @@ void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 
 void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 	piCout << "rec msg" << "received_POI_DSA      ";
+	piCout << msg;
 	POI_flags.dsa                   = msg.par;
 	dsa_vr_n                        = msg.vr_n;
 	dsa_vr_k                        = msg.vr_k;
@@ -555,6 +536,7 @@ void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 
 void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 	piCout << "rec msg" << "received_POI_APU      ";
+	piCout << msg;
 	apu_k1 = msg.getLevelk1();
 	apu_k2 = msg.getLevelk2();
 	if (cfg.dma_enabled) {
@@ -572,6 +554,7 @@ void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 
 void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 	piCout << "rec msg" << "received_POI_Zona     ";
+	piCout << msg;
 	zona_k1                         = msg.k1;
 	zona_k2                         = msg.k2;
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
@@ -581,6 +564,7 @@ void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 
 void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
 	piCout << "rec msg" << "received_POI_Kan      ";
+	piCout << msg;
 	if (cfg.dma_enabled) {
 		axi_dsp_set_channel_mask((uint32_t)msg.kan);
 		POI_kan = (uint8_t)axi_dsp_get_channel_mask();

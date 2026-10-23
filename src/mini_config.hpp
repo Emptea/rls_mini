@@ -41,7 +41,7 @@ public:
 	std::array<int16_t, TARGET_COUNT> target_vel{};
 	std::array<double, TARGET_COUNT> target_osl{};
 	double opu_az               = 0.0;
-	std::array<bool, TARGET_COUNT> imitator_enabled{};
+	std::array<bool, TARGET_COUNT> imitator_target_en{};
 	std::array<bool, CHANNEL_COUNT> imitator_channels_en{};
 
 	using Signal                = std::array<uint8_t, SAMPLE_COUNT>;

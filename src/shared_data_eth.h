@@ -35,9 +35,9 @@ public:
 		/// remove if wrong endian
 		changeEndian(data);
 
-		auto addr = eth_rlso_send->sendAddress();
-		addr.setPort(T::Port);
-		// piCout << "send msg" << data;
+		PINetworkAddress addr = T::Broadcast ? PINetworkAddress("193.1.1.255", T::Port) : eth_rlso_send->sendAddress();
+
+		piCout << "addr " << addr << "send msg" << data;
 		eth_rlso_send->send(addr, data);
 	}
 

@@ -24,7 +24,6 @@ public:
 
 	U220 * board(size_t i) const { return boards_[i]; }
 	UserU220 * fpga(size_t i) const { return fpga_[i]; }
-	ImitatorU220 * imitator(size_t i) const { return imitators_[i]; }
 	const PIVector<size_t> & active_boards() const { return active_boards_; }
 	size_t board_count() const { return boards_.size(); }
 
@@ -37,7 +36,6 @@ private:
 	PIVector<U220 *> boards_;
 	PIVector<UserU220 *> fpga_;
 	PIVector<size_t> active_boards_;
-	PIVector<ImitatorU220 *> imitators_;
 
 	const MiniConfig & cfg_;
 	UserRegLogger reg_logger_;

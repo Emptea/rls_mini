@@ -2,6 +2,8 @@
 
 #include "../rls_fpga/rls.hpp"
 #include "rlso_const.hpp"
+#include "u220.hpp"
+#include "u220_group.h"
 #include "user_u220.h"
 
 #include <cmath>
@@ -10,7 +12,7 @@
 const double ImitatorU220::ENERGY_CONST =
 	std::sqrt(PT * (LAMBDA * LAMBDA) * GAIN_IF * GAIN_SDR * 50.0 / (4.0 * std::pow(std::acos(-1.0), 3)) * G_MAX * (1 << 12) / U_REF);
 
-ImitatorU220::ImitatorU220(UserU220 & fpga): fpga_(fpga) {}
+ImitatorU220::ImitatorU220(U220Group & group): group_(group) {}
 
 double ImitatorU220::attenuation_to_rcs(double attenuation_db) {
 	if (!std::isfinite(attenuation_db)) throw std::invalid_argument("Attenuation must be finite");
@@ -29,8 +31,7 @@ uint32_t ImitatorU220::velocity_to_phase(int16_t velocity_mps) {
 	return static_cast<uint32_t>(phase_units);
 }
 
-std::complex<int16_t>
-ImitatorU220::calc_amplitude(uint16_t distance_m, size_t channel, uint16_t angle, double attenuation_db) {
+std::complex<int16_t> ImitatorU220::calc_amplitude(uint16_t distance_m, size_t channel, uint16_t angle, double attenuation_db) {
 	if (distance_m == 0) throw std::invalid_argument("Target distance must be nonzero");
 
 	const double pi        = std::acos(-1.0);
@@ -85,8 +86,12 @@ void ImitatorU220::set_distance(const std::array<double, 4> & target_dist) {
 		delays[k] = delay;
 	}
 
-	for (size_t radio = 0; radio < 2; ++radio)
-		fpga_.set_rx_playback_delay(radio, delays);
+	for (const auto board_index: group_.active_boards()) {
+		auto * fpga = group_.fpga(board_index);
+
+		for (size_t radio = 0; radio < 2; ++radio)
+			fpga->set_rx_playback_delay(radio, delays);
+	}
 }
 
 void ImitatorU220::set_velocity(const std::array<int16_t, 4> & target_vel) {
@@ -95,8 +100,12 @@ void ImitatorU220::set_velocity(const std::array<int16_t, 4> & target_vel) {
 	for (size_t k = 0; k < 4; ++k)
 		phases[k] = velocity_to_phase(target_vel[k]);
 
-	for (size_t radio = 0; radio < 2; ++radio)
-		fpga_.set_rx_playback_phase(radio, phases);
+	for (const auto board_index: group_.active_boards()) {
+		auto * fpga = group_.fpga(board_index);
+
+		for (size_t radio = 0; radio < 2; ++radio)
+			fpga->set_rx_playback_phase(radio, phases);
+	}
 }
 
 void ImitatorU220::set_az(const std::array<double, 4> & target_az) {
@@ -112,8 +121,12 @@ void ImitatorU220::set_az(const std::array<double, 4> & target_az) {
 		offsets[k]           = fixed >> 4;
 	}
 
-	for (size_t radio = 0; radio < 2; ++radio)
-		fpga_.set_rx_playback_dn_offset(radio, offsets);
+	for (const auto board_index: group_.active_boards()) {
+		auto * fpga = group_.fpga(board_index);
+
+		for (size_t radio = 0; radio < 2; ++radio)
+			fpga->set_rx_playback_dn_offset(radio, offsets);
+	}
 }
 
 void ImitatorU220::set_amplitude(const std::array<double, 4> & target_um,
@@ -143,7 +156,9 @@ void ImitatorU220::set_amplitude(const std::array<double, 4> & target_um,
 				static_cast<uint16_t>(amplitude.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(amplitude.imag())) << 16);
 		}
 
-		fpga_.set_rx_playback_amplitude(radio, amplitudes);
+		for (const auto board_index: group_.active_boards()) {
+			group_.fpga(board_index)->set_rx_playback_amplitude(radio, amplitudes);
+		}
 	}
 }
 
@@ -163,7 +178,9 @@ void ImitatorU220::set_opu(double angle_degrees, double speed_degps) {
 	if (!std::isfinite(rounded_step) || rounded_step < -524288.0 || rounded_step > 524287.0)
 		throw std::out_of_range("OPU rotation speed exceeds signed 20-bit step range");
 
-	fpga_.set_rx_playback_dn_counter(start, static_cast<int32_t>(rounded_step));
+	for (const auto board_index: group_.active_boards()) {
+		group_.fpga(board_index)->set_rx_playback_dn_counter(start, static_cast<int32_t>(rounded_step));
+	}
 }
 
 void ImitatorU220::set_params(const std::array<double, 4> & target_az,
@@ -177,24 +194,50 @@ void ImitatorU220::set_params(const std::array<double, 4> & target_az,
 	set_amplitude(target_um, target_dist, target_osl);
 }
 
-void ImitatorU220::set_params(const std::array<TargetParams, 4>& targets)
-{
-    std::array<double, 4> az{};
-    std::array<double, 4> um{};
-    std::array<double, 4> distances{};
-    std::array<int16_t, 4> velocities{};
-    std::array<double, 4> attenuations{};
+void ImitatorU220::set_params(const std::array<TargetParams, 4> & targets) {
+	std::array<double, 4> az{};
+	std::array<double, 4> um{};
+	std::array<double, 4> distances{};
+	std::array<int16_t, 4> velocities{};
+	std::array<double, 4> attenuations{};
 
-    for (size_t k = 0; k < targets.size(); ++k) {
-        az[k]           = targets[k].az;
-        um[k]           = targets[k].um;
-        distances[k]    = targets[k].distance;
-        velocities[k]   = targets[k].velocity;
-        attenuations[k] = targets[k].attenuation;
-    }
+	for (size_t k = 0; k < targets.size(); ++k) {
+		az[k]           = targets[k].az;
+		um[k]           = targets[k].um;
+		distances[k]    = targets[k].distance;
+		velocities[k]   = targets[k].velocity;
+		attenuations[k] = targets[k].attenuation;
+	}
 
-    set_distance(distances);
-    set_velocity(velocities);
-    set_az(az);
-    set_amplitude(um, distances, attenuations);
+	set_distance(distances);
+	set_velocity(velocities);
+	set_az(az);
+	set_amplitude(um, distances, attenuations);
+}
+
+void ImitatorU220::apply(double delay_seconds) {
+	if (!std::isfinite(delay_seconds) || delay_seconds < 0.0)
+		throw std::invalid_argument("Imitator apply delay must be finite and non-negative");
+
+	const auto & active_boards = group_.active_boards();
+
+	if (active_boards.isEmpty()) return;
+
+	auto first_usrp       = group_.board(active_boards[0])->get_usrp();
+	const auto apply_time = first_usrp->get_time_now() + uhd::time_spec_t(delay_seconds);
+
+	for (const auto board_index: active_boards) {
+		auto usrp = group_.board(board_index)->get_usrp();
+
+		usrp->set_command_time(apply_time);
+
+		try {
+			group_.fpga(board_index)->apply_rx_playback();
+		} catch (...) {
+			usrp->clear_command_time();
+			throw;
+		}
+
+		usrp->clear_command_time();
+	}
 }

@@ -11,9 +11,6 @@
 U220Group::U220Group(const MiniConfig & cfg): cfg_(cfg) {}
 
 U220Group::~U220Group() {
-	for (auto * imitator: imitators_) {
-		delete imitator;
-	}
 	for (auto * u: fpga_) {
 		delete u;
 	}
@@ -42,7 +39,6 @@ void U220Group::stop_and_drain_rx() {
 void U220Group::add_board(U220 * board) {
 	boards_ << board;
 	fpga_ << nullptr;
-	imitators_ << nullptr;
 }
 
 void U220Group::setup_one_board(size_t i) {
@@ -60,6 +56,12 @@ void U220Group::setup_one_board(size_t i) {
 	u->set_play_gpio_rx_enable(0b11);
 	u->set_play_rx_insert_count(1);
 
+	uint8_t enable_mask = 0;
+
+	for (size_t k = 0; k < 4; ++k) {
+		if (cfg_.imitator_target_en[k]) enable_mask |= static_cast<uint8_t>(1u << k);
+	}
+
 	for (size_t channel = 0; channel < 2; ++channel) {
 		const size_t ch = i * 2 + channel;
 
@@ -70,6 +72,14 @@ void U220Group::setup_one_board(size_t i) {
 		}
 
 		u->set_tx_complex_gain(channel, cfg_.complex_gains[ch]);
+
+		// Калибровка имитатора
+		u->set_rx_playback_correction(channel, cfg_.complex_corrections[ch]);
+
+		// Включение целей для данного радиоканала
+		const uint8_t mask = cfg_.imitator_channels_en[ch] ? enable_mask : uint8_t{0};
+
+		u->set_rx_playback_enable(channel, mask);
 	}
 }
 
@@ -199,7 +209,6 @@ void U220Group::activate_board(size_t i) {
 
 	boards_[i]->init();
 	fpga_[i]                  = new UserU220(boards_[i]->get_usrp());
-	imitators_[i]             = new ImitatorU220(*fpga_[i]);
 	const PIString & serial   = boards_[i]->get_serial();
 	const size_t board_number = static_cast<size_t>(std::stoul(serial.mid(4).data()));
 	fpga_[i]->set_reg_logger(&reg_logger_, i);

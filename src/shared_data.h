@@ -2,6 +2,7 @@
 #define shared_data_H
 
 #include "axi_dsp.h"
+#include "cpm_rr.h"
 #include "fpga_dma.hpp"
 #include "imitator_u220.h"
 #include "mini_config.hpp"
@@ -32,8 +33,9 @@ private:
 public:
 	const PIString u220_args =
 		"recv_frame_size=16360,num_recv_frames=64,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
-	UHD_UTILS uhd_utils;
+	UHD_UTILS uhd_utils{"type=b200"};
 	U220Group u220_group;
+	ImitatorU220 imitator_u220;
 	fpga_dma dma;
 	// Retained after stop; index = 2 * board_index + local channel.
 	std::array<VectorComplexS, 8> dump_channels;
@@ -100,29 +102,13 @@ private:
 	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
 	VectorComplexS zero_vector;
 
-	PIMap<int, bool> board_statuses;
-	union {
-		uint8_t bits = 0;
-		struct {
-			uint8_t _reserve: 1;
-			uint8_t ant     : 1;
-			uint8_t izl     : 1;
-			uint8_t kuizl   : 1;
-			uint8_t vr      : 2;
-			uint8_t kuvr    : 2;
-		};
-	} flags          = {0};
-	uint8_t ispr_kan = 0;
-	double daz       = 0;
-	int16_t dd_poi   = 0; // 1 м
-	double daz_poi   = 0;
 	double time;
 	PIProtectedVariable<PIVector<uint32_t>> dma_channel_buf;
 	bool req_test_point       = false;
 	uint16_t req_test_channel = 0;
 
-
 	Techlaser techlaser;
+	CpmRr cpm_rr{techlaser};
 
 	union {
 		uint8_t bits = 0;
@@ -166,9 +152,9 @@ private:
 	uint16_t az_delayed   = 0; // Азимут, задержанный в обработке
 	uint16_t zona         = 0; // Дальность отметки "Зона"
 	uint16_t nes          = 0; // Количество эхосигналов
-	                           // Дальность эхосигнала
-	                           // ...
-	                           // uint16_t[nes]
+	// Дальность эхосигнала
+	// ...
+	// uint16_t[nes]
 
 	struct target {
 		uint16_t n     = 0;

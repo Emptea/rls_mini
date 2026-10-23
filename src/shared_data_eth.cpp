@@ -20,12 +20,13 @@ void GlobalDataEth::initEth() {
 	const auto & net_conf = global->mainConfig().child("net");
 
 	/// RLSO start
-	PIStringList my_dest  = {"poi", "upr", "it", "soi", "all"};
+	PIStringList my_dest  = {"poi", "rr", "it", "soi", "all"};
 
 	PIEthernet * _eth     = PIIODevice::createFromFullPath(net_conf.childValue("rls").toString())->cast<PIEthernet>();
 	if (_eth) {
 		eth_rlso_send = new PIEthernet(PIEthernet::UDP);
 		eth_rlso_send->setSendAddress(_eth->sendAddress());
+		eth_rlso_send->setParameter(PIEthernet::Broadcast);
 		if (_eth) {
 			/*PIString d_s_ip = "255.255.255.255";
 			if (_eth) {

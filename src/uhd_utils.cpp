@@ -20,7 +20,7 @@ UHD_UTILS::~UHD_UTILS() {};
 
 void UHD_UTILS::find_devices() {
 	const uhd::device_addr_t args(device_args);
-	uhd::device_addrs_t device_addrs = uhd::device::find(append_findall(args));
+	uhd::device_addrs_t device_addrs = uhd::device::find(args);
 	if (device_addrs.empty()) {
 		return;
 	}
