@@ -43,7 +43,7 @@ void GlobalData::init() {
 	const auto & com_conf = main_config.child("com");
 	techlaser.open(com_conf.childValue("techlaser").toString());
 	if (cfg.dma_enabled) {
-		if (dma.init() != 0) {
+		if (dma.init(cfg.rx_insert_count) != 0) {
 			fprintf(stderr, "Failed to initialize FPGA DMA\n");
 			cfg.dma_enabled = false;
 		}
@@ -88,6 +88,7 @@ void GlobalData::init() {
 	if (cfg.dma_enabled) {
 		axi_dsp_init();
 		axi_dsp_configure();
+		axi_dsp_set_expect_u220_del(cfg.rx_insert_count);
 		axi_dsp_set_output_source(1, 0, 0);
 		auto v = axi_dsp_get_output_source();
 		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE;
@@ -354,7 +355,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 
 	int data_cnt     = 0;
 	if (msg.kt != Protocol_RLS_Mini::CTRL) {
-		data_cnt = rls::get_rx_words_per_buf(test_point);
+		data_cnt = rls::get_rx_words_per_buf(test_point, cfg.rx_insert_count);
 	} else {
 		// TODO get all dsp regs state and pack them into one packet
 	}
@@ -380,12 +381,14 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 			auto ref = adc_channels.getRef();
 			data     = (*ref)[msg.nkan];
 		}
-		set_data(data, (232 + 2 * cfg.rx_insert_count) * 3);
+		data_cnt = (232 + 2 * cfg.rx_insert_count) * 3;
+		set_data(data, data_cnt);
 	} else {
+		data_cnt = 232;
 		ans.setData(zero_vector);
 	}
 
-	ans.nw = static_cast<uint16_t>(ans.words.size());
+	ans.nw = static_cast<uint16_t>(data_cnt);
 	global->sendMessage(ans);
 }
 
