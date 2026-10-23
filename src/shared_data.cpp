@@ -277,30 +277,29 @@ void GlobalData::processChannels() {
 }
 
 void GlobalData::u220_recv() {
-	for (const auto board_index: u220_group.active_boards()) {
-		u220_group.board(board_index)->receive();
-	}
-
-	// while (!dma.can_send())
-	// 	;
-	int ret = dma.send();
-	if (ret != 0) {
-		fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
-	}
-
-	if (!first_transfer) {
-		first_transfer = true;
-	} else {
-		ret = dma.receive();
-		if (ret != 0) {
-			fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
+	const size_t first_board = u220_group.active_boards()[0];
+	auto packet_cnt          = u220_group.board(first_board)->get_stats().rx_packet_cnt;
+	auto u220_cycles         = u220_group.board(first_board)->get_stats().cycles_completed;
+	if (dma.can_send()) {
+		for (const auto board_index: u220_group.active_boards()) {
+			u220_group.board(board_index)->receive();
 		}
+		// }
+		int ret = dma.send();
+		if (ret != 0) {
+			fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
+		}
+		return;
+	}
+
+	int ret = dma.receive();
+	if (ret != 0) {
+		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
+		u220_recv_thread.stopAndWait();
 	}
 
 	if (u220_group.active_boards().isEmpty()) return;
 
-	const size_t first_board = u220_group.active_boards()[0];
-	auto packet_cnt          = u220_group.board(first_board)->get_stats().rx_packet_cnt;
 
 	if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
 		for (const auto board_index: u220_group.active_boards()) {
@@ -314,7 +313,9 @@ void GlobalData::u220_recv() {
 			}
 		}
 	}
-	notifier_channels.notify();
+	if (u220_cycles > 0) {
+		notifier_channels.notify();
+	}
 }
 
 static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
