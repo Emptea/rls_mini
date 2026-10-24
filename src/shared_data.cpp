@@ -140,7 +140,6 @@ void GlobalData::start() {
 	auto start_time = u220_group.board(u220_group.active_boards()[0])->get_usrp()->get_time_now();
 	piCout << "TX start at" << start_time.get_full_secs();
 
-	t_start = PISystemTime::current();
 	for (const auto board_index: u220_group.active_boards()) {
 		u220_group.fpga(board_index)->set_play_start_tx();
 	}
@@ -153,6 +152,13 @@ void GlobalData::stop() {
 	process_thread.stop();          // mark thread for stop
 	notifier_channels.notify();     // notify thread
 	process_thread.waitForFinish(); // wait for thread really finish
+	t_end = PISystemTime::current();
+
+	if (cfg.dma_enabled) {
+		while (dma.get_completed() < dma.get_submitted()) {
+			if (dma.receive() != 0) break;
+		}
+	}
 
 	stopEth();
 
@@ -185,7 +191,6 @@ void GlobalData::stop() {
 		axi_dsp_deinit();
 	}
 
-	t_end = PISystemTime::current();
 
 	piCout << "====";
 
@@ -254,6 +259,11 @@ void GlobalData::u220_recv() {
 	const size_t first_board = u220_group.active_boards()[0];
 	auto packet_cnt          = u220_group.board(first_board)->get_stats().rx_packet_cnt;
 	auto u220_cycles         = u220_group.board(first_board)->get_stats().cycles_completed;
+
+	if (!u220_cycles) {
+		t_start = PISystemTime::current();
+	}
+
 	if (dma.can_send()) {
 		for (const auto board_index: u220_group.active_boards()) {
 			u220_group.board(board_index)->receive();
