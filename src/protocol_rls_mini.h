@@ -760,105 +760,103 @@ BINARY_STREAM_WRITE(Protocol_RLS_Mini::ZBL) {
 	return s;
 }
 
-inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Zapros & v) {
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::Header & v) {
 	return out << "type:" << v.msg_type << "code:" << v.msg_code;
 }
 
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Zapros & v) {
+	return out;
+}
+
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Vr & v) {
-	return out << "type:" << v.msg_type << "code:" << v.msg_code << "par:" << v.par;
+	return out << "par:" << v.par;
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Izl & v) {
-	return out << "type:" << v.msg_type << "code:" << v.msg_code << "par:" << v.par;
+	return out << "par:" << v.par;
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Ant & v) {
-	return out << "type:" << v.msg_type << "code:" << v.msg_code << "par:" << v.par;
+	return out << "par:" << v.par;
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_TTek & v) {
-	return out << "type:" << v.msg_type << "code:" << v.msg_code << "time:" << PICoutManipulators::Hex << v.time_msw
-	           << PICoutManipulators::Hex << v.time_lsw;
+	return out << "time:" << PICoutManipulators::Hex << v.time_msw << PICoutManipulators::Hex << v.time_lsw;
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_AzPopr & v) {
-	return out << "type:" << v.msg_type << "code:" << v.msg_code << "daz:" << v.daz;
+	return out << "daz:" << v.daz;
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_DPopr_POI & v) {
-	return out << "type:" << v.msg_type << "code:" << v.msg_code << "dd:" << v.dd;
+	return out << "dd:" << v.dd;
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_AzPopr_POI & v) {
-	return out << "type:" << v.msg_type << "code:" << v.msg_code << "daz:" << v.daz;
+	return out << "daz:" << v.daz;
 }
 
 // RR_Kvit
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Kvit & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "bits:" << int(v.bits) << "ant:" << int(v.ant)
-	           << "izl:" << int(v.izl) << "kuizl:" << int(v.kuizl) << "vr:" << int(v.vr) << "kuvr:" << int(v.kuvr)
+	return out << "ant:" << int(v.ant) << "izl:" << int(v.izl) << "kuizl:" << int(v.kuizl) << "vr:" << int(v.vr) << "kuvr:" << int(v.kuvr)
 	           << "ispr_kan:" << int(v.ispr_kan) << "daz:" << v.daz << "dd_poi:" << v.dd_poi << "daz_poi:" << v.daz_poi;
 }
 
 // POI_Zapros
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Zapros & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code);
+	return out;
 }
 
 // POI_Shtat
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Shtat & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code);
+	return out;
 }
 
 // POI_SDC
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_SDC & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "par:" << v.par;
+	return out << "par:" << v.par;
 }
 
 // POI_DSA
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_DSA & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "par:" << v.par << "vr_n:" << v.vr_n << "vr_k:" << v.vr_k;
+	return out << "par:" << v.par << "vr_n:" << v.vr_n << "vr_k:" << v.vr_k;
 }
 
 // POI_APU
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_APU & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "k1:" << v.k1 << "k2:" << v.k2;
+	return out << "k1:" << v.k1 << "k2:" << v.k2;
 }
 
 // POI_Zona
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Zona & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "k1:" << int(v.k1) << "k2:" << v.k2;
+	return out << "k1:" << int(v.k1) << "k2:" << v.k2;
 }
 
 // POI_Kan
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Kan & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "kan:" << int(v.kan);
+	return out << "kan:" << int(v.kan);
 }
 
 // POI_Kvit
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Kvit & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "bits:" << int(v.bits) << "sdc:" << int(v.sdc)
-	           << "dsa:" << int(v.dsa) << "kan:" << int(v.kan) << "dsa_vr_n:" << v.dsa_vr_n << "dsa_vr_k:" << v.dsa_vr_k
-	           << "apu_k1:" << v.apu_k1 << "apu_k2:" << v.apu_k2 << "zona_k1:" << int(v.zona_k1) << "zona_k2:" << v.zona_k2;
+	return out << "sdc:" << int(v.sdc) << "dsa:" << int(v.dsa) << "kan:" << int(v.kan) << "dsa_vr_n:" << v.dsa_vr_n
+	           << "dsa_vr_k:" << v.dsa_vr_k << "apu_k1:" << v.apu_k1 << "apu_k2:" << v.apu_k2 << "zona_k1:" << int(v.zona_k1)
+	           << "zona_k2:" << v.zona_k2;
 }
 
 // POI_TK_Zapros
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_TK_Zapros & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "kt:" << v.kt << "nkan:" << v.nkan
-	           << "reg_takt:" << v.reg_takt;
+	return out << "kt:" << v.kt << "nkan:" << v.nkan << "reg_takt:" << v.reg_takt;
 }
 
 // POI_TK_Kvit
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_TK_Kvit & v) {
-	out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "nw:" << v.nw << "words:";
-	for (const auto & word: v.words)
-		out << word;
-	return out;
+	return out << "nw:" << v.nw << "words:";
 }
 
 // CIT_Zapros
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CIT_Zapros & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code);
+	return out;
 }
 
 // ImitatorTarget
@@ -869,35 +867,34 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ImitatorTarget & v
 
 // CIT_KU
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CIT_KU & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "it1:{" << v.it1 << "}"
+	return out << "it1:{" << v.it1 << "}"
 	           << "it2:{" << v.it2 << "}";
 }
 
 // CIT_Kvit
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CIT_Kvit & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "it1:{" << v.it1 << "}"
+	return out << "it1:{" << v.it1 << "}"
 	           << "it2:{" << v.it2 << "}";
 }
 
 // PI
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::PI & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "aztek:" << v.aztek << "time:" << PICoutManipulators::Hex
-	           << v.time_msw << PICoutManipulators::Hex << v.time_lsw << "az:" << v.az << "zona:" << v.zona << "nes:" << v.nes;
+	return out << "aztek:" << v.aztek << "time:" << PICoutManipulators::Hex << v.time_msw << PICoutManipulators::Hex << v.time_lsw
+	           << "az:" << v.az << "zona:" << v.zona << "nes:" << v.nes;
 }
 
 // KTA_VO
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::KTA_VO & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "N:" << v.N << "T:" << v.T << "az:" << v.az << "um:" << v.um
-	           << "D:" << v.D << "porog:" << v.porog << "sp:" << v.sp << "amp:" << v.amp << "vr:" << v.vr << "bits:" << int(v.bits)
-	           << "tn:" << int(v.tn) << "dum:" << int(v.dum);
+	return out << "N:" << v.N << "T:" << v.T << "az:" << v.az << "um:" << v.um << "D:" << v.D << "porog:" << v.porog << "sp:" << v.sp
+	           << "amp:" << v.amp << "vr:" << v.vr << "tn:" << int(v.tn) << "dum:" << int(v.dum);
 }
 
 // TRVO
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::TRVO & v) {
-	out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "N:" << v.N << "ID:" << v.ID << "T:" << v.T << "az:" << v.az
-		<< "D:" << v.D << "um:" << v.um << "X:" << v.X << "Y:" << v.Y << "H:" << v.H << "VX:" << v.VX << "VY:" << v.VY << "VH:" << v.VH
-		<< "VK:" << v.VK << "K:" << v.K << "bits0:" << int(v.bits0) << "bits1:" << int(v.bits1) << "mh:" << int(v.mh) << "mk:" << int(v.mk)
-		<< "pv:" << int(v.pv) << "tn:" << int(v.tn) << "dum:" << int(v.dum) << "klass:" << int(v.klass) << "sopr:" << int(v.sopr) << "KTA:";
+	out << "N:" << v.N << "ID:" << v.ID << "T:" << v.T << "az:" << v.az << "D:" << v.D << "um:" << v.um << "X:" << v.X << "Y:" << v.Y
+		<< "H:" << v.H << "VX:" << v.VX << "VY:" << v.VY << "VH:" << v.VH << "VK:" << v.VK << "K:" << v.K << "mh:" << int(v.mh)
+		<< "mk:" << int(v.mk) << "pv:" << int(v.pv) << "tn:" << int(v.tn) << "dum:" << int(v.dum) << "klass:" << int(v.klass)
+		<< "sopr:" << int(v.sopr) << "KTA:";
 	for (const auto & kta: v.KTA)
 		out << kta;
 	return out;
@@ -910,20 +907,20 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::TRETA & v) {
 
 // STRSOPR
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::STRSOPR & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "N:" << v.N << "az:" << v.az << "D:" << v.D << "um:" << v.um
-	           << "X:" << v.X << "Y:" << v.Y << "H:" << v.H << "Daz:" << v.Daz << "DD:" << v.DD << "Dum:" << v.Dum << "DX:" << v.DX
-	           << "DY:" << v.DY << "DH:" << v.DH << "Daz_big:" << v.Daz_big << "DD_big:" << v.DD_big << "Dum_big:" << v.Dum_big
-	           << "DX_big:" << v.DX_big << "DY_big:" << v.DY_big << "DH_big:" << v.DH_big;
+	return out << "N:" << v.N << "az:" << v.az << "D:" << v.D << "um:" << v.um << "X:" << v.X << "Y:" << v.Y << "H:" << v.H
+	           << "Daz:" << v.Daz << "DD:" << v.DD << "Dum:" << v.Dum << "DX:" << v.DX << "DY:" << v.DY << "DH:" << v.DH
+	           << "Daz_big:" << v.Daz_big << "DD_big:" << v.DD_big << "Dum_big:" << v.Dum_big << "DX_big:" << v.DX_big
+	           << "DY_big:" << v.DY_big << "DH_big:" << v.DH_big;
 }
 
 // KORTR
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::KORTR & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "az:" << v.az << "D:" << v.D << "N:" << v.N;
+	return out << "az:" << v.az << "D:" << v.D << "N:" << v.N;
 }
 
 // KV_KORTR
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::KV_KORTR & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "az:" << v.az << "D:" << v.D << "message:" << v.message;
+	return out << "az:" << v.az << "D:" << v.D << "message:" << v.message;
 }
 
 // Zone
@@ -933,12 +930,12 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::Zone & v) {
 
 // CMD_ZZT
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CMD_ZZT & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "zone:{" << v.zone << "}";
+	return out << "zone:{" << v.zone << "}";
 }
 
 // ZZT
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ZZT & v) {
-	out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "zones:";
+	out << "zones:";
 	for (const auto & zone: v.zones)
 		out << "{" << zone << "}";
 	return out;
@@ -946,12 +943,12 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ZZT & v) {
 
 // CMD_ZBL
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CMD_ZBL & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "zone:{" << v.zone << "}";
+	return out << "zone:{" << v.zone << "}";
 }
 
 // ZBL
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ZBL & v) {
-	out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "zones:";
+	out << "zones:";
 	for (const auto & zone: v.zones)
 		out << "{" << zone << "}";
 	return out;
@@ -959,31 +956,29 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ZBL & v) {
 
 // AZIMUTH
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::AZIMUTH & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "T_voi:" << v.T_voi << "T_poi:" << v.T_poi
-	           << "az_poi:" << v.az_poi << "az_ant:" << v.az_ant;
+	return out << "T_voi:" << v.T_voi << "T_poi:" << v.T_poi << "az_poi:" << v.az_poi << "az_ant:" << v.az_ant;
 }
 
 // VKL_REG
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::VKL_REG & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code);
+	return out;
 }
 
 // OTKL_REG
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::OTKL_REG & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code);
+	return out;
 }
 
 // ZPR_SOST_REG
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ZPR_SOST_REG & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code);
+	return out;
 }
 
 // SOST_REG
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::SOST_REG & v) {
-	return out << "type:" << int(v.msg_type) << "code:" << int(v.msg_code) << "disk_size:" << v.disk_size << "disk_free:" << v.disk_free
-	           << "mon:" << int(v.mon) << "year:" << int(v.year) << "free_perc:" << int(v.free_perc) << "day:" << int(v.day)
-	           << "min:" << int(v.min) << "hour:" << int(v.hour) << "dhour:" << int(v.dhour) << "sec:" << int(v.sec)
-	           << "dsec:" << int(v.dsec) << "dmin:" << int(v.dmin);
+	return out << "disk_size:" << v.disk_size << "disk_free:" << v.disk_free << "mon:" << int(v.mon) << "year:" << int(v.year)
+	           << "free_perc:" << int(v.free_perc) << "day:" << int(v.day) << "min:" << int(v.min) << "hour:" << int(v.hour)
+	           << "dhour:" << int(v.dhour) << "sec:" << int(v.sec) << "dsec:" << int(v.dsec) << "dmin:" << int(v.dmin);
 }
 
 #endif // protocol_rls_mini_H

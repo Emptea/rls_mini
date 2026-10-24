@@ -97,6 +97,7 @@ void GlobalDataEth::receivedRLS(PIByteArray data, int port) {
 	Protocol_RLS_Mini::Header header;
 	if (data.size() < sizeof(header)) return;
 	memcpy(&header, data.data(), sizeof(header));
+	piCout << header;
 
 	// clang-format off
 	/// Удалить ненужные
