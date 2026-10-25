@@ -2,6 +2,7 @@
 #define shared_data_H
 
 #include "axi_dsp.h"
+#include "cpm_cit.h"
 #include "cpm_poi.h"
 #include "cpm_rr.h"
 #include "fpga_dma.hpp"
@@ -87,6 +88,10 @@ public:
 
 	Protocol_RLS_Mini::PI set_PI();
 
+	Protocol_RLS_Mini::CIT_Kvit set_CIT_Kvit();
+	void received_CIT_Zapros(const Protocol_RLS_Mini::CIT_Zapros & msg);
+	void received_CIT_KU(const Protocol_RLS_Mini::CIT_KU & msg);
+
 protected:
 
 private:
@@ -116,6 +121,7 @@ private:
 	Techlaser techlaser;
 	CpmRr cpm_rr{techlaser};
 	CpmPoi cpm_poi{cfg.dma_enabled};
+	CpmCit cpm_cit;
 
 	struct target {
 		uint16_t n     = 0;

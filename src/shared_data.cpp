@@ -43,7 +43,7 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
-	const auto & com_conf   = main_config.child("com");
+	const auto & com_conf = main_config.child("com");
 	techlaser.open(com_conf.childValue("techlaser").toString());
 	if (cfg.dma_enabled) {
 		if (dma.init(cfg.rx_insert_count) != 0) {
@@ -556,6 +556,29 @@ Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 }
 
 
+Protocol_RLS_Mini::CIT_Kvit GlobalData::set_CIT_Kvit() {
+	Protocol_RLS_Mini::CIT_Kvit kvit;
+
+	const auto targets                        = cpm_cit.get_targets();
+
+	Protocol_RLS_Mini::ImitatorTarget * dst[] = {&kvit.it1, &kvit.it2};
+
+	for (size_t i = 0; i < 2; ++i) {
+		const auto & src = targets[i];
+
+		dst[i]->reg      = static_cast<uint8_t>(src.reg);
+		dst[i]->on       = src.on;
+		dst[i]->setDegreesAz(src.az);
+		dst[i]->setMeters(src.distance);
+		dst[i]->setDegreesUm(src.um);
+		dst[i]->setVelocity(src.vr);
+		dst[i]->setAttenuation(src.osl);
+	}
+
+	return kvit;
+}
+
+
 void GlobalData::received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg) {
 	piCout << "rec msg" << "received_POI_Zapros   ";
 	piCout << msg;
@@ -601,7 +624,7 @@ void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 
 
 void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
-	piCout << "rec msg" << "received_POI_Zona     ";
+	piCout << "rec msg" << "received_POI_Zona";
 	piCout << msg;
 	cpm_poi.set_zona(msg.k1, msg.k2);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
@@ -610,9 +633,47 @@ void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 
 
 void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
-	piCout << "rec msg" << "received_POI_Kan      ";
+	piCout << "rec msg" << "received_POI_Kan";
 	piCout << msg;
 	cpm_poi.set_kan(msg.kan);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
+}
+
+
+void GlobalData::received_CIT_Zapros(const Protocol_RLS_Mini::CIT_Zapros & msg) {
+	piCout << "rec msg" << "received_CIT_Zapros";
+	piCout << msg;
+	Protocol_RLS_Mini::CIT_Kvit ans = set_CIT_Kvit();
+	global->sendMessage(ans);
+}
+
+
+void GlobalData::received_CIT_KU(const Protocol_RLS_Mini::CIT_KU & msg) {
+	piCout << "rec msg" << "received_CIT_KU";
+	piCout << msg;
+
+	const Protocol_RLS_Mini::ImitatorTarget * src[] = {&msg.it1, &msg.it2};
+
+	CpmCit::Targets targets{};
+
+	for (size_t i = 0; i < 2; ++i) {
+		if (src[i]->reg > 1) {
+			return;
+		}
+
+		auto & dst   = targets[i];
+
+		dst.reg      = static_cast<CpmCit::Register>(src[i]->reg);
+		dst.on       = src[i]->on != 0;
+		dst.az       = src[i]->getDegreesAz();
+		dst.distance = src[i]->getMeters();
+		dst.um       = src[i]->getDegreesUm();
+		dst.vr       = src[i]->getVelocity();
+		dst.osl      = src[i]->getAttenuation();
+	}
+
+	cpm_cit.set_targets(targets);
+
+	global->sendMessage(set_CIT_Kvit());
 }

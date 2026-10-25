@@ -46,8 +46,8 @@ public:
 
 	// clang-format off
 	/// Удалить ненужные
-	void received_CIT_Zapros      (const Protocol_RLS_Mini::CIT_Zapros     & msg) {piCout << "rec msg" << "received_CIT_Zapros   ";}
-	void received_CIT_KU          (const Protocol_RLS_Mini::CIT_KU         & msg) {piCout << "rec msg" << "received_CIT_KU       ";}
+	// void received_CIT_Zapros      (const Protocol_RLS_Mini::CIT_Zapros     & msg) {piCout << "rec msg" << "received_CIT_Zapros   ";}
+	// void received_CIT_KU          (const Protocol_RLS_Mini::CIT_KU         & msg) {piCout << "rec msg" << "received_CIT_KU       ";}
 	// void received_TRVO            (const Protocol_RLS_Mini::TRVO           & msg) {piCout << "rec msg" << "received_TRVO         ";}
 	// void received_TRETA           (const Protocol_RLS_Mini::TRETA          & msg) {piCout << "rec msg" << "received_TRETA        ";}
 	// void received_STRSOPR         (const Protocol_RLS_Mini::STRSOPR        & msg) {piCout << "rec msg" << "received_STRSOPR      ";}

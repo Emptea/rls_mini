@@ -304,17 +304,23 @@ public:
 
 
 	struct ImitatorTarget PIMETA(no-stream) {
-		uint8_t on   = 0; // 0 - Выключена, 1 - Включен
 		uint8_t reg  = 0; // 0 - POA, 1 - PBA
-		uint16_t az  = 0; // Азимут
-		uint16_t D   = 0; // Дальность, 1 м
-		int16_t um   = 0; // Угол места
-		uint16_t vr  = 0; // Радиальная скорость, 1 м/с
-		uint16_t osl = 0; // Ослабление,  0.5 дБ
-		void setDegreesAz(double v) { az = v / degLSB; }
-		double getDegreesAz() const { return az * degLSB; }
-		void setDegreesUm(double v) { um = v / 0.1; }
-		double getDegreesUm() const { return um * 0.1; }
+		uint8_t on   = 0; // 0 - Выключена, 1 - Включен
+		uint16_t az  = 0; // Азимут, без знака, цмр 0.0054931640625 гр
+		uint16_t D   = 0; // Дальность, без знака, цмр 1 м
+		int16_t um   = 0; // Угол места, в доп.коде, цмр 0.1 град
+		int16_t vr   = 0; // Радиальная скорость, в доп.коде, цмр 1 м/с
+		uint16_t osl = 0; // Ослабление, без знака, цмр 0.5 дБ
+		void setDegreesAz(float v) { az = static_cast<uint16_t>(std::lround(v / degLSB)); }
+		float getDegreesAz() const { return az * degLSB; }
+		void setDegreesUm(float v) { um = static_cast<int16_t>(std::lround(v / 0.1f)); }
+		float getDegreesUm() const { return um * 0.1f; }
+		void setMeters(float v) { D = static_cast<uint16_t>(std::lround(v)); }
+		float getMeters() const { return D; }
+		void setVelocity(float v) { vr = static_cast<int16_t>(std::lround(v)); }
+		float getVelocity() const { return vr; }
+		void setAttenuation(float v) { osl = static_cast<uint16_t>(std::lround(v / 0.5f)); }
+		float getAttenuation() const { return osl * 0.5f; }
 	};
 
 
