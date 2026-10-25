@@ -67,10 +67,10 @@ void GlobalDataEth::initEth() {
 	/// RLSO end
 }
 
-
 void GlobalDataEth::stopEth() {
 	piCout << "stop eth";
 	EthStorage<GlobalDataEth>::stopEth();
+	PIMutexLocker locker(send_mutex);
 	piDeleteSafety(eth_rlso_send);
 }
 

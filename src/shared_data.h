@@ -85,6 +85,8 @@ public:
 	void received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg);
 	void received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg);
 
+	Protocol_RLS_Mini::PI set_PI();
+
 protected:
 
 private:
@@ -100,6 +102,9 @@ private:
 	PIThread process_thread;
 	PIThread u220_recv_thread;
 
+	PIThread cpm_thread;
+	void cpm_loop();
+
 	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
 	VectorComplexS zero_vector;
 
@@ -111,16 +116,6 @@ private:
 	Techlaser techlaser;
 	CpmRr cpm_rr{techlaser};
 	CpmPoi cpm_poi{cfg.dma_enabled};
-
-	// TODO work header send
-	uint16_t aztek        = 0; // Азимут текущий, незадержанный в ПОИ
-	uint32_t time_delayed = 0; // Время, задержанное в обработке
-	uint16_t az_delayed   = 0; // Азимут, задержанный в обработке
-	uint16_t zona         = 0; // Дальность отметки "Зона"
-	uint16_t nes          = 0; // Количество эхосигналов
-	// Дальность эхосигнала
-	// ...
-	// uint16_t[nes]
 
 	struct target {
 		uint16_t n     = 0;

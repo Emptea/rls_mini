@@ -7,6 +7,8 @@
 #include "user_u220.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <fstream>
@@ -16,6 +18,7 @@
 #include <pistring_std.h>
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
+#include <thread>
 
 GlobalData::GlobalData(): GlobalDataEth(this), cfg(), u220_group(cfg), imitator_u220(u220_group) {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
@@ -40,7 +43,6 @@ GlobalData * GlobalData::instance() {
 
 void GlobalData::init() {
 	initEth();
-	cpm_rr.on_state_changed = [this]() { global->sendMessage(set_RR_Kvit()); };
 	const auto & com_conf   = main_config.child("com");
 	techlaser.open(com_conf.childValue("techlaser").toString());
 	if (cfg.dma_enabled) {
@@ -105,7 +107,7 @@ void GlobalData::init() {
 
 void GlobalData::start() {
 	startEth();
-	cpm_rr.start();
+	cpm_thread.start([this]() { cpm_loop(); });
 
 	if (u220_group.active_boards().isEmpty()) {
 		return;
@@ -148,7 +150,7 @@ void GlobalData::start() {
 
 
 void GlobalData::stop() {
-	cpm_rr.stop();
+	cpm_thread.stopAndWait();
 	u220_recv_thread.stopAndWait();
 	process_thread.stop();          // mark thread for stop
 	notifier_channels.notify();     // notify thread
@@ -303,6 +305,40 @@ void GlobalData::u220_recv() {
 	}
 }
 
+void GlobalData::cpm_loop() {
+	using clock           = std::chrono::steady_clock;
+
+	constexpr auto period = std::chrono::milliseconds(10);
+
+	auto next             = clock::now();
+	auto previous_vr      = cpm_rr.get_vr();
+	uint8_t tick          = 0;
+
+	while (!cpm_thread.isStopping()) {
+		// PI — 100 Гц
+		global->sendMessage(set_PI());
+
+		// Проверка RR — 10 Гц
+		if (++tick >= 10) {
+			tick            = 0;
+
+			auto current_vr = cpm_rr.get_vr();
+
+			if (current_vr != previous_vr) {
+				previous_vr = current_vr;
+				global->sendMessage(set_RR_Kvit());
+			}
+		}
+
+		next += period;
+
+		// Не догоняем пропущенные интервалы
+		if (next < clock::now()) next = clock::now();
+
+		std::this_thread::sleep_until(next);
+	}
+}
+
 static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
 	switch (control_point) {
 	case Protocol_RLS_Mini::CTRL: return rls::TP_WORK;
@@ -393,7 +429,7 @@ Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
 	kvit.dd_poi = static_cast<int16_t>(cpm_rr.get_dd_poi());
 	kvit.setDegreesDazPOI(cpm_rr.get_daz_poi());
 
-	piCout << kvit;
+	// piCout << kvit;
 
 	return kvit;
 }
@@ -479,6 +515,19 @@ void GlobalData::send_PI() {
 	global->sendMessage(ans);
 }
 
+Protocol_RLS_Mini::PI GlobalData::set_PI() {
+	Protocol_RLS_Mini::PI pi;
+
+	pi.setDegreesAzTek(cpm_rr.get_aztek());
+	pi.setSeconds(cpm_rr.get_time());
+	pi.setDegreesAz(cpm_rr.get_az());
+
+	pi.zona = cpm_poi.get_zona();
+	pi.nes  = cpm_poi.get_nes();
+
+	return pi;
+}
+
 
 Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 	Protocol_RLS_Mini::POI_Kvit kvit;
@@ -490,11 +539,15 @@ Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 	kvit.dsa_vr_n = cpm_poi.get_dsa_vr_n();
 	kvit.dsa_vr_k = cpm_poi.get_dsa_vr_k();
 
-	if (cpm_poi.get_apu_k1() > 0) kvit.setLevelApuk1(cpm_poi.get_apu_k1());
-	else piCout << "Error: apu_k1 == 0";
-	
-	if (cpm_poi.get_apu_k2() > 0) kvit.setLevelApuk2(cpm_poi.get_apu_k2());
-	else piCout << "Error: apu_k2 == 0";
+	if (cpm_poi.get_apu_k1() > 0)
+		kvit.setLevelApuk1(cpm_poi.get_apu_k1());
+	else
+		piCout << "Error: apu_k1 == 0";
+
+	if (cpm_poi.get_apu_k2() > 0)
+		kvit.setLevelApuk2(cpm_poi.get_apu_k2());
+	else
+		piCout << "Error: apu_k2 == 0";
 
 	kvit.zona_k1 = cpm_poi.get_zona_k1();
 	kvit.zona_k2 = cpm_poi.get_zona_k2();

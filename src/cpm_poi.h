@@ -72,6 +72,13 @@ public:
 		zona_k2 = k2;
 	}
 
+	// TODO: что это как считать?
+	uint16_t get_zona() const { return 5555; }
+    
+	// TODO: где считать? Нужен ли Set?
+	uint16_t get_nes() const { return 0; }
+
+
 	// KAN — маска подключённых каналов
 	uint8_t get_kan() const {
 		if (dma_enabled) return kan;
@@ -81,7 +88,7 @@ public:
 
 	void set_kan(uint8_t value) {
 		if (!dma_enabled) return;
-        
+
 		axi_dsp_set_channel_mask(uint32_t(value));
 		kan = value;
 	}

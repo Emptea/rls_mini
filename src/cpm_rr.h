@@ -26,11 +26,9 @@ public:
 	};
 
 	explicit CpmRr(Techlaser & techlaser): techlaser(techlaser) {}
-	~CpmRr() { stop(); }
+	~CpmRr() {}
 	CpmRr(const CpmRr &)             = delete;
 	CpmRr & operator=(const CpmRr &) = delete;
-
-	std::function<void()> on_state_changed;
 
 
 	// KUVR — последняя полученная команда управления вращением
@@ -100,39 +98,38 @@ public:
 	double get_time() const { return time; }
 	void set_time(double value) { time = value; }
 
+	float get_aztek() const { return techlaser.getAngleCurrent(); }
+	float get_az() const { return techlaser.getAngleAgo(PISystemTime::fromMilliseconds(10)); }
 
-	void start() {
-		if (thread.joinable()) return;
+	// void start() {
+	// 	if (thread.joinable()) return;
 
-		running = true;
+	// 	running = true;
 
-		thread  = std::thread([this]() {
-            auto previous = get_vr();
+	// 	thread  = std::thread([this]() {
+	//         auto previous = get_vr();
 
-            while (running) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	//         while (running) {
+	//             std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-                if (!running) break;
+	//             if (!running) break;
 
-                const auto current = get_vr();
-                if (current == previous) continue;
-                previous = current;
-                if (on_state_changed) on_state_changed();
-            }
-        });
-	}
+	//             const auto current = get_vr();
+	//             if (current == previous) continue;
+	//             previous = current;
+	//             if (on_state_changed) on_state_changed();
+	//         }
+	//     });
+	// }
 
-	void stop() {
-		running = false;
-		if (thread.joinable()) thread.join();
-	}
+	// void stop() {
+	// 	running = false;
+	// 	if (thread.joinable()) thread.join();
+	// }
 
 
 private:
 	Techlaser & techlaser;
-
-	std::atomic<bool> running{false};
-	std::thread thread;
 
 	RotationCommand kuvr = RotationCommand::Off; // Последняя команда вращения
 	RotationState vr     = RotationState::Off;   // Текущее состояние вращения

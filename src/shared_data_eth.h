@@ -5,7 +5,7 @@
 #include "protocol_rls_mini.h"
 
 #include <piethernet.h>
-
+#include <pimutex.h>
 
 class GlobalData;
 
@@ -22,19 +22,18 @@ public:
 
 	void changeEndian(PIByteArray & data) {
 		uchar * ptr = data.data();
-		for (uint i = 0; i < data.size_s(); i += 2) {
+		for (uint i = 0; i + 1 < data.size_s(); i += 2) {
 			piSwap(ptr[i], ptr[i + 1]);
 		}
 	}
 
 	template<typename T>
 	void sendMessage(const T & msg) {
-		if (!eth_rlso_send) return;
 		PIByteArray data = piSerialize(msg);
-
 		/// remove if wrong endian
 		changeEndian(data);
-
+		PIMutexLocker locker(send_mutex);
+		if (!eth_rlso_send) return;
 		PINetworkAddress addr = PINetworkAddress("193.1.1.255", T::Port);
 		if (!T::Broadcast) {
 			addr = eth_rlso_send->sendAddress();
@@ -58,6 +57,7 @@ public:
 protected:
 	GlobalData * global        = nullptr;
 	PIEthernet * eth_rlso_send = nullptr;
+	PIMutex send_mutex;
 
 private:
 };
