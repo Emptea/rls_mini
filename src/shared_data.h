@@ -2,6 +2,7 @@
 #define shared_data_H
 
 #include "axi_dsp.h"
+#include "cpm_poi.h"
 #include "cpm_rr.h"
 #include "fpga_dma.hpp"
 #include "imitator_u220.h"
@@ -109,42 +110,7 @@ private:
 
 	Techlaser techlaser;
 	CpmRr cpm_rr{techlaser};
-
-	union {
-		uint8_t bits = 0;
-		struct {
-			uint8_t _reserve0: 6;
-			uint8_t sdc      : 1;
-			uint8_t dsa      : 1;
-		};
-	} POI_flags       = {0};
-	uint8_t POI_kan   = 0;
-	uint16_t dsa_vr_n = 0.0; // 1 м/c
-	uint16_t dsa_vr_k = 0.0; // 1 м/c
-	uint16_t apu_k1   = 0;
-	uint16_t apu_k2   = 0;
-	uint32_t zona_k1  = 0;
-	uint32_t zona_k2  = 0;
-
-	void setShtat() {
-		POI_flags.sdc = 1;
-		POI_flags.dsa = 0;
-		POI_kan       = 0b11111111;
-		dsa_vr_n      = 0.0; // 1 м/c
-		dsa_vr_k      = 0.0; // 1 м/c
-		apu_k1        = 36;
-		apu_k2        = 0;
-		zona_k1       = 0;
-		zona_k2       = 0;
-
-		axi_dsp_set_compensation_mode(0);
-		axi_dsp_set_compensation_ref((uint32_t)1575);
-		axi_dsp_set_motion_selector(1, POI_flags.sdc);
-		axi_dsp_set_detector_level(apu_k1, 0);
-		axi_dsp_set_detector_level(apu_k2, 1);
-		axi_dsp_set_channel_mask(POI_kan);
-	}
-
+	CpmPoi cpm_poi{cfg.dma_enabled};
 
 	// TODO work header send
 	uint16_t aztek        = 0; // Азимут текущий, незадержанный в ПОИ

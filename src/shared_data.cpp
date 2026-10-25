@@ -49,6 +49,7 @@ void GlobalData::init() {
 			cfg.dma_enabled = false;
 		}
 	}
+	cpm_poi.set_dma_enabled(cfg.dma_enabled);
 	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	auto dit                        = devices.begin();
@@ -480,24 +481,22 @@ void GlobalData::send_PI() {
 
 
 Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
-	Protocol_RLS_Mini::POI_Kvit ans;
-	ans.bits     = POI_flags.bits;
-	ans.kan      = POI_kan;
-	ans.dsa_vr_n = dsa_vr_n;
-	ans.dsa_vr_k = dsa_vr_k;
-	ans.setLevelApuk1(apu_k1);
-	ans.setLevelApuk2(apu_k2);
-	ans.zona_k1 = zona_k1;
-	ans.zona_k2 = zona_k2;
-	piCout << ans.bits;
-	piCout << PICoutManipulators::Bin << ans.kan;
-	piCout << ans.dsa_vr_n;
-	piCout << ans.dsa_vr_k;
-	piCout << ans.apu_k1;
-	piCout << ans.apu_k2;
-	piCout << ans.zona_k1;
-	piCout << ans.zona_k2;
-	return ans;
+	Protocol_RLS_Mini::POI_Kvit kvit;
+
+	kvit.sdc      = cpm_poi.get_sdc();
+	kvit.dsa      = cpm_poi.get_dsa();
+	kvit.kan      = cpm_poi.get_kan();
+
+	kvit.dsa_vr_n = cpm_poi.get_dsa_vr_n();
+	kvit.dsa_vr_k = cpm_poi.get_dsa_vr_k();
+
+	kvit.setLevelApuk1(cpm_poi.get_apu_k1());
+	kvit.setLevelApuk2(cpm_poi.get_apu_k2());
+
+	kvit.zona_k1 = cpm_poi.get_zona_k1();
+	kvit.zona_k2 = cpm_poi.get_zona_k2();
+
+	return kvit;
 }
 
 
@@ -512,7 +511,7 @@ void GlobalData::received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg) 
 void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
 	piCout << "rec msg" << "received_POI_Shtat    ";
 	piCout << msg;
-	setShtat();
+	cpm_poi.set_shtat();
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
@@ -521,12 +520,7 @@ void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
 void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 	piCout << "rec msg" << "received_POI_SDC      ";
 	piCout << msg;
-	if (cfg.dma_enabled) {
-		axi_dsp_set_motion_selector(1, msg.par);
-		auto v        = axi_dsp_get_motion_selector();
-		POI_flags.sdc = v.ONOFF;
-	}
-
+	cpm_poi.set_sdc(msg.par == 1);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
@@ -535,10 +529,7 @@ void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 	piCout << "rec msg" << "received_POI_DSA      ";
 	piCout << msg;
-	POI_flags.dsa                   = msg.par;
-	dsa_vr_n                        = msg.vr_n;
-	dsa_vr_k                        = msg.vr_k;
-
+	cpm_poi.set_dsa(msg.par == 1, msg.vr_n, msg.vr_k);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
@@ -547,16 +538,7 @@ void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 	piCout << "rec msg" << "received_POI_APU      ";
 	piCout << msg;
-	apu_k1 = msg.getLevelk1();
-	apu_k2 = msg.getLevelk2();
-	if (cfg.dma_enabled) {
-		axi_dsp_set_detector_level(apu_k1, 0);
-		axi_dsp_set_detector_level(apu_k2, 1);
-	} else {
-		apu_k1 = 0;
-		apu_k2 = 0;
-	}
-
+	cpm_poi.set_apu(msg.getLevelk1(), msg.getLevelk2());
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
@@ -565,8 +547,7 @@ void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 	piCout << "rec msg" << "received_POI_Zona     ";
 	piCout << msg;
-	zona_k1                         = msg.k1;
-	zona_k2                         = msg.k2;
+	cpm_poi.set_zona(msg.k1, msg.k2);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
@@ -575,12 +556,7 @@ void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
 	piCout << "rec msg" << "received_POI_Kan      ";
 	piCout << msg;
-	if (cfg.dma_enabled) {
-		axi_dsp_set_channel_mask((uint32_t)msg.kan);
-		POI_kan = (uint8_t)axi_dsp_get_channel_mask();
-	} else {
-		POI_kan = msg.kan;
-	}
+	cpm_poi.set_kan(msg.kan);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }

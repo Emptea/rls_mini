@@ -239,6 +239,7 @@ public:
 		uint8_t zona_k1   = 0;
 		uint8_t _reserve1;
 		uint16_t zona_k2 = 0;
+		// TODO: функции преобразования неверны, нет LSB
 		void setLevelApuk1(uint32_t v) { apu_k1 = (uint16_t)(10 * log10((double)v)); }
 		double getLevelApuk1() const { return (pow(10, apu_k1) / 10); }
 		void setLevelApuk2(uint32_t v) { apu_k2 = (uint16_t)(10 * log10((double)v)); }
@@ -799,7 +800,8 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_AzPopr_POI & v)
 // RR_Kvit
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Kvit & v) {
 	return out << "ant:" << int(v.ant) << "izl:" << int(v.izl) << "kuizl:" << int(v.kuizl) << "vr:" << int(v.vr) << "kuvr:" << int(v.kuvr)
-	           << "ispr_kan:" << int(v.ispr_kan) << "daz:" << v.daz << "dd_poi:" << v.dd_poi << "daz_poi:" << v.daz_poi;
+	           << "ispr_kan:" << PICoutManipulators::Bin << v.ispr_kan << "daz:" << v.daz << "dd_poi:" << v.dd_poi
+	           << "daz_poi:" << v.daz_poi;
 }
 
 // POI_Zapros
@@ -834,12 +836,12 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Zona & v) {
 
 // POI_Kan
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Kan & v) {
-	return out << "kan:" << int(v.kan);
+	return out << "kan:" << PICoutManipulators::Bin << v.kan;
 }
 
 // POI_Kvit
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Kvit & v) {
-	return out << "sdc:" << int(v.sdc) << "dsa:" << int(v.dsa) << "kan:" << int(v.kan) << "dsa_vr_n:" << v.dsa_vr_n
+	return out << "sdc:" << int(v.sdc) << "dsa:" << int(v.dsa) << "kan:" << PICoutManipulators::Bin << v.kan << "dsa_vr_n:" << v.dsa_vr_n
 	           << "dsa_vr_k:" << v.dsa_vr_k << "apu_k1:" << v.apu_k1 << "apu_k2:" << v.apu_k2 << "zona_k1:" << int(v.zona_k1)
 	           << "zona_k2:" << v.zona_k2;
 }
