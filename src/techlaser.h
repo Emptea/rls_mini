@@ -60,6 +60,7 @@ public:
 	// current state
 	State getState() const;
 	double getAngleAgo(PISystemTime ago) const;
+	double getAngleCurrent() const { return getState().current_angle; }
 
 private:
 	using Clock = std::chrono::steady_clock;

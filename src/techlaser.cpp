@@ -126,7 +126,7 @@ bool Techlaser::open(const PIString & serial) {
 
 	if (!ser.isThreadedRead()) ser.startThreadedRead();
 
-	req_thread.start(20_Hz);
+	req_thread.start(100_Hz);
 	piCout << "Techlaser: open port";
 	return true;
 }
