@@ -377,30 +377,33 @@ public:
 		static constexpr int16_t Type   = 4;
 		static constexpr int16_t Code   = 1;
 		KTA_VO(): Header(Type, Code) {}
-		uint16_t N     = 0; // Номер КТА
-		uint32_t T     = 0; // Время локации
-		uint16_t az    = 0; // Азимут
-		int16_t um     = 0; // Угол места
-		uint16_t D     = 0; // Дальность, 1 м
+		uint16_t n     = 0; // Номер КТА
+		uint16_t t_msw = 0; // Время локации, без знака, цмр 0.001 с
+		uint16_t t_lsw = 0; // Время локации, без знака, цмр 0.001 с
+		uint16_t az    = 0; // Азимут, без знака, цмр 0.0054931640625
+		int16_t um     = 0; // Угол места, в доп.коде, цмр 0.1 град
+		uint16_t d     = 0; // Дальность, 1 м
 		uint16_t porog = 0; // Порог обнаружения, 0.5 дБ
 		uint16_t sp    = 0; // Отношение сигнал/порог, 0.5 дБ
 		uint16_t amp   = 0; // Амплитуда сигнала цели, 0.5 дБ
 		int16_t vr     = 0; // Радиальная скорость, 1 м/с
 		union {
-			uint8_t bits = 0;
+			uint16_t bits = 0;
 			struct {
-				uint8_t _reserve0: 6;
-				uint8_t tn       : 1; // Признак тренажной цели
-				uint8_t dum      : 1; // Признак достоверности измерения угла места цели
+				uint16_t resv: 14;
+				uint16_t tn  : 1; // Признак тренажной цели
+				uint16_t dum : 1; // Признак достоверности измерения угла места цели
 			};
 		};
-		uint8_t _reserve1 = 0;
 		void setDegreesAz(double v) { az = v / degLSB; }
 		double getDegreesAz() const { return az * degLSB; }
 		void setDegreesUm(double v) { um = v / 0.1; }
 		double getDegreesUm() const { return um * 0.1; }
-		void setSeconds(double s) { T = s / timeLSB; }
-		double getSeconds() const { return T * timeLSB; }
+		void setT(double s) {
+			uint32_t t = uint32_t(std::roundl(s / timeLSB));
+			t_msw      = uint16_t(t >> 16);
+			t_lsw      = uint16_t(t);
+		}
 	};
 
 
@@ -893,8 +896,9 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::PI & v) {
 
 // KTA_VO
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::KTA_VO & v) {
-	return out << "N:" << v.N << "T:" << v.T << "az:" << v.az << "um:" << v.um << "D:" << v.D << "porog:" << v.porog << "sp:" << v.sp
-	           << "amp:" << v.amp << "vr:" << v.vr << "tn:" << int(v.tn) << "dum:" << int(v.dum);
+	return out << "N:" << v.n << "T:" << PICoutManipulators::Hex << v.t_msw << PICoutManipulators::Hex << v.t_lsw << "az:" << v.az
+	           << "um:" << v.um << "D:" << v.d << "porog:" << v.porog << "sp:" << v.sp << "amp:" << v.amp << "vr:" << v.vr
+	           << "tn:" << int(v.tn) << "dum:" << int(v.dum);
 }
 
 // TRVO

@@ -498,7 +498,7 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	Protocol_RLS_Mini::KTA_VO ans;
 	ans.az = targ.az;
 	ans.setDegreesUm(targ.um);
-	ans.D     = targ.D;
+	ans.d     = targ.D;
 	ans.porog = targ.porog;
 	ans.sp    = targ.sp;
 	ans.amp   = targ.amp;

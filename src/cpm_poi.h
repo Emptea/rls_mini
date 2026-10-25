@@ -74,7 +74,7 @@ public:
 
 	// TODO: что это как считать?
 	uint16_t get_zona() const { return 5555; }
-    
+
 	// TODO: где считать? Нужен ли Set?
 	uint16_t get_nes() const { return 0; }
 
