@@ -20,7 +20,7 @@ void GlobalDataEth::initEth() {
 	const auto & net_conf = global->mainConfig().child("net");
 
 	/// RLSO start
-	PIStringList my_dest  = {"poi", "rr", "it", "soi", "all"};
+	PIStringList my_dest  = {"poi", "rr", "it"};
 
 	PIEthernet * _eth     = PIIODevice::createFromFullPath(net_conf.childValue("rls").toString())->cast<PIEthernet>();
 	if (_eth) {
