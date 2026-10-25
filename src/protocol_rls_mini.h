@@ -190,10 +190,10 @@ public:
 		POI_APU(): Header(Type, Code) {}
 		uint16_t k1 = 0; // Коэффициент порога 1, цмр 0.5 дБ
 		uint16_t k2 = 0; // Коэффициент порога 2, цмр 0.5 дБ
-		void setLevelk1(uint32_t v) { k1 = (uint16_t)(10 * log10((double)v)); }
-		double getLevelk1() const { return (pow(10, k1) / 10); }
-		void setLevelk2(uint32_t v) { k2 = (uint16_t)(10 * log10((double)v)); }
-		double getLevelk2() const { return (pow(10, k2) / 10); }
+		void setLevelk1(uint32_t v) { k1 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
+		double getLevelk1() const { return std::pow(10.0, k1 * dbLSB / 10.0); }
+		void setLevelk2(uint32_t v) { k2 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
+		double getLevelk2() const { return std::pow(10.0, k2 * dbLSB / 10.0); }
 	};
 
 
@@ -213,8 +213,13 @@ public:
 		static constexpr int16_t Type = 2;
 		static constexpr int16_t Code = 5;
 		POI_Kan(): Header(Type, Code) {}
-		uint8_t _reserve;
-		uint8_t kan = 0; // Подключенные каналы
+		union {
+			uint16_t bits = 0;
+			struct {
+				uint16_t kan : 8; // Подключенные каналы
+				uint16_t resv: 8;
+			};
+		};
 	};
 
 
@@ -224,25 +229,27 @@ public:
 		static constexpr int16_t Code = 0;
 		POI_Kvit(): Header(Type, Code) {}
 		union {
-			uint8_t bits = 0;
+			uint16_t bits = 0;
 			struct {
-				uint8_t _reserve0: 6;
-				uint8_t sdc      : 1;
-				uint8_t dsa      : 1;
+				uint16_t kan      : 8; // Подключенные каналы
+				uint16_t _reserve0: 6;
+				uint16_t dsa      : 1;
+				uint16_t sdc      : 1;
 			};
 		};
-		uint8_t kan       = 0; // Подключенные каналы
 		uint16_t dsa_vr_n = 0;
 		uint16_t dsa_vr_k = 0;
 		uint16_t apu_k1   = 0;
 		uint16_t apu_k2   = 0;
-		uint8_t zona_k1   = 0;
-		uint8_t _reserve1;
+		struct {
+			uint16_t _reserve1: 8;
+			uint16_t zona_k1  : 8;
+		};
 		uint16_t zona_k2 = 0;
-		void setLevelApuk1(uint32_t v) { apu_k1 = uint16_t(round(10.0 * log10(v) / levelApukLSB)); }
-		float getLevelApuk1() const { return pow(10.0, apu_k1 * levelApukLSB / 10.0); }
-		void setLevelApuk2(uint32_t v) { apu_k2 = uint16_t(round(10.0 * log10(v) / levelApukLSB)); }
-		float getLevelApuk2() const { return std::pow(10.0, apu_k2 * levelApukLSB / 10.0); }
+		void setLevelApuk1(uint32_t v) { apu_k1 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
+		double getLevelApuk1() const { return std::pow(10.0, apu_k1 * dbLSB / 10.0); }
+		void setLevelApuk2(uint32_t v) { apu_k2 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
+		double getLevelApuk2() const { return std::pow(10.0, apu_k2 * dbLSB / 10.0); }
 	};
 
 
@@ -682,9 +689,9 @@ public:
 #pragma pack(pop)
 
 private:
-	static constexpr float degLSB       = 0.0054931640625;
-	static constexpr double timeLSB     = 0.001;
-	static constexpr float levelApukLSB = 0.5;
+	static constexpr float degLSB   = 0.0054931640625;
+	static constexpr double timeLSB = 0.001;
+	static constexpr double dbLSB   = 0.5;
 };
 
 

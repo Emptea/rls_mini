@@ -54,11 +54,9 @@ public:
 	}
 
 	void set_apu(uint32_t k1, uint32_t k2) {
-		if (!dma_enabled) return;
-
 		apu_k1 = k1;
 		apu_k2 = k2;
-
+		if (!dma_enabled) return;
 		axi_dsp_set_detector_level(apu_k1, 0);
 		axi_dsp_set_detector_level(apu_k2, 1);
 	}
@@ -87,10 +85,9 @@ public:
 	}
 
 	void set_kan(uint8_t value) {
-		if (!dma_enabled) return;
-
-		axi_dsp_set_channel_mask(uint32_t(value));
 		kan = value;
+		if (!dma_enabled) return;
+		axi_dsp_set_channel_mask(uint32_t(value));
 	}
 
 	// Штатные настройки ПОИ
