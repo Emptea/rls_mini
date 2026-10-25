@@ -330,6 +330,34 @@ void GlobalData::cpm_loop() {
 			}
 		}
 
+		// отправка иммитированных целей
+		const auto detections = cpm_cit.update_azimuth(cpm_rr.get_current_az());
+
+		for (const auto & detection: detections) {
+			const auto & target = detection.target;
+
+			Protocol_RLS_Mini::KTA_VO msg;
+			static uint32_t n_kta = 0;
+			msg.n = static_cast<uint16_t>(n_kta++);
+			msg.setT(cpm_rr.get_compensated_time());
+			msg.setDegreesAz(target.az);
+			msg.setDegreesUm(target.um);
+			msg.setDistance(target.distance);
+			msg.setVelocity(target.vr);
+			msg.amp = 20;
+			msg.sp = 10;
+			msg.porog = 10;
+
+
+			msg.tn0  = 0;
+			msg.tn1  = 0;
+			msg.dum0 = 1;
+			msg.dum1 = 1;
+			piCout << msg;
+
+			global->sendMessage(msg);
+		}
+
 		next += period;
 
 		// Не догоняем пропущенные интервалы
@@ -503,8 +531,10 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	ans.sp    = targ.sp;
 	ans.amp   = targ.amp;
 	ans.vr    = targ.vr;
-	ans.dum   = targ.dum;
-	ans.tn    = targ.tn;
+	ans.dum0   = targ.dum;
+	ans.tn0    = targ.tn;
+	ans.dum1   = targ.dum;
+	ans.tn1    = targ.tn;
 	global->sendMessage(ans);
 }
 

@@ -304,8 +304,8 @@ public:
 
 
 	struct ImitatorTarget PIMETA(no-stream) {
-		uint8_t reg  = 0; // 0 - POA, 1 - PBA
 		uint8_t on   = 0; // 0 - Выключена, 1 - Включен
+		uint8_t reg  = 0; // 0 - POA, 1 - PBA
 		uint16_t az  = 0; // Азимут, без знака, цмр 0.0054931640625 гр
 		uint16_t D   = 0; // Дальность, без знака, цмр 1 м
 		int16_t um   = 0; // Угол места, в доп.коде, цмр 0.1 град
@@ -390,20 +390,27 @@ public:
 		union {
 			uint16_t bits = 0;
 			struct {
-				uint16_t resv: 14;
-				uint16_t tn  : 1; // Признак тренажной цели
-				uint16_t dum : 1; // Признак достоверности измерения угла места цели
+				uint16_t resv0: 6;
+				uint16_t tn0  : 1; // Признак тренажной цели
+				uint16_t dum0 : 1; // Признак достоверности измерения угла места цели
+				uint16_t resv1: 6;
+				uint16_t tn1  : 1; // Признак тренажной цели
+				uint16_t dum1 : 1; // Признак достоверности измерения угла места цели
 			};
 		};
-		void setDegreesAz(double v) { az = v / degLSB; }
-		double getDegreesAz() const { return az * degLSB; }
-		void setDegreesUm(double v) { um = v / 0.1; }
-		double getDegreesUm() const { return um * 0.1; }
+		void setDegreesAz(float v) { az = uint16_t(std::roundl(v / degLSB)); }
+		float getDegreesAz() const { return az * degLSB; }
+		void setDegreesUm(float v) { um = int16_t(std::roundl(v / 0.1)); }
+		float getDegreesUm() const { return um * 0.1; }
 		void setT(double s) {
 			uint32_t t = uint32_t(std::roundl(s / timeLSB));
 			t_msw      = uint16_t(t >> 16);
 			t_lsw      = uint16_t(t);
 		}
+		void setDistance(float v) { d = uint16_t(std::roundl(v)); }
+		float getDistance() const { return d * degLSB; }
+		void setVelocity(float v) { vr = int16_t(std::roundl(v)); }
+		float getVelocity() const { return vr * degLSB; }
 	};
 
 
@@ -896,9 +903,9 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::PI & v) {
 
 // KTA_VO
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::KTA_VO & v) {
-	return out << "N:" << v.n << "T:" << PICoutManipulators::Hex << v.t_msw << PICoutManipulators::Hex << v.t_lsw << "az:" << v.az
+	return out << "N:" << v.n << "T:" << PICoutManipulators::Hex << v.t_msw << v.t_lsw << PICoutManipulators::Dec << "az:" << v.az
 	           << "um:" << v.um << "D:" << v.d << "porog:" << v.porog << "sp:" << v.sp << "amp:" << v.amp << "vr:" << v.vr
-	           << "tn:" << int(v.tn) << "dum:" << int(v.dum);
+	           << "tn:" << int(v.tn0) << "dum:" << int(v.dum0) << "tn:" << int(v.tn1) << "dum:" << int(v.dum1);
 }
 
 // TRVO
