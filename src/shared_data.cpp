@@ -490,8 +490,11 @@ Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 	kvit.dsa_vr_n = cpm_poi.get_dsa_vr_n();
 	kvit.dsa_vr_k = cpm_poi.get_dsa_vr_k();
 
-	kvit.setLevelApuk1(cpm_poi.get_apu_k1());
-	kvit.setLevelApuk2(cpm_poi.get_apu_k2());
+	if (cpm_poi.get_apu_k1() > 0) kvit.setLevelApuk1(cpm_poi.get_apu_k1());
+	else piCout << "Error: apu_k1 == 0";
+	
+	if (cpm_poi.get_apu_k2() > 0) kvit.setLevelApuk2(cpm_poi.get_apu_k2());
+	else piCout << "Error: apu_k2 == 0";
 
 	kvit.zona_k1 = cpm_poi.get_zona_k1();
 	kvit.zona_k2 = cpm_poi.get_zona_k2();

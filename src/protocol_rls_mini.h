@@ -239,11 +239,10 @@ public:
 		uint8_t zona_k1   = 0;
 		uint8_t _reserve1;
 		uint16_t zona_k2 = 0;
-		// TODO: функции преобразования неверны, нет LSB
-		void setLevelApuk1(uint32_t v) { apu_k1 = (uint16_t)(10 * log10((double)v)); }
-		double getLevelApuk1() const { return (pow(10, apu_k1) / 10); }
-		void setLevelApuk2(uint32_t v) { apu_k2 = (uint16_t)(10 * log10((double)v)); }
-		double getLevelApuk2() const { return (pow(10, apu_k2) / 10); }
+		void setLevelApuk1(uint32_t v) { apu_k1 = uint16_t(round(10.0 * log10(v) / levelApukLSB)); }
+		float getLevelApuk1() const { return pow(10.0, apu_k1 * levelApukLSB / 10.0); }
+		void setLevelApuk2(uint32_t v) { apu_k2 = uint16_t(round(10.0 * log10(v) / levelApukLSB)); }
+		float getLevelApuk2() const { return std::pow(10.0, apu_k2 * levelApukLSB / 10.0); }
 	};
 
 
@@ -667,8 +666,9 @@ public:
 #pragma pack(pop)
 
 private:
-	static constexpr float degLSB   = 0.0054931640625;
-	static constexpr double timeLSB = 0.001;
+	static constexpr float degLSB       = 0.0054931640625;
+	static constexpr double timeLSB     = 0.001;
+	static constexpr float levelApukLSB = 0.5;
 };
 
 

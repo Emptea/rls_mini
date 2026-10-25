@@ -4,6 +4,8 @@
 
 #include <cstdint>
 
+// TODO: нужно ли axi_dsp_apply();
+
 class CpmPoi {
 public:
 	struct Dsa {
@@ -15,13 +17,17 @@ public:
 	explicit CpmPoi(bool dma_enabled): dma_enabled(dma_enabled) {}
 
 	// SDC — селекция движущихся целей
-	bool get_sdc() const { return sdc; }
+	bool get_sdc() const {
+		if (!dma_enabled) return sdc;
+		return sdc;
+		// return axi_dsp_get_motion_selector().ONOFF;
+	}
 
 	void set_sdc(bool value) {
 		if (!dma_enabled) return;
 
 		axi_dsp_set_motion_selector(1, value);
-		sdc = axi_dsp_get_motion_selector().ONOFF;
+		sdc = value;
 	}
 
 	// DSA — диапазон скоростей автокомпенсации
@@ -36,15 +42,19 @@ public:
 	}
 
 	// APU — пороги обнаружения
-	uint32_t get_apu_k1() const { return apu_k1; }
-	uint32_t get_apu_k2() const { return apu_k2; }
+	uint32_t get_apu_k1() const {
+		if (!dma_enabled) return apu_k1;
+		return apu_k1;
+		// return axi_dsp_get_detector_level(0);
+	}
+	uint32_t get_apu_k2() const {
+		if (!dma_enabled) return apu_k2;
+		return apu_k2;
+		// return axi_dsp_get_detector_level(1);
+	}
 
 	void set_apu(uint32_t k1, uint32_t k2) {
-		if (!dma_enabled) {
-			apu_k1 = 0;
-			apu_k2 = 0;
-			return;
-		}
+		if (!dma_enabled) return;
 
 		apu_k1 = k1;
 		apu_k2 = k2;
@@ -63,15 +73,17 @@ public:
 	}
 
 	// KAN — маска подключённых каналов
-	uint8_t get_kan() const { return kan; }
+	uint8_t get_kan() const {
+		if (dma_enabled) return kan;
+		return kan;
+		// return axi_dsp_get_channel_mask();
+	}
 
 	void set_kan(uint8_t value) {
-		if (dma_enabled) {
-			axi_dsp_set_channel_mask(uint32_t(value));
-			kan = uint8_t(axi_dsp_get_channel_mask());
-		} else {
-			kan = value;
-		}
+		if (!dma_enabled) return;
+        
+		axi_dsp_set_channel_mask(uint32_t(value));
+		kan = value;
 	}
 
 	// Штатные настройки ПОИ
