@@ -332,7 +332,7 @@ void Techlaser::packetReceived(PIByteArray msg) {
 		case 'b': ref->motor_error = faults != 0; break;
 		case 'c':
 			ref->current_angle           = static_cast<float>(value);
-			ref->angle_receive_timestamp = PISystemTime::current();
+			ref->angle_receive_timestamp = PISystemTime::current(true);
 			break;
 		case 'd': ref->current_speed = static_cast<float>(value); break;
 		case 'e': ref->motor_status = static_cast<MotorStatus>(static_cast<int>(value)); break;
@@ -356,7 +356,7 @@ Techlaser::State Techlaser::getState() const {
 
 double Techlaser::getAngleAgo(PISystemTime ago) const {
 	auto s              = getState();
-	PISystemTime now    = PISystemTime::current();
+	PISystemTime now    = PISystemTime::current(true);
 	PISystemTime target = now - ago;
 	PISystemTime dt     = target - s.angle_receive_timestamp;
 	double angle        = s.current_angle + s.current_speed * dt.toSeconds();

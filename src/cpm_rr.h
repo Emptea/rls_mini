@@ -25,7 +25,7 @@ public:
 		Unknown   = 3  // Состояние не определено
 	};
 
-	explicit CpmRr(Techlaser & techlaser): techlaser(techlaser) {}
+	explicit CpmRr(Techlaser & techlaser): techlaser(techlaser) { set_current_time(0.0); }
 	~CpmRr() {}
 	CpmRr(const CpmRr &)             = delete;
 	CpmRr & operator=(const CpmRr &) = delete;
@@ -95,38 +95,14 @@ public:
 	float get_daz_poi() const { return daz_poi; }
 	void set_daz_poi(float value) { daz_poi = value; }
 
-	double get_time() const { return time; }
-	void set_time(double value) { time = value; }
 
-	float get_aztek() const { return techlaser.getAngleCurrent(); }
-	float get_az() const { return techlaser.getAngleAgo(PISystemTime::fromMilliseconds(10)); }
+	void set_current_time(double value) { time_offset = value - PISystemTime::current(true).toSeconds(); }
+	double get_current_time() const { return PISystemTime::current(true).toSeconds() + time_offset; }
+	double get_compensated_time() const { return get_current_time() - signal_processing_delay; }
+	void set_signal_processing_delay(double value) { signal_processing_delay = value; }
 
-	// void start() {
-	// 	if (thread.joinable()) return;
-
-	// 	running = true;
-
-	// 	thread  = std::thread([this]() {
-	//         auto previous = get_vr();
-
-	//         while (running) {
-	//             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-	//             if (!running) break;
-
-	//             const auto current = get_vr();
-	//             if (current == previous) continue;
-	//             previous = current;
-	//             if (on_state_changed) on_state_changed();
-	//         }
-	//     });
-	// }
-
-	// void stop() {
-	// 	running = false;
-	// 	if (thread.joinable()) thread.join();
-	// }
-
+	float get_current_az() const { return techlaser.getAngleCurrent() + daz; }
+	float get_compensated_az() const { return techlaser.getAngleAgo(PISystemTime::fromSeconds(signal_processing_delay)) + daz; }
 
 private:
 	Techlaser & techlaser;
@@ -143,5 +119,7 @@ private:
 	float daz            = 0.0f; // Азимутальная поправка датчика, градусы
 	float dd_poi         = 0.0f; // Поправка дальности ПОИ, метры
 	float daz_poi        = 0.0f; // Азимутальная поправка ПОИ, градусы
-	double time          = 0.0;  // Текущее время, секунды
+
+	std::atomic<double> time_offset{0.0};
+	std::atomic<double> signal_processing_delay{0.01};
 };

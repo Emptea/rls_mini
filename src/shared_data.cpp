@@ -375,7 +375,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	req_test_point   = true;
 
 	int data_cnt     = 0;
-	if (msg.kt != Protocol_RLS_Mini::CTRL) {
+	if (msg.kt != Protocol_RLS_Mini::CTRL && msg.reg_takt == 1) {
 		data_cnt = rls::get_rx_words_per_buf(test_point, cfg.rx_insert_count);
 	} else {
 		// TODO get all dsp regs state and pack them into one packet
@@ -468,7 +468,7 @@ void GlobalData::received_RR_Ant(const Protocol_RLS_Mini::RR_Ant & msg) {
 void GlobalData::received_RR_TTek(const Protocol_RLS_Mini::RR_TTek & msg) {
 	piCout << "rec msg" << "received_RR_TTek      ";
 	piCout << msg;
-	cpm_rr.set_time(msg.getSeconds());
+	cpm_rr.set_current_time(msg.getSeconds());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
@@ -518,9 +518,9 @@ void GlobalData::send_PI() {
 Protocol_RLS_Mini::PI GlobalData::set_PI() {
 	Protocol_RLS_Mini::PI pi;
 
-	pi.setDegreesAzTek(cpm_rr.get_aztek());
-	pi.setSeconds(cpm_rr.get_time());
-	pi.setDegreesAz(cpm_rr.get_az());
+	pi.setDegreesAzTek(cpm_rr.get_current_az());
+	pi.setSeconds(cpm_rr.get_compensated_time());
+	pi.setDegreesAz(cpm_rr.get_compensated_az());
 
 	pi.zona = cpm_poi.get_zona();
 	pi.nes  = cpm_poi.get_nes();
