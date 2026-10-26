@@ -137,7 +137,6 @@ void GlobalData::start() {
 	}
 
 	imitator_u220.set_params(targets);
-	imitator_u220.set_opu(cfg.opu_az, 180.0);
 	imitator_u220.apply(0.0);
 
 	auto start_time = u220_group.board(u220_group.active_boards()[0])->get_usrp()->get_time_now();
@@ -285,24 +284,94 @@ void GlobalData::u220_recv() {
 		u220_recv_thread.stopAndWait();
 	}
 
-	if (u220_group.active_boards().isEmpty()) return;
+	const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
+	if (buffer) {
+		const auto * hdr = reinterpret_cast<const rls::header *>(buffer);
 
+		if (hdr->tp != rls::TP_WORK) {
+			const size_t words = rls::get_rx_words_per_buf(hdr->tp, cfg.rx_insert_count);
 
-	if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
-		for (const auto board_index: u220_group.active_boards()) {
-			auto * board = u220_group.board(board_index);
-			auto ref1    = current_channels.getRef();
-			auto ref2    = adc_channels.getRef();
+			if (words > 0 && words <= BUFFER_SIZE / sizeof(uint32_t)) {
+				auto ref = dma_channel_buf.getRef();
+				*ref     = PIVector<uint32_t>(buffer, words);
+			}
+		} else {
+			process_work_pac(buffer);
+		}
 
-			for (int channel: {0, 1}) {
-				const int global_channel = 2 * board_index + channel;
-				(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
+		if (u220_group.active_boards().isEmpty()) return;
+
+		if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
+			for (const auto board_index: u220_group.active_boards()) {
+				auto * board = u220_group.board(board_index);
+				auto ref1    = current_channels.getRef();
+				auto ref2    = adc_channels.getRef();
+
+				for (int channel: {0, 1}) {
+					const int global_channel = 2 * board_index + channel;
+					(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
+				}
 			}
 		}
+		// if (u220_cycles > 0) {
+		// 	notifier_channels.notify();
+		// }
 	}
-	if (u220_cycles > 0) {
-		notifier_channels.notify();
+}
+
+void GlobalData::process_work_pac(const uint32_t * buffer) {
+	constexpr size_t work_header_size = sizeof(rls::header) + sizeof(rls::work_posthdr);
+
+	static_assert(sizeof(rls::header) == 24, "Invalid header size");
+	static_assert(sizeof(rls::work_posthdr) == 8, "Invalid work_posthdr size");
+	static_assert(sizeof(rls::work_packet) == 16, "Invalid work_packet size");
+	static_assert(BUFFER_SIZE >= work_header_size, "DMA buffer too small");
+
+	// Общий заголовок
+	const auto * hdr                  = reinterpret_cast<const rls::header *>(buffer);
+
+	const uint32_t del_high           = hdr->del_high;
+	const uint32_t del_low            = hdr->del_low;
+	const uint32_t packet_number      = hdr->packet_number;
+	const uint64_t timestamp          = hdr->timestamp;
+	const uint32_t channel            = hdr->channel;
+	const uint32_t range              = hdr->range;
+	const uint32_t tp                 = hdr->tp;
+
+	// Заголовок рабочих данных
+	const auto * work                 = reinterpret_cast<const rls::work_posthdr *>(buffer + rls::HDR_SIZE);
+
+	const uint32_t work_packet_number = work->packet_number;
+	const uint32_t n_work_packets     = work->n_work_packets;
+
+	// Проверка количества обнаружений
+	constexpr size_t max_packets      = (BUFFER_SIZE - work_header_size) / sizeof(rls::work_packet);
+
+	if (n_work_packets > max_packets) {
+		fprintf(stderr, "Invalid WORK packet count: %u (max %zu)\n", n_work_packets, max_packets);
+		return;
 	}
+
+	// Массив обнаружений
+	const auto * packets = reinterpret_cast<const rls::work_packet *>(work + 1);
+
+	for (uint32_t i = 0; i < n_work_packets; ++i) {
+		const auto & packet                  = packets[i];
+
+		const uint32_t main_amplitude        = packet.main_amplitude;
+		const uint32_t neighbor_amplitude    = packet.neighbor_amplitude;
+		const uint32_t target_range          = packet.range;
+		const uint32_t main_diagram_number   = packet.main_diagram_number;
+		const uint32_t neighbor_diagram_side = packet.neighbor_diagram_side;
+		const uint32_t frequency_channel     = packet.frequency_channel;
+		const uint32_t padding               = packet.padding;
+		const uint32_t rank_out              = packet.rank_out;
+
+		// TODO: обработка одного обнаружения
+		// Здесь доступны все поля packet.
+	}
+
+	// Пока поля hdr и work извлечены, но не используются.
 }
 
 void GlobalData::cpm_loop() {
@@ -338,21 +407,21 @@ void GlobalData::cpm_loop() {
 
 			Protocol_RLS_Mini::KTA_VO msg;
 			static uint32_t n_kta = 0;
-			msg.n = static_cast<uint16_t>(n_kta++);
+			msg.n                 = static_cast<uint16_t>(n_kta++);
 			msg.setT(cpm_rr.get_compensated_time());
 			msg.setDegreesAz(target.az);
 			msg.setDegreesUm(target.um);
 			msg.setDistance(target.distance);
 			msg.setVelocity(target.vr);
-			msg.amp = 20;
-			msg.sp = 10;
+			msg.amp   = 20;
+			msg.sp    = 10;
 			msg.porog = 10;
 
 
-			msg.tn0  = 0;
-			msg.tn1  = 0;
-			msg.dum0 = 1;
-			msg.dum1 = 1;
+			msg.tn0   = 0;
+			msg.tn1   = 0;
+			msg.dum0  = 1;
+			msg.dum1  = 1;
 			piCout << msg;
 
 			global->sendMessage(msg);
@@ -531,10 +600,10 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	ans.sp    = targ.sp;
 	ans.amp   = targ.amp;
 	ans.vr    = targ.vr;
-	ans.dum0   = targ.dum;
-	ans.tn0    = targ.tn;
-	ans.dum1   = targ.dum;
-	ans.tn1    = targ.tn;
+	ans.dum0  = targ.dum;
+	ans.tn0   = targ.tn;
+	ans.dum1  = targ.dum;
+	ans.tn1   = targ.tn;
 	global->sendMessage(ans);
 }
 

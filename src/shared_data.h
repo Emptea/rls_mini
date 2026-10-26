@@ -100,6 +100,7 @@ private:
 
 	void write_dump_hex(const char * filename) const;
 	void u220_recv();
+	void process_work_pac(const uint32_t *buffer);
 
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
