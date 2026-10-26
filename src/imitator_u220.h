@@ -40,7 +40,11 @@ public:
 
 	// Angle in degrees, rotation speed in degrees per second.
 	// Zero speed holds the specified angle.
-	void set_opu(double angle_degrees, double speed_degps = 0.0);
+	void set_opu(double angle_degrees, double Simulator = 0.0);
+	float get_opu_az();
+	float get_opu_azago(double ago_sec);
+	float get_opu_speed_degps();
+	bool is_opu_running() const { return opu_speed_degps_ > 0.0; }
 	void apply(double delay_seconds);
 
 private:
@@ -58,6 +62,8 @@ private:
 	static constexpr double CLOCK_RATE = 40e6;
 
 	U220Group & group_;
+	// bool opu_running_       = false;
+	double opu_speed_degps_ = 0.0;
 
 	static double attenuation_to_rcs(double attenuation_db);
 	static uint32_t velocity_to_phase(int16_t velocity_mps);

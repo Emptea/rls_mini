@@ -165,8 +165,8 @@ void ImitatorU220::set_amplitude(const std::array<double, 4> & target_um,
 void ImitatorU220::set_opu(double angle_degrees, double speed_degps) {
 	if (!std::isfinite(angle_degrees) || !std::isfinite(speed_degps)) throw std::invalid_argument("OPU angle and speed must be finite");
 
-	double wrapped = std::fmod(angle_degrees, 360.0);
-
+	double wrapped   = std::fmod(angle_degrees, 360.0);
+	opu_speed_degps_ = speed_degps;
 	if (wrapped < 0.0) wrapped += 360.0;
 
 	const uint16_t start              = static_cast<uint16_t>(wrapped * (4096.0 / 360.0));
@@ -181,6 +181,24 @@ void ImitatorU220::set_opu(double angle_degrees, double speed_degps) {
 	for (const auto board_index: group_.active_boards()) {
 		group_.fpga(board_index)->set_rx_playback_dn_counter(start, static_cast<int32_t>(rounded_step));
 	}
+}
+
+float ImitatorU220::get_opu_az() {
+	auto status  = group_.fpga(0)->get_rx_playback_status(0, 0);
+	// opu_running_ = status.playing;
+	auto az      = status.getDnDeg();
+	return az;
+}
+
+float ImitatorU220::get_opu_azago(double ago_sec) {
+	auto status  = group_.fpga(0)->get_rx_playback_status(0, 0);
+	// opu_running_ = status.playing;
+	auto cur_az  = status.getDnDeg();
+	auto az_ago  = cur_az - opu_speed_degps_ * ago_sec;
+	az_ago       = std::fmod(az_ago, 360.0);
+	if (az_ago < 0.0) az_ago += 360.0;
+
+	return az_ago;
 }
 
 void ImitatorU220::set_params(const std::array<double, 4> & target_az,

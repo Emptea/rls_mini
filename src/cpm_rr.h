@@ -1,5 +1,6 @@
 #pragma once
 
+#include "imitator_u220.h"
 #include "techlaser.h"
 
 #include <atomic>
@@ -25,7 +26,9 @@ public:
 		Unknown   = 3  // Состояние не определено
 	};
 
-	explicit CpmRr(Techlaser & techlaser): techlaser(techlaser) { set_current_time(0.0); }
+	explicit CpmRr(Techlaser & techlaser, ImitatorU220 & imitator_u220): techlaser(techlaser), imitator_u220(imitator_u220) {
+		set_current_time(0.0);
+	}
 	~CpmRr() {}
 	CpmRr(const CpmRr &)             = delete;
 	CpmRr & operator=(const CpmRr &) = delete;
@@ -34,28 +37,43 @@ public:
 	// KUVR — последняя полученная команда управления вращением
 	// VR — фактическое состояние вращения антенны
 	RotationState get_vr() const {
+		if (use_imit_opu) return imitator_u220.is_opu_running() ? RotationState::Simulator : RotationState::Off;
+
 		const auto state = techlaser.getState();
 
-		if (state.motor_error || state.motor_status == Techlaser::MotorStatus::Invalid) return RotationState::Unknown;
+		if (state.motor_error) return RotationState::Unknown;
 
 		switch (state.motor_status) {
 		case Techlaser::MotorStatus::Starting:
 		case Techlaser::MotorStatus::Rotating:
 		case Techlaser::MotorStatus::Braking:
 		case Techlaser::MotorStatus::Stopping: return RotationState::On;
+
 		case Techlaser::MotorStatus::Idle:
 		case Techlaser::MotorStatus::Hold: return RotationState::Off;
 
 		default: return RotationState::Unknown;
 		}
 	}
+
 	RotationCommand get_kuvr() const { return kuvr; }
 	void set_vr(RotationCommand value) {
 		kuvr = value;
 		switch (value) {
-		case RotationCommand::Off: techlaser.stop(); break;
-		case RotationCommand::On: techlaser.start(180.f); break;
-		case RotationCommand::Simulator: break;
+		case RotationCommand::Off: {
+			techlaser.stop();
+			imitator_u220.set_opu(0, 0);
+			imitator_u220.apply(0);
+		} break;
+		case RotationCommand::On: {
+			use_imit_opu = false;
+			techlaser.start(180.f);
+		} break;
+		case RotationCommand::Simulator: {
+			use_imit_opu = true;
+			imitator_u220.set_opu(0, 180);
+			imitator_u220.apply(0);
+		} break;
 		default: break;
 		}
 	}
@@ -101,11 +119,25 @@ public:
 	double get_compensated_time() const { return get_current_time() - signal_processing_delay; }
 	void set_signal_processing_delay(double value) { signal_processing_delay = value; }
 
-	float get_current_az() const { return techlaser.getAngleCurrent() + daz; }
-	float get_compensated_az() const { return techlaser.getAngleAgo(PISystemTime::fromSeconds(signal_processing_delay)) + daz; }
+	float get_current_az() const {
+		auto az = use_imit_opu ? imitator_u220.get_opu_az() : techlaser.getAngleCurrent();
+		az += daz;
+		az = std::fmod(az, 360.0);
+		if (az < 0.0) az += 360.0;
+		return az;
+	}
+	float get_compensated_az() const {
+		auto az = use_imit_opu ? imitator_u220.get_opu_azago(signal_processing_delay)
+		                       : techlaser.getAngleAgo(PISystemTime::fromSeconds(signal_processing_delay));
+		az += daz;
+		az = std::fmod(az, 360.0);
+		if (az < 0.0) az += 360.0;
+		return az;
+	}
 
 private:
 	Techlaser & techlaser;
+	ImitatorU220 & imitator_u220;
 
 	RotationCommand kuvr = RotationCommand::Off; // Последняя команда вращения
 	RotationState vr     = RotationState::Off;   // Текущее состояние вращения
@@ -113,6 +145,9 @@ private:
 	bool kuizl           = false; // Последняя команда излучения
 	bool izl             = false; // Текущее состояние излучения
 	bool ant             = false; // Состояние подключения антенны
+
+	bool use_imit_opu    = false;
+	bool is_imit_opu_run = false;
 
 	uint8_t ispr_kan     = 0; // Исправность приёмных каналов
 

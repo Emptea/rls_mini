@@ -119,7 +119,7 @@ private:
 	uint16_t req_test_channel = 0;
 
 	Techlaser techlaser;
-	CpmRr cpm_rr{techlaser};
+	CpmRr cpm_rr{techlaser, imitator_u220};
 	CpmPoi cpm_poi{cfg.dma_enabled};
 	CpmCit cpm_cit;
 
