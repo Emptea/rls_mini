@@ -33,11 +33,11 @@ void UserU220::write_reg(WrReg reg, uint32_t value, bool log) {
 	user_regs->poke32(addr, value);
 
 	if (log && reg_logger_) {
-		reg_logger_->log(board_index_, addr, value);
+		reg_logger_->log(board_index_, UserRegLogger::Operation::Write, addr, value);
 	}
 }
 
-uint64_t UserU220::read_reg(RdReg reg) {
+uint64_t UserU220::read_reg(RdReg reg, bool log) {
 	auto user_regs = usrp_->get_user_settings_iface();
 
 	if (!user_regs) {
@@ -46,6 +46,10 @@ uint64_t UserU220::read_reg(RdReg reg) {
 
 	const uint32_t addr  = reg_addr(reg);
 	const uint64_t value = user_regs->peek64(addr);
+
+	if (log && reg_logger_) {
+		reg_logger_->log(board_index_, UserRegLogger::Operation::Read, addr, value);
+	}
 
 	// std::cout << "Read reg 0x" << std::hex << std::setw(4) << std::setfill('0') << addr << ": 0x" << std::setw(16) << std::setfill('0')
 	// 		  << value << std::dec << std::endl;
@@ -59,12 +63,12 @@ void UserU220::write_rx_playback_reg(size_t channel, RxPlaybackReg reg, uint32_t
 	write_reg(static_cast<WrReg>(32 + 32 * channel + offset), value, log);
 }
 
-uint64_t UserU220::read_rx_playback_reg(size_t channel, RxPlaybackReg reg) {
+uint64_t UserU220::read_rx_playback_reg(size_t channel, RxPlaybackReg reg, bool log) {
 	const uint32_t offset = static_cast<uint32_t>(reg);
 	if (channel >= 2 || offset >= 32 || (offset >= 4 && offset < 8) || (offset >= 24 && offset < 28))
 		throw std::out_of_range("Invalid RX playback readback slot");
 
-	return read_reg(static_cast<RdReg>(32 + 32 * channel + offset));
+	return read_reg(static_cast<RdReg>(32 + 32 * channel + offset), log);
 }
 
 void UserU220::write_play_ctrl() {
@@ -384,5 +388,12 @@ UserU220::RxPlaybackStatus UserU220::get_rx_playback_status(size_t radio, size_t
 
 	const uint64_t raw = read_rx_playback_reg(radio, reg);
 
-	return {bool(raw & 1), bool(raw & 2), static_cast<uint32_t>((raw >> 2) & 0xFFFFF)};
+	RxPlaybackStatus status;
+	status.sin        = static_cast<int16_t>(static_cast<uint16_t>(raw >> 48));
+	status.cos        = static_cast<int16_t>(static_cast<uint16_t>(raw >> 32));
+	status.dn_counter = static_cast<uint32_t>((raw >> 2) & 0xFFFFF);
+	status.playing    = (raw >> 1) & 1;
+	status.waiting    = raw & 1;
+
+	return status;
 }

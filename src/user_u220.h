@@ -65,14 +65,20 @@ public:
 	void set_rx_playback_dn(size_t radio, size_t playback, const std::array<int16_t, 4096> & samples);
 	void set_rx_playback_dn_offset(size_t radio, const std::array<uint32_t, 4> & values);
 	void set_rx_playback_dn_counter(uint16_t start, int32_t step);
-	
+
 	// Чтение состояния
 	uint16_t get_rx_playback_dn_counter_start();
 
 	struct RxPlaybackStatus {
-		bool waiting;
-		bool playing;
-		uint32_t dn_counter; // 20 бит, включая дробную часть
+		int16_t sin         = 0;     // [63:48] Синус поворота
+		int16_t cos         = 0;     // [47:32] Косинус поворота
+		uint32_t dn_counter = 0;     // [21:2] Amplitude2 counter, ЦМР 1/256 записи
+		bool playing        = false; // [1] Воспроизведение
+		bool waiting        = false; // [0] Ожидание задержки
+
+		double getDnDeg() const { return dn_counter * 360.0 / (1 << 20); }
+		double getSin() const { return sin / 32768.0; }
+		double getCos() const { return cos / 32768.0; }
 	};
 
 	RxPlaybackStatus get_rx_playback_status(size_t radio, size_t playback);
@@ -175,8 +181,8 @@ private:
 
 	void write_reg(WrReg reg, uint32_t value, bool log = true);
 	void write_rx_playback_reg(size_t channel, RxPlaybackReg reg, uint32_t value, bool log = true);
-	uint64_t read_reg(RdReg reg);
-	uint64_t read_rx_playback_reg(size_t channel, RxPlaybackReg reg);
+	uint64_t read_reg(RdReg reg, bool log = true);
+	uint64_t read_rx_playback_reg(size_t channel, RxPlaybackReg reg, bool log = true);
 
 
 	void write_play_ctrl();

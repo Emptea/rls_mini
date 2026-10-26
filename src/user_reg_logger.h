@@ -18,14 +18,20 @@ public:
 	UserRegLogger(const UserRegLogger &)             = delete;
 	UserRegLogger & operator=(const UserRegLogger &) = delete;
 
-	void log(size_t board, uint32_t addr, uint32_t value);
+	enum class Operation : uint8_t {
+		Read,
+		Write
+	};
+
+	void log(size_t board, Operation operation, uint32_t addr, uint64_t value);
 
 private:
 	struct Entry {
 		std::chrono::system_clock::time_point timestamp;
 		size_t board;
+		Operation operation;
 		uint32_t addr;
-		uint32_t value;
+		uint64_t value;
 	};
 
 	void run();

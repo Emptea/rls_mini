@@ -38,17 +38,13 @@ UserRegLogger::~UserRegLogger() {
 	if (thread_.joinable()) thread_.join();
 }
 
-void UserRegLogger::log(size_t board, uint32_t addr, uint32_t value) {
+void UserRegLogger::log(size_t board, Operation operation, uint32_t addr, uint64_t value) {
 	const auto timestamp = std::chrono::system_clock::now();
-
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
-
 		if (stopping_) return;
-
-		queue_.push_back({timestamp, board, addr, value});
+		queue_.push_back({timestamp, board, operation, addr, value});
 	}
-
 	cv_.notify_one();
 }
 
@@ -68,16 +64,17 @@ void UserRegLogger::run() {
 
 		for (const auto & entry: entries) {
 			const auto us             = std::chrono::duration_cast<std::chrono::microseconds>(entry.timestamp.time_since_epoch()).count();
-
 			const std::time_t seconds = static_cast<std::time_t>(us / 1000000);
-			const auto millis = (us / 1000) % 1000;
-
+			const auto millis         = (us / 1000) % 1000;
 			std::tm tm{};
 			localtime_r(&seconds, &tm);
 
-			file_ << std::put_time(&tm, "%H:%M:%S") << '.' << std::setfill('0') << std::setw(3) << millis << " " << std::dec
-				  << entry.board << " W addr=0x" << std::hex << std::setw(8) << entry.addr << " value=0x" << std::setw(8) << entry.value
-				  << std::dec << '\n';
+			const char operation  = entry.operation == Operation::Read ? 'R' : 'W';
+			const int value_width = entry.operation == Operation::Read ? 16 : 8;
+
+			file_ << std::put_time(&tm, "%H:%M:%S") << '.' << std::setfill('0') << std::setw(3) << millis << " " << std::dec << entry.board
+				  << " " << operation << " addr=0x" << std::hex << std::setw(8) << entry.addr << " value=0x" << std::setw(value_width)
+				  << entry.value << std::dec << '\n';
 		}
 	}
 
