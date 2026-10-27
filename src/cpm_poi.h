@@ -42,12 +42,12 @@ public:
 	}
 
 	// APU — пороги обнаружения
-	uint32_t get_apu_k1() const {
+	double get_apu_k1() const {
 		if (!dma_enabled) return apu_k1;
 		return apu_k1;
 		// return axi_dsp_get_detector_level(0);
 	}
-	uint32_t get_apu_k2() const {
+	double get_apu_k2() const {
 		if (!dma_enabled) return apu_k2;
 		return apu_k2;
 		// return axi_dsp_get_detector_level(1);
@@ -130,8 +130,8 @@ private:
 	uint16_t dsa_vr_n = 0;
 	uint16_t dsa_vr_k = 0;
 
-	uint32_t apu_k1   = 0;
-	uint32_t apu_k2   = 0;
+	double apu_k1   = 36;
+	double apu_k2   = 0;
 
 	uint8_t zona_k1   = 0;
 	uint16_t zona_k2  = 0;

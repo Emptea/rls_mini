@@ -96,7 +96,7 @@ void GlobalData::init() {
 		axi_dsp_init();
 		axi_dsp_configure();
 		axi_dsp_set_expect_u220_del(cfg.rx_insert_count);
-		axi_dsp_set_output_source(1, 0, 0);
+		axi_dsp_set_output_source(0, 0, 0);
 		auto v = axi_dsp_get_output_source();
 		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE;
 		axi_dsp_set_channel_mask((uint32_t)cpm_rr.get_ispr_kan());
@@ -137,6 +137,7 @@ void GlobalData::start() {
 	}
 
 	imitator_u220.set_params(targets);
+	imitator_u220.set_opu(0.0, 0.0);
 	imitator_u220.apply(0.0);
 
 	auto start_time = u220_group.board(u220_group.active_boards()[0])->get_usrp()->get_time_now();
@@ -327,51 +328,74 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 	static_assert(sizeof(rls::work_packet) == 16, "Invalid work_packet size");
 	static_assert(BUFFER_SIZE >= work_header_size, "DMA buffer too small");
 
-	// Общий заголовок
-	const auto * hdr                  = reinterpret_cast<const rls::header *>(buffer);
+	struct rls::header * hdr          = (rls::header *)buffer;
+	struct rls::work_posthdr * work   = (struct rls::work_posthdr *)(hdr + 1);
+	struct rls::work_packet * packets = reinterpret_cast<struct rls::work_packet *>(work + 1);
+	auto nes                          = work->n_work_packets;
+	auto time_delayed                 = static_cast<uint32_t>(std::round((double)(hdr->packet_number - work->packet_number) * 46.4e-3));
+	static uint16_t n_taget           = 0;
+	for (size_t i = 0; i < nes; i++) {
+		struct rls::work_packet & packet = packets[i];
+		struct target targ;
+		targ.n                                   = n_taget++;
+		targ.time                                = cpm_rr.get_compensated_time();
+		targ.az                                  = cpm_rr.get_compensated_az();
 
-	const uint32_t del_high           = hdr->del_high;
-	const uint32_t del_low            = hdr->del_low;
-	const uint32_t packet_number      = hdr->packet_number;
-	const uint64_t timestamp          = hdr->timestamp;
-	const uint32_t channel            = hdr->channel;
-	const uint32_t range              = hdr->range;
-	const uint32_t tp                 = hdr->tp;
+		auto um_idx                              = packet.main_diagram_number;
+		constexpr std::array<float, 8> um_values = {
+			5.3125f,
+			15.9375f,
+			26.5625f,
+			37.1875f,
+			47.8125f,
+			58.4375f,
+			69.0625f,
+			79.6875f,
+		};
+		// targ.um        = (double)111packet.main_amplitude / (double)packet.neighbor_amplitude;
+		targ.um        = um_values[um_idx];
+		auto range_idx = packet.range;
+		// TODO: перенести в константы
+		size_t tx_sig_len;
+		if (range_idx < 101) {
+			tx_sig_len = 40;
+		} else {
+			tx_sig_len = 6;
+		}
+		double range                       = (range_idx + tx_sig_len / 2) / 5e6 * 299792458.0 / 2;
+		targ.d                             = range;
+		targ.porog                         = packet.rank_out * cpm_poi.get_apu_k1();
+		targ.amp                           = (double)packet.main_amplitude;
 
-	// Заголовок рабочих данных
-	const auto * work                 = reinterpret_cast<const rls::work_posthdr *>(buffer + rls::HDR_SIZE);
+		constexpr double carrier_frequency = 3.6e9;
+		constexpr double c                 = 299792458.0;
+		constexpr double fft_size          = 512.0;
+		constexpr double pulse_period      = 46.4e-6;
+		const double wavelength            = c / carrier_frequency;
+		const double velocity_step         = wavelength / pulse_period / (2.0 * fft_size);
+		const uint32_t freq_idx            = packet.frequency_channel;
+		const int doppler_bin              = freq_idx < 256 ? -static_cast<int>(freq_idx) : 512 - static_cast<int>(freq_idx);
+		targ.vr                            = doppler_bin * velocity_step;
 
-	const uint32_t work_packet_number = work->packet_number;
-	const uint32_t n_work_packets     = work->n_work_packets;
+		send_KTA_VO(targ);
 
-	// Проверка количества обнаружений
-	constexpr size_t max_packets      = (BUFFER_SIZE - work_header_size) / sizeof(rls::work_packet);
-
-	if (n_work_packets > max_packets) {
-		fprintf(stderr, "Invalid WORK packet count: %u (max %zu)\n", n_work_packets, max_packets);
-		return;
+		printf("Target #%zu: "
+		       "range=%u, "
+		       "main_amplitude=%u, "
+		       "neighbor_amplitude=%u, "
+		       "main_diagram_number=%u, "
+		       "neighbor_diagram_side=%u, "
+		       "frequency_channel=%u, "
+		       "rank_out=%u\n",
+		       i + 1,
+		       static_cast<unsigned>(packet.range),
+		       packet.main_amplitude,
+		       packet.neighbor_amplitude,
+		       static_cast<unsigned>(packet.main_diagram_number),
+		       static_cast<unsigned>(packet.neighbor_diagram_side),
+		       static_cast<unsigned>(packet.frequency_channel),
+		       packet.rank_out);
 	}
-
-	// Массив обнаружений
-	const auto * packets = reinterpret_cast<const rls::work_packet *>(work + 1);
-
-	for (uint32_t i = 0; i < n_work_packets; ++i) {
-		const auto & packet                  = packets[i];
-
-		const uint32_t main_amplitude        = packet.main_amplitude;
-		const uint32_t neighbor_amplitude    = packet.neighbor_amplitude;
-		const uint32_t target_range          = packet.range;
-		const uint32_t main_diagram_number   = packet.main_diagram_number;
-		const uint32_t neighbor_diagram_side = packet.neighbor_diagram_side;
-		const uint32_t frequency_channel     = packet.frequency_channel;
-		const uint32_t padding               = packet.padding;
-		const uint32_t rank_out              = packet.rank_out;
-
-		// TODO: обработка одного обнаружения
-		// Здесь доступны все поля packet.
-	}
-
-	// Пока поля hdr и work извлечены, но не используются.
 }
 
 void GlobalData::cpm_loop() {
@@ -593,17 +617,13 @@ void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI &
 
 void GlobalData::send_KTA_VO(struct target targ) {
 	Protocol_RLS_Mini::KTA_VO ans;
-	ans.az = targ.az;
+	ans.n = targ.n;
+	ans.setT(targ.time);
+	ans.setDegreesAz(targ.az);
 	ans.setDegreesUm(targ.um);
-	ans.d     = targ.D;
-	ans.porog = targ.porog;
-	ans.sp    = targ.sp;
-	ans.amp   = targ.amp;
-	ans.vr    = targ.vr;
-	ans.dum0  = targ.dum;
-	ans.tn0   = targ.tn;
-	ans.dum1  = targ.dum;
-	ans.tn1   = targ.tn;
+	ans.setDistance(targ.d);
+	ans.setAmpPorogSp(targ.amp, targ.porog);
+	ans.setVelocity(targ.vr);
 	global->sendMessage(ans);
 }
 

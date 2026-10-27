@@ -156,5 +156,5 @@ private:
 	float daz_poi        = 0.0f; // Азимутальная поправка ПОИ, градусы
 
 	std::atomic<double> time_offset{0.0};
-	std::atomic<double> signal_processing_delay{0.01};
+	std::atomic<double> signal_processing_delay{0.0239424}; // (paramRLSmini.N_ddr/2+paramRLSmini.M_az/2*paramRLSmini.frqScl)*paramRLSmini.pulsePeriod
 };

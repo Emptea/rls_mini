@@ -100,7 +100,7 @@ private:
 
 	void write_dump_hex(const char * filename) const;
 	void u220_recv();
-	void process_work_pac(const uint32_t *buffer);
+	void process_work_pac(const uint32_t * buffer);
 
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
@@ -125,23 +125,14 @@ private:
 	CpmCit cpm_cit;
 
 	struct target {
-		uint16_t n     = 0;
-		uint32_t time  = 0;
-		double az      = 0;
-		int16_t um     = 0; // Угол места
-		uint16_t D     = 0; // Дальность, 1 м
-		uint16_t porog = 0; // Порог обнаружения, 0.5 дБ
-		uint16_t sp    = 0; // Отношение сигнал/порог, 0.5 дБ
-		uint16_t amp   = 0; // Амплитуда сигнала цели, 0.5 дБ
-		int16_t vr     = 0; // Радиальная скорость, 1 м/с
-		union {
-			uint8_t bits = 0;
-			struct {
-				uint8_t _reserve0: 6;
-				uint8_t tn       : 1; // Признак тренажной цели
-				uint8_t dum      : 1; // Признак достоверности измерения угла места цели
-			};
-		};
+		uint32_t n   = 0; // номер цели
+		double time  = 0; // время обнаружения
+		float az    = 0; // азимут цели. град
+		float um     = 0; // Угол места, град
+		float d      = 0; // Дальность, м
+		double amp   = 0; // Амплитуда сигнала цели, в ед АЦП
+		double porog = 0; // Порог обнаружения, в ед АЦП
+		float vr     = 0; // Радиальная скорость, 1 м/с
 	};
 
 	void send_KTA_VO(struct target targ);

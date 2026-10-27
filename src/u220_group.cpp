@@ -100,7 +100,8 @@ void U220Group::sync_ad9361() {
 	print_ad9361_ensm_states();
 	piCout << "AD9361: Complete sync";
 	piCout << "AD9361: Enable ext LO";
-	enable_external_lo_all();
+	// TODO: Добавить в конфиг
+	// enable_external_lo_all();
 }
 
 void U220Group::generate_ad9361_sync_in() {

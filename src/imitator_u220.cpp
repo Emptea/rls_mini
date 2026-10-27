@@ -26,7 +26,7 @@ uint32_t ImitatorU220::velocity_to_phase(int16_t velocity_mps) {
 
 	const double phase_turns  = -2.0 * velocity_mps * FREQ * period_s / LIGHT_SPEED;
 
-	const int64_t phase_units = std::llround(phase_turns * 4294967296.0);
+	const int32_t phase_units = std::lround(phase_turns * 4294967296.0);
 
 	return static_cast<uint32_t>(phase_units);
 }
@@ -60,23 +60,13 @@ std::complex<int16_t> ImitatorU220::calc_amplitude(uint16_t distance_m, size_t c
 }
 
 void ImitatorU220::set_distance(const std::array<double, 4> & target_dist) {
-	std::array<uint16_t, 4> distances{};
-
-	for (size_t k = 0; k < 4; ++k) {
-		if (!std::isfinite(target_dist[k]) || target_dist[k] < 0.5 || target_dist[k] >= 65535.5)
-			throw std::out_of_range("Target distance must round to 1..65535 metres");
-
-		distances[k] = static_cast<uint16_t>(std::llround(target_dist[k]));
-	}
-
 	std::array<uint32_t, 4> delays{};
-
 	for (size_t k = 0; k < 4; ++k) {
-		const double bias = (2.0 * distances[k] / LIGHT_SPEED) * CLOCK_RATE;
+		const double bias = (2.0 * target_dist[k] / LIGHT_SPEED) * CLOCK_RATE;
 
 		if (!std::isfinite(bias) || bias < 0.0 || bias >= 65535.5) throw std::out_of_range("RX playback delay exceeds 16 bits");
 
-		uint32_t delay = static_cast<uint32_t>(std::llround(bias));
+		uint32_t delay = static_cast<uint32_t>(std::lround(bias));
 
 		if (k < 2)
 			delay -= SAMPLES_FAR * 4;
@@ -97,8 +87,9 @@ void ImitatorU220::set_distance(const std::array<double, 4> & target_dist) {
 void ImitatorU220::set_velocity(const std::array<int16_t, 4> & target_vel) {
 	std::array<uint32_t, 4> phases{};
 
-	for (size_t k = 0; k < 4; ++k)
+	for (size_t k = 0; k < 4; ++k) {
 		phases[k] = velocity_to_phase(target_vel[k]);
+	}
 
 	for (const auto board_index: group_.active_boards()) {
 		auto * fpga = group_.fpga(board_index);
@@ -146,17 +137,19 @@ void ImitatorU220::set_amplitude(const std::array<double, 4> & target_um,
 		distances[k]  = static_cast<uint16_t>(std::llround(target_dist[k]));
 	}
 
-	for (size_t radio = 0; radio < 2; ++radio) {
-		std::array<uint32_t, 4> amplitudes{};
+	for (const auto board_index: group_.active_boards()) {
+		for (size_t radio = 0; radio < 2; ++radio) {
+			std::array<uint32_t, 4> amplitudes{};
 
-		for (size_t k = 0; k < 4; ++k) {
-			const auto amplitude = calc_amplitude(distances[k], radio + 1, elevations[k], target_osl[k]);
+			const size_t channel = 2 * board_index + radio + 1;
 
-			amplitudes[k] =
-				static_cast<uint16_t>(amplitude.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(amplitude.imag())) << 16);
-		}
+			for (size_t k = 0; k < 4; ++k) {
+				const auto amplitude = calc_amplitude(distances[k], channel, elevations[k], target_osl[k]);
 
-		for (const auto board_index: group_.active_boards()) {
+				amplitudes[k] =
+					static_cast<uint16_t>(amplitude.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(amplitude.imag())) << 16);
+			}
+
 			group_.fpga(board_index)->set_rx_playback_amplitude(radio, amplitudes);
 		}
 	}
@@ -184,18 +177,18 @@ void ImitatorU220::set_opu(double angle_degrees, double speed_degps) {
 }
 
 float ImitatorU220::get_opu_az() {
-	auto status  = group_.fpga(0)->get_rx_playback_status(0, 0);
+	auto status = group_.fpga(0)->get_rx_playback_status(0, 0);
 	// opu_running_ = status.playing;
-	auto az      = status.getDnDeg();
+	auto az     = status.getDnDeg();
 	return az;
 }
 
 float ImitatorU220::get_opu_azago(double ago_sec) {
-	auto status  = group_.fpga(0)->get_rx_playback_status(0, 0);
+	auto status = group_.fpga(0)->get_rx_playback_status(0, 0);
 	// opu_running_ = status.playing;
-	auto cur_az  = status.getDnDeg();
-	auto az_ago  = cur_az - opu_speed_degps_ * ago_sec;
-	az_ago       = std::fmod(az_ago, 360.0);
+	auto cur_az = status.getDnDeg();
+	auto az_ago = cur_az - opu_speed_degps_ * ago_sec;
+	az_ago      = std::fmod(az_ago, 360.0);
 	if (az_ago < 0.0) az_ago += 360.0;
 
 	return az_ago;

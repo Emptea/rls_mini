@@ -395,7 +395,7 @@ public:
 		uint16_t amp   = 0; // Амплитуда сигнала цели, 0.5 дБ
 		int16_t vr     = 0; // Радиальная скорость, 1 м/с
 		union {
-			uint16_t bits = 0;
+			uint16_t bits = 0x8080; // dum0 = 1, dum1 = 1
 			struct {
 				uint16_t resv0: 6;
 				uint16_t tn0  : 1; // Признак тренажной цели
@@ -415,9 +415,14 @@ public:
 			t_lsw      = uint16_t(t);
 		}
 		void setDistance(float v) { d = uint16_t(std::roundl(v)); }
-		float getDistance() const { return d * degLSB; }
+		float getDistance() const { return d; }
 		void setVelocity(float v) { vr = int16_t(std::roundl(v)); }
-		float getVelocity() const { return vr * degLSB; }
+		float getVelocity() const { return vr; }
+		void setAmpPorogSp(double v_amp, double v_porog) {
+			amp   = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v_amp)));
+			porog = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v_porog)));
+			sp    = amp - porog;
+		}
 	};
 
 

@@ -386,7 +386,7 @@ UserU220::RxPlaybackStatus UserU220::get_rx_playback_status(size_t radio, size_t
 
 	const auto reg     = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::SAMPLE_MEM) + playback);
 
-	const uint64_t raw = read_rx_playback_reg(radio, reg);
+	const uint64_t raw = read_rx_playback_reg(radio, reg, false);
 
 	RxPlaybackStatus status;
 	status.sin        = static_cast<int16_t>(static_cast<uint16_t>(raw >> 48));

@@ -49,8 +49,8 @@ public:
 
 private:
 	static constexpr double LIGHT_SPEED = 299792458.0;
-	static constexpr double LAMBDA      = 0.032480222968581;
-	static constexpr double FREQ        = 9.23e9;
+	static constexpr double LAMBDA      = 0.0832756827777778;
+	static constexpr double FREQ        = 3.6e9;
 	static constexpr double PT          = 80.0;
 	static constexpr double GAIN_IF     = 3162.2776601683795;
 	static constexpr double GAIN_SDR    = 10000000.0;
@@ -59,7 +59,7 @@ private:
 	static constexpr int N_CHANNELS     = 8;
 	static constexpr double ANT_DIST    = LAMBDA / 2.0;
 	static const double ENERGY_CONST;
-	static constexpr double CLOCK_RATE = 40e6;
+	static constexpr double CLOCK_RATE = 20e6;
 
 	U220Group & group_;
 	// bool opu_running_       = false;
