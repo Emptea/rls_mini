@@ -14,6 +14,11 @@ public:
 		uint16_t vr_k;
 	};
 
+	enum class ZoneCalcStage : uint16_t {
+		BeforeLou = 0,
+		AfterLou  = 1,
+	};
+
 	explicit CpmPoi(bool dma_enabled): dma_enabled(dma_enabled) {}
 
 	// SDC — селекция движущихся целей
@@ -62,17 +67,18 @@ public:
 	}
 
 	// ZONA — параметры расчёта зоны
-	uint8_t get_zona_k1() const { return zona_k1; }
-	uint16_t get_zona_k2() const { return zona_k2; }
 
-	void set_zona_k(uint8_t k1, uint16_t k2) {
-		zona_k1 = k1;
-		zona_k2 = k2;
+
+	void set_zona_params(ZoneCalcStage stage, uint16_t ch_num) {
+		zona_stage  = stage;
+		zona_ch_num = ch_num;
 	}
 
-	// TODO: что это как считать?
-	double set_zona_val(double val_sq) { zona_val_sq_ = val_sq; }
-	double get_zona_val() const { return zona_val_sq_; }
+	ZoneCalcStage get_zona_stage() const { return zona_stage; }
+	uint16_t get_zona_ch_num() const { return zona_ch_num; }
+
+	void set_zona_val(const uint32_t (&data)[2][8]) { zona_val_sq = data[static_cast<size_t>(zona_stage)][zona_ch_num]; }
+	double get_zona_val() const { return zona_val_sq; }
 
 	// TODO: где считать? Нужен ли Set?
 	uint16_t get_nes() const { return 0; }
@@ -94,19 +100,19 @@ public:
 
 	// Штатные настройки ПОИ
 	void set_shtat() {
-		sdc       = true;
-		dsa_is_on = false;
+		sdc         = true;
+		dsa_is_on   = false;
 
-		kan       = 0xFF;
+		kan         = 0xFF;
 
-		dsa_vr_n  = 0;
-		dsa_vr_k  = 0;
+		dsa_vr_n    = 0;
+		dsa_vr_k    = 0;
 
-		apu_k1    = 36;
-		apu_k2    = 0;
+		apu_k1      = 36;
+		apu_k2      = 0;
 
-		zona_k1   = 0;
-		zona_k2   = 0;
+		zona_stage  = ZoneCalcStage::BeforeLou;
+		zona_ch_num = 0;
 
 		if (!dma_enabled) return;
 
@@ -121,21 +127,21 @@ public:
 	void set_dma_enabled(bool value) { dma_enabled = value; }
 
 private:
-	bool dma_enabled    = false;
+	bool dma_enabled         = false;
 
-	bool sdc            = false;
-	bool dsa_is_on      = false;
+	bool sdc                 = false;
+	bool dsa_is_on           = false;
 
-	uint8_t kan         = 0;
+	uint8_t kan              = 0;
 
-	uint16_t dsa_vr_n   = 0;
-	uint16_t dsa_vr_k   = 0;
+	uint16_t dsa_vr_n        = 0;
+	uint16_t dsa_vr_k        = 0;
 
-	double apu_k1       = 36;
-	double apu_k2       = 0;
+	double apu_k1            = 36;
+	double apu_k2            = 0;
 
 
-	uint8_t zona_k1     = 0;
-	uint16_t zona_k2    = 0;
-	double zona_val_sq_ = 1.0;
+	ZoneCalcStage zona_stage = ZoneCalcStage::BeforeLou;
+	uint16_t zona_ch_num     = 0;
+	double zona_val_sq       = 1.0;
 };

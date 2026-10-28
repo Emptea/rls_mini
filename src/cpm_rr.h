@@ -147,7 +147,6 @@ private:
 	bool ant             = false; // Состояние подключения антенны
 
 	bool use_imit_opu    = false;
-	bool is_imit_opu_run = false;
 
 	uint8_t ispr_kan     = 0; // Исправность приёмных каналов
 

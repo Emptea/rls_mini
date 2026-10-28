@@ -138,7 +138,9 @@ void GlobalData::start() {
 	}
 
 	imitator_u220.set_params(targets);
-	imitator_u220.set_opu(0.0, 0.0);
+	// imitator_u220.set_opu(0.0, 0.0);
+	cpm_rr.set_vr(CpmRr::RotationCommand::Simulator);
+
 	imitator_u220.apply(0.0);
 
 	// 1_s .sleep();
@@ -380,24 +382,24 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		const int doppler_bin              = freq_idx < 256 ? -static_cast<int>(freq_idx) : 512 - static_cast<int>(freq_idx);
 		targ.vr                            = doppler_bin * velocity_step;
 
-		// send_KTA_VO(targ);
+		send_KTA_VO(targ);
 
-		// printf("Target #%zu: "
-		//        "range=%u, "
-		//        "main_amplitude=%u, "
-		//        "neighbor_amplitude=%u, "
-		//        "main_diagram_number=%u, "
-		//        "neighbor_diagram_side=%u, "
-		//        "frequency_channel=%u, "
-		//        "rank_out=%u\n",
-		//        i + 1,
-		//        static_cast<unsigned>(packet.range),
-		//        packet.main_amplitude,
-		//        packet.neighbor_amplitude,
-		//        static_cast<unsigned>(packet.main_diagram_number),
-		//        static_cast<unsigned>(packet.neighbor_diagram_side),
-		//        static_cast<unsigned>(packet.frequency_channel),
-		//        packet.rank_out);
+		printf("Target #%zu: "
+		       "range=%u, "
+		       "main_amplitude=%u, "
+		       "neighbor_amplitude=%u, "
+		       "main_diagram_number=%u, "
+		       "neighbor_diagram_side=%u, "
+		       "frequency_channel=%u, "
+		       "rank_out=%u\n",
+		       i + 1,
+		       static_cast<unsigned>(packet.range),
+		       packet.main_amplitude,
+		       packet.neighbor_amplitude,
+		       static_cast<unsigned>(packet.main_diagram_number),
+		       static_cast<unsigned>(packet.neighbor_diagram_side),
+		       static_cast<unsigned>(packet.frequency_channel),
+		       packet.rank_out);
 	}
 }
 
@@ -654,8 +656,8 @@ Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 	else
 		piCout << "Error: apu_k2 == 0";
 
-	kvit.zona_k1 = cpm_poi.get_zona_k1();
-	kvit.zona_k2 = cpm_poi.get_zona_k2();
+	kvit.zona_k1 = static_cast<uint16_t>(cpm_poi.get_zona_stage());
+	kvit.zona_k2 = cpm_poi.get_zona_ch_num();
 
 	return kvit;
 }
@@ -733,7 +735,11 @@ void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 	piCout << "rec msg" << "received_POI_Zona";
 	piCout << msg;
-	cpm_poi.set_zona_k(msg.k1, msg.k2);
+	if (msg.k1 <= 1 && msg.k2 <= 7) {
+		cpm_poi.set_zona_params(static_cast<CpmPoi::ZoneCalcStage>(msg.k1), msg.k2);
+	} else {
+		piCout << "Error: k1 =" << msg.k1 << "; k2 =" << msg.k2;
+	}
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
