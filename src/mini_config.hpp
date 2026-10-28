@@ -27,20 +27,21 @@ public:
 	std::array<uint32_t, CHANNEL_COUNT> rx_adc_delay{};
 	std::array<uint32_t, CHANNEL_COUNT> rx_en_delay{};
 	std::array<bool, CHANNEL_COUNT> use_ext_file_sg{};
-	uint32_t tx_gpio_enable     = 0;
-	uint32_t rx_gpio_enable     = 0;
-	uint32_t rx_insert_count    = 0;
+	uint32_t tx_gpio_enable   = 0;
+	uint32_t rx_gpio_enable   = 0;
+	uint32_t rx_insert_count  = 0;
 
-	uint32_t pps_dead_zone_ms   = 0;
+	uint32_t pps_dead_zone_ms = 0;
 
-	bool dma_enabled            = false;
+	bool use_ext_lo           = true;
+	bool dma_enabled          = false;
 
 	std::array<double, TARGET_COUNT> target_az{};
 	std::array<double, TARGET_COUNT> target_um{};
 	std::array<double, TARGET_COUNT> target_dist{};
 	std::array<int16_t, TARGET_COUNT> target_vel{};
 	std::array<double, TARGET_COUNT> target_osl{};
-	double opu_az               = 0.0;
+	double opu_az = 0.0;
 	std::array<bool, TARGET_COUNT> imitator_target_en{};
 	std::array<bool, CHANNEL_COUNT> imitator_channels_en{};
 

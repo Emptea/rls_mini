@@ -204,6 +204,7 @@ void MiniConfig::load_settings() {
 	rx_gpio_enable    = get_uint("rx", "gpio_enable");
 	rx_insert_count   = get_uint("rx", "insert_count");
 	pps_dead_zone_ms  = get_uint("sync", "pps_dead_zone_ms");
+	use_ext_lo        = get_uint("sync", "use_ext_lo") == 1;
 	dma_enabled       = get_uint("dma", "enable") == 1;
 	const auto values = get_uint_array("tx", "use_ext_file_sg");
 	for (size_t ch = 0; ch < CHANNEL_COUNT; ++ch) {
@@ -375,13 +376,13 @@ void MiniConfig::load_imitator() {
 		}
 		return it->second;
 	};
-	const auto parse     = [](const std::string & text) {
-        size_t end         = 0;
-        const double value = std::stod(text, &end);
-        if (text.find_first_not_of(" \t\r\n", end) != std::string::npos || !std::isfinite(value)) {
-            throw std::runtime_error("Invalid imitator value: " + text);
-        }
-        return value;
+	const auto parse = [](const std::string & text) {
+		size_t end         = 0;
+		const double value = std::stod(text, &end);
+		if (text.find_first_not_of(" \t\r\n", end) != std::string::npos || !std::isfinite(value)) {
+			throw std::runtime_error("Invalid imitator value: " + text);
+		}
+		return value;
 	};
 	const auto load_targets = [&](const std::string & key, std::array<double, TARGET_COUNT> & values) {
 		std::istringstream stream(get_value(key));
