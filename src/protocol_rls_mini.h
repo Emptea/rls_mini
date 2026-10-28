@@ -202,9 +202,9 @@ public:
 		static constexpr int16_t Type = 2;
 		static constexpr int16_t Code = 4;
 		POI_Zona(): Header(Type, Code) {}
-		uint8_t k1 = 0; // Код строба расчета зоны
+		uint8_t k1 = 0; // Код строба расчета зоны: 0 – в каналах (перед алгоритмом ЛОУ), 1 – в лучах (после алгоритма ЛОУ)
 		uint8_t _reserve;
-		uint16_t k2 = 0; // Код канала расчета зоны
+		uint16_t k2 = 0; // Код канала расчёта зоны: номер канала/луча: 0…7
 	};
 
 

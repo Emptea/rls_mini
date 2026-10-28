@@ -65,16 +65,18 @@ public:
 	uint8_t get_zona_k1() const { return zona_k1; }
 	uint16_t get_zona_k2() const { return zona_k2; }
 
-	void set_zona(uint8_t k1, uint16_t k2) {
+	void set_zona_k(uint8_t k1, uint16_t k2) {
 		zona_k1 = k1;
 		zona_k2 = k2;
 	}
 
 	// TODO: что это как считать?
-	uint16_t get_zona() const { return 5555; }
+	double set_zona_val(double val_sq) { zona_val_sq_ = val_sq; }
+	double get_zona_val() const { return zona_val_sq_; }
 
 	// TODO: где считать? Нужен ли Set?
 	uint16_t get_nes() const { return 0; }
+	uint16_t set_nes() const { return 0; }
 
 
 	// KAN — маска подключённых каналов
@@ -111,7 +113,6 @@ public:
 		axi_dsp_set_compensation_mode(0);
 		axi_dsp_set_compensation_ref(uint32_t(1575));
 		axi_dsp_set_motion_selector(1, sdc);
-		// TODO непонятно в чем detector level
 		axi_dsp_set_detector_level(apu_k1, 0);
 		axi_dsp_set_detector_level(apu_k2, 1);
 		axi_dsp_set_channel_mask(kan);
@@ -120,19 +121,21 @@ public:
 	void set_dma_enabled(bool value) { dma_enabled = value; }
 
 private:
-	bool dma_enabled  = false;
+	bool dma_enabled    = false;
 
-	bool sdc          = false;
-	bool dsa_is_on    = false;
+	bool sdc            = false;
+	bool dsa_is_on      = false;
 
-	uint8_t kan       = 0;
+	uint8_t kan         = 0;
 
-	uint16_t dsa_vr_n = 0;
-	uint16_t dsa_vr_k = 0;
+	uint16_t dsa_vr_n   = 0;
+	uint16_t dsa_vr_k   = 0;
 
-	double apu_k1   = 36;
-	double apu_k2   = 0;
+	double apu_k1       = 36;
+	double apu_k2       = 0;
 
-	uint8_t zona_k1   = 0;
-	uint16_t zona_k2  = 0;
+
+	uint8_t zona_k1     = 0;
+	uint16_t zona_k2    = 0;
+	double zona_val_sq_ = 1.0;
 };

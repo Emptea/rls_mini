@@ -627,7 +627,7 @@ Protocol_RLS_Mini::PI GlobalData::set_PI() {
 	pi.setSeconds(cpm_rr.get_compensated_time());
 	pi.setDegreesAz(cpm_rr.get_compensated_az());
 
-	pi.zona = cpm_poi.get_zona();
+	pi.zona = cpm_poi.get_zona_val();
 	pi.nes  = cpm_poi.get_nes();
 
 	return pi;
@@ -722,7 +722,9 @@ void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 	piCout << "rec msg" << "received_POI_APU      ";
 	piCout << msg;
-	cpm_poi.set_apu(msg.getLevelk1(), msg.getLevelk2());
+	// TODO: msg.getLevelk2() - непонятно почему дБ если у нас шататно ноль
+	// а порог может быть нулем
+	cpm_poi.set_apu(msg.getLevelk1(), 0);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
@@ -731,7 +733,7 @@ void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 	piCout << "rec msg" << "received_POI_Zona";
 	piCout << msg;
-	cpm_poi.set_zona(msg.k1, msg.k2);
+	cpm_poi.set_zona_k(msg.k1, msg.k2);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
