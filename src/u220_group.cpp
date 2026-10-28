@@ -81,6 +81,7 @@ void U220Group::setup_one_board(size_t i) {
 
 		u->set_rx_playback_enable(channel, mask);
 	}
+	u->set_rx_playback_start_delay(253, 253);
 }
 
 void U220Group::reset_time(uint32_t value) {

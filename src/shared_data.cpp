@@ -95,6 +95,7 @@ void GlobalData::init() {
 	if (cfg.dma_enabled) {
 		axi_dsp_init();
 		axi_dsp_configure();
+		axi_dsp_set_compensation_mode(1);
 		axi_dsp_set_expect_u220_del(cfg.rx_insert_count);
 		axi_dsp_set_output_source(0, 0, 0);
 		auto v = axi_dsp_get_output_source();
@@ -139,6 +140,8 @@ void GlobalData::start() {
 	imitator_u220.set_params(targets);
 	imitator_u220.set_opu(0.0, 0.0);
 	imitator_u220.apply(0.0);
+
+	// 1_s .sleep();
 
 	auto start_time = u220_group.board(u220_group.active_boards()[0])->get_usrp()->get_time_now();
 	piCout << "TX start at" << start_time.get_full_secs();
@@ -377,24 +380,24 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		const int doppler_bin              = freq_idx < 256 ? -static_cast<int>(freq_idx) : 512 - static_cast<int>(freq_idx);
 		targ.vr                            = doppler_bin * velocity_step;
 
-		send_KTA_VO(targ);
+		// send_KTA_VO(targ);
 
-		printf("Target #%zu: "
-		       "range=%u, "
-		       "main_amplitude=%u, "
-		       "neighbor_amplitude=%u, "
-		       "main_diagram_number=%u, "
-		       "neighbor_diagram_side=%u, "
-		       "frequency_channel=%u, "
-		       "rank_out=%u\n",
-		       i + 1,
-		       static_cast<unsigned>(packet.range),
-		       packet.main_amplitude,
-		       packet.neighbor_amplitude,
-		       static_cast<unsigned>(packet.main_diagram_number),
-		       static_cast<unsigned>(packet.neighbor_diagram_side),
-		       static_cast<unsigned>(packet.frequency_channel),
-		       packet.rank_out);
+		// printf("Target #%zu: "
+		//        "range=%u, "
+		//        "main_amplitude=%u, "
+		//        "neighbor_amplitude=%u, "
+		//        "main_diagram_number=%u, "
+		//        "neighbor_diagram_side=%u, "
+		//        "frequency_channel=%u, "
+		//        "rank_out=%u\n",
+		//        i + 1,
+		//        static_cast<unsigned>(packet.range),
+		//        packet.main_amplitude,
+		//        packet.neighbor_amplitude,
+		//        static_cast<unsigned>(packet.main_diagram_number),
+		//        static_cast<unsigned>(packet.neighbor_diagram_side),
+		//        static_cast<unsigned>(packet.frequency_channel),
+		//        packet.rank_out);
 	}
 }
 
@@ -405,7 +408,8 @@ void GlobalData::cpm_loop() {
 
 	auto next             = clock::now();
 	auto previous_vr      = cpm_rr.get_vr();
-	uint8_t tick          = 0;
+	uint32_t tick         = 0;
+	uint32_t tick2        = 0;
 
 	while (!cpm_thread.isStopping()) {
 		// PI — 100 Гц
@@ -422,33 +426,15 @@ void GlobalData::cpm_loop() {
 				global->sendMessage(set_RR_Kvit());
 			}
 		}
-
-		// отправка иммитированных целей
-		const auto detections = cpm_cit.update_azimuth(cpm_rr.get_current_az());
-
-		for (const auto & detection: detections) {
-			const auto & target = detection.target;
-
-			Protocol_RLS_Mini::KTA_VO msg;
-			static uint32_t n_kta = 0;
-			msg.n                 = static_cast<uint16_t>(n_kta++);
-			msg.setT(cpm_rr.get_compensated_time());
-			msg.setDegreesAz(target.az);
-			msg.setDegreesUm(target.um);
-			msg.setDistance(target.distance);
-			msg.setVelocity(target.vr);
-			msg.amp   = 20;
-			msg.sp    = 10;
-			msg.porog = 10;
-
-
-			msg.tn0   = 0;
-			msg.tn1   = 0;
-			msg.dum0  = 1;
-			msg.dum1  = 1;
-			piCout << msg;
-
-			global->sendMessage(msg);
+		// Проверка stat — 1 Гц
+		if (++tick2 >= 100) {
+			tick2 = 0;
+			for (size_t i = 0; i < 4; i++) {
+				u220_group.fpga(i)->log_rx_playback_status(0);
+				u220_group.fpga(i)->log_rx_playback_status(1);
+				u220_group.fpga(i)->log_rx_playback_phase(0);
+				u220_group.fpga(i)->log_rx_playback_phase(1);
+			}
 		}
 
 		next += period;

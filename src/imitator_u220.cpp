@@ -105,7 +105,7 @@ void ImitatorU220::set_az(const std::array<double, 4> & target_az) {
 	for (size_t k = 0; k < 4; ++k) {
 		if (!std::isfinite(target_az[k])) throw std::invalid_argument("Target azimuth must be finite");
 
-		const double angle   = std::fmod(-target_az[k], 360.0);
+		const double angle   = std::fmod(target_az[k], 360.0);
 
 		const uint16_t fixed = static_cast<uint16_t>(std::llround(angle * (65536.0 / 360.0)));
 
@@ -227,28 +227,32 @@ void ImitatorU220::set_params(const std::array<TargetParams, 4> & targets) {
 }
 
 void ImitatorU220::apply(double delay_seconds) {
-	if (!std::isfinite(delay_seconds) || delay_seconds < 0.0)
-		throw std::invalid_argument("Imitator apply delay must be finite and non-negative");
+	// if (!std::isfinite(delay_seconds) || delay_seconds < 0.0)
+	// 	throw std::invalid_argument("Imitator apply delay must be finite and non-negative");
 
-	const auto & active_boards = group_.active_boards();
+	// const auto & active_boards = group_.active_boards();
 
-	if (active_boards.isEmpty()) return;
+	// if (active_boards.isEmpty()) return;
 
-	auto first_usrp       = group_.board(active_boards[0])->get_usrp();
-	const auto apply_time = first_usrp->get_time_now() + uhd::time_spec_t(delay_seconds);
+	// auto first_usrp       = group_.board(active_boards[0])->get_usrp();
+	// const auto apply_time = first_usrp->get_time_now() + uhd::time_spec_t(delay_seconds);
 
-	for (const auto board_index: active_boards) {
-		auto usrp = group_.board(board_index)->get_usrp();
+	// for (const auto board_index: active_boards) {
+	// 	auto usrp = group_.board(board_index)->get_usrp();
 
-		usrp->set_command_time(apply_time);
+	// 	usrp->set_command_time(apply_time);
 
-		try {
-			group_.fpga(board_index)->apply_rx_playback();
-		} catch (...) {
-			usrp->clear_command_time();
-			throw;
-		}
+	// 	try {
+	// 		group_.fpga(board_index)->apply_rx_playback();
+	// 	} catch (...) {
+	// 		usrp->clear_command_time();
+	// 		throw;
+	// 	}
 
-		usrp->clear_command_time();
+	// 	usrp->clear_command_time();
+	// }
+
+	for (const auto board_index: group_.active_boards()) {
+		group_.fpga(board_index)->apply_rx_playback();
 	}
 }

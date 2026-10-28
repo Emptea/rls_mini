@@ -322,6 +322,14 @@ void UserU220::set_rx_playback_phase(size_t radio, const std::array<uint32_t, 4>
 	}
 }
 
+void UserU220::log_rx_playback_phase(size_t radio) {
+	for (size_t k = 0; k < 4; ++k) {
+		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::PHASE) + k);
+
+		read_rx_playback_reg(radio, reg);
+	}
+}
+
 void UserU220::set_rx_playback_amplitude(size_t radio, const std::array<uint32_t, 4> & values) {
 	for (size_t k = 0; k < values.size(); ++k) {
 		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::AMPLITUDE) + k);
@@ -367,6 +375,12 @@ void UserU220::set_rx_playback_dn_offset(size_t radio, const std::array<uint32_t
 	}
 }
 
+void UserU220::set_rx_playback_start_delay(uint16_t delay_radio0, uint16_t delay_radio1) {
+	const uint32_t value = static_cast<uint32_t>(delay_radio0) | (static_cast<uint32_t>(delay_radio1) << 16);
+
+	write_reg(WrReg::RX_PLAYBACK_START_DELAY, value);
+}
+
 void UserU220::set_rx_playback_dn_counter(uint16_t start, int32_t step) {
 	if (start > 0xFFF) throw std::out_of_range("DN counter start must be 12 bits");
 
@@ -396,4 +410,17 @@ UserU220::RxPlaybackStatus UserU220::get_rx_playback_status(size_t radio, size_t
 	status.waiting    = raw & 1;
 
 	return status;
+}
+void UserU220::log_rx_playback_status(size_t radio) {
+	const auto reg     = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::SAMPLE_MEM));
+
+	const uint64_t raw = read_rx_playback_reg(radio, reg);
+	(void)raw;
+
+	// RxPlaybackStatus status;
+	// status.sin        = static_cast<int16_t>(static_cast<uint16_t>(raw >> 48));
+	// status.cos        = static_cast<int16_t>(static_cast<uint16_t>(raw >> 32));
+	// status.dn_counter = static_cast<uint32_t>((raw >> 2) & 0xFFFFF);
+	// status.playing    = (raw >> 1) & 1;
+	// status.waiting    = raw & 1;
 }

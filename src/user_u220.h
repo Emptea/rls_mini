@@ -65,6 +65,10 @@ public:
 	void set_rx_playback_dn(size_t radio, size_t playback, const std::array<int16_t, 4096> & samples);
 	void set_rx_playback_dn_offset(size_t radio, const std::array<uint32_t, 4> & values);
 	void set_rx_playback_dn_counter(uint16_t start, int32_t step);
+	void set_rx_playback_start_delay(uint16_t delay_radio0, uint16_t delay_radio1);
+
+	void log_rx_playback_status(size_t radio);
+	void log_rx_playback_phase(size_t radio);
 
 	// Чтение состояния
 	uint16_t get_rx_playback_dn_counter_start();
@@ -108,6 +112,7 @@ private:
 		RX_PLAYBACK_START       = 14,
 		RX_PLAYBACK_APPLY       = 18,
 		RX_PLAYBACK_APPLY_PULSE = 19,
+		RX_PLAYBACK_START_DELAY = 20,
 
 		RX0_PLAYBACK_BASE       = 32,
 		RX1_PLAYBACK_BASE       = 64,
