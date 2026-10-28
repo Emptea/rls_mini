@@ -424,3 +424,44 @@ void UserU220::log_rx_playback_status(size_t radio) {
 	// status.playing    = (raw >> 1) & 1;
 	// status.waiting    = raw & 1;
 }
+
+void UserU220::log_rx_playback_enable(size_t radio) {
+	read_rx_playback_reg(radio, RxPlaybackReg::ENABLE);
+}
+
+void UserU220::log_rx_playback_correction(size_t radio) {
+	read_rx_playback_reg(radio, RxPlaybackReg::CORRECTION_RE);
+	read_rx_playback_reg(radio, RxPlaybackReg::CORRECTION_IM);
+}
+
+void UserU220::log_rx_playback_delay(size_t radio) {
+	for (size_t k = 0; k < 4; ++k) {
+		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::DELAY) + k);
+
+		read_rx_playback_reg(radio, reg);
+	}
+}
+
+void UserU220::log_rx_playback_amplitude(size_t radio) {
+	for (size_t k = 0; k < 4; ++k) {
+		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::AMPLITUDE) + k);
+
+		read_rx_playback_reg(radio, reg);
+	}
+}
+
+void UserU220::log_rx_playback_dn_offset(size_t radio) {
+	for (size_t k = 0; k < 4; ++k) {
+		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::AMPLITUDE2_OFFSET) + k);
+
+		read_rx_playback_reg(radio, reg);
+	}
+}
+
+void UserU220::log_rx_playback_dn_counter() {
+	read_reg(RdReg::RX_PLAYBACK_START);
+}
+
+void UserU220::log_rx_playback_start_delay() {
+	read_reg(RdReg::RX_PLAYBACK_START_DELAY);
+}

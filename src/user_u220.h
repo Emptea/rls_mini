@@ -69,6 +69,13 @@ public:
 
 	void log_rx_playback_status(size_t radio);
 	void log_rx_playback_phase(size_t radio);
+	void log_rx_playback_enable(size_t radio);
+	void log_rx_playback_correction(size_t radio);
+	void log_rx_playback_delay(size_t radio);
+	void log_rx_playback_amplitude(size_t radio);
+	void log_rx_playback_dn_offset(size_t radio);
+	void log_rx_playback_dn_counter();
+	void log_rx_playback_start_delay();
 
 	// Чтение состояния
 	uint16_t get_rx_playback_dn_counter_start();
@@ -141,6 +148,7 @@ private:
 		TX_GAINON_DELAY_EFFECTIVE = 19,
 
 		RX_PLAYBACK_START         = 22,
+		RX_PLAYBACK_START_DELAY   = 26,
 		RX0_PLAYBACK_BASE         = 32,
 		RX1_PLAYBACK_BASE         = 64,
 	};

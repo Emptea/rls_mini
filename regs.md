@@ -77,14 +77,16 @@ Open the device with the `enable_user_regs` device argument.
 | 12 | 48 | [31:0] | radio 1 (`tx1`) DAC memory[pointer] = `{I[15:0], Q[15:0]}`, then pointer + 1 | init file |
 | 13 | 52 | [15:0] | `PLAY_EXTERNAL_TX_ENABLE_P` playback delay after the trigger, `radio_clk` cycles, 0 = none | 0 |
 | | | [31:16] | `PLAY_EXTERNAL_TX_ENABLE_N` playback delay after the trigger, 0 = none | 0 |
-| 14 | 56 | [11:0] | RX playback amplitude2 counter start, all eight playbacks (both radios): the next apply (register 18) loads every counter with it (fraction 0); see [RX playback](#rx-playback-registers-32-63-and-64-95) | 0 |
-| | | [31:12] | `a2_global_offset_speed` - what every amplitude2 counter adds on each capture start of its playback, 2^8 = one entry (`0x00100` one entry, `0xFFF00` one entry back). A write sets both fields | `0x00100` |
+| 14 | 56 | [11:0] | RX playback amplitude2 counter start: the next apply (register 18) loads the counter, one for all eight playbacks of both radios, with it (fraction 0); see [RX playback](#rx-playback-registers-32-63-and-64-95) | 0 |
+| | | [31:12] | `a2_global_offset_speed` - what the amplitude2 counter adds on every trigger, whether or not anything plays, 2^8 = one entry (`0x00100` one entry, `0xFFF00` one entry back). A write sets both fields | `0x00100` |
 | 15 | 60 | [0] | `PLAY_EXTERNAL_TX_ENABLE_N` memory[pointer] = bit, then pointer + 1 | init file |
 | 16 | 64 | [0] | `PLAY_EXTERNAL_RX_ENABLE_N` memory[pointer] = bit, then pointer + 1 | init file |
 | 17 | 68 | [15:0] | RX_FRAME / TX_FRAME lock-in: `PPS_IN_EXT` edges to let pass after the first edge of a sequence; the lock-in is on the next one (0 = on the first edge); see [RX_FRAME / TX_FRAME lock-in](#rx_frame--tx_frame-lock-in-on-pps-register-17-readback-slots-23--24) | 0 |
 | | | [16] | lock-in enable; going 1 also arms a new sequence | 1 |
-| 18 | 72 | - | RX playback apply: a write (any value) puts every RX playback parameter written so far into effect, both radios and register 14, in one cycle, on this board; every rising edge on `RX_PLAY_APPLY_IN` does the same; see [RX playback](#rx-playback-registers-32-63-and-64-95) | - |
+| 18 | 72 | - | RX playback apply: a write (any value) puts every RX playback parameter written so far into effect, both radios and registers 14 and 20, in one cycle, on this board; every rising edge on `RX_PLAY_APPLY_IN` does the same; see [RX playback](#rx-playback-registers-32-63-and-64-95) | - |
 | 19 | 76 | - | RX playback apply pulse: a write (any value) sends a pulse out on `RX_PLAY_APPLY_OUT` (`B16_L7_P`, JP1-1) and applies nothing by itself. Cabled to `RX_PLAY_APPLY_IN` (`B16_L16_P`, JP1-17) of every board, its own included, it applies on all of them together; see [RX playback](#rx-playback-registers-32-63-and-64-95) | - |
+| 20 | 80 | [15:0] | RX playback start delay, radio 0: its playbacks start this many `radio_clk` cycles after every trigger, independent of the ADC capture start (register 5); 0 = in the trigger's cycle. Applied by register 18; see [RX playback](#rx-playback-registers-32-63-and-64-95) | 0 |
+| | | [31:16] | RX playback start delay, radio 1 | 0 |
 | 32-63 | 128-252 | | RX playback, radio 0 (see [RX playback](#rx-playback-registers-32-63-and-64-95)) | |
 | 64-95 | 256-380 | | RX playback, radio 1 | |
 
@@ -103,10 +105,12 @@ radio 0 / `_P` pin and [31:16] radio 1 / `_N` pin:
 | 5 | ADC capture start |
 | 6 | `PLAY_EXTERNAL_RX_ENABLE_P` / `_N` |
 | 13 | `PLAY_EXTERNAL_TX_ENABLE_P` / `_N` |
+| 20 | RX playback start (applied by register 18) |
 
 A write sets both halves, so write the two delays together. They read back
-in slots 3 / 4, 5 / 6, 7 / 8 and 18 / 19 (as written / in effect), with the
-same layout.
+in slots 3 / 4, 5 / 6, 7 / 8 and 18 / 19 (as written / in effect), and
+register 20 in slot 26 with the same layout: `[31:0]` as written, `[63:32]`
+applied.
 
 Each of the four external enable pins has its own 1-bit memory and its own
 delay:
@@ -538,14 +542,28 @@ bool     waiting  = (fl >> 21) & 1;       // still counting edges
 
 Four synthetic signals per radio, added to that radio's RX samples ahead of
 its DDC (`top/rx_playback.v`), for example simulated echoes. Playback k
-(0..3) of a radio starts on every **ADC capture start** of that radio (the
-trigger plus register 5 [15:0] for radio 0, [31:16] for radio 1), waits its
-own delay, then plays its own sample memory, one entry per `radio_clk` cycle:
+(0..3) of a radio starts on every **playback start** of that radio: the
+trigger plus register 20 [15:0] for radio 0, [31:16] for radio 1. That is
+independent of the radio's ADC capture start (register 5), so moving the RX
+capture does not move the playbacks. It waits its own delay, then plays its
+own sample memory, one entry per `radio_clk` cycle:
 
 ```
 rx += sample[n] * correction * e^(j * phase[k]) * amplitude[k]
-      * amplitude2[k][(offset[k] - counter[k]) mod 4096]
+      * amplitude2[k][(offset[k] - counter) mod 4096]
 ```
+
+`phase[k]` is 0 for the first burst after playback k is switched on and
+goes up by its phase step (register BASE+12+k) from one burst to the next
+(see Phase below). `counter` is one amplitude2 counter for all eight
+playbacks of both radios, stepping on every trigger (see amplitude2 below).
+
+Radio 1 subtracts its playbacks instead (`rx -= ...`). UHD's B200 code sets
+radio 1's DDC input to `IbQb`, I and Q inverted (`b200_impl.cpp`,
+`setup_radio`), to undo RX2 reaching the FPGA inverted. Added as is, radio 1's
+playbacks came out times -1 next to radio 0's. Subtracted, playbacks with the
+same settings come out in phase on both radios, as a real signal on both
+inputs does.
 
 One block per radio, both in radio 0's user space for now: `BASE` = 32 for
 radio 0, 64 for radio 1. UHD `poke32` offset = 4 x register.
@@ -556,30 +574,55 @@ radio 0, 64 for radio 1. UHD `poke32` offset = 4 x register.
 | BASE+1 | 132 / 260 | [11:0] | memory write pointer, shared by the radio's 8 memories | 0 |
 | BASE+2 | 136 / 264 | [23:0] | correction, real part | `0x004000` |
 | BASE+3 | 140 / 268 | [23:0] | correction, imaginary part | 0 |
-| BASE+8+k | 160 + 4k / 288 + 4k | [15:0] | playback k delay after the capture start, `radio_clk` cycles, 0 = none | 0 |
-| BASE+12+k | 176 + 4k / 304 + 4k | [31:0] | playback k phase difference: an angle, real, 2^32 = one full turn (`0x4000_0000` = 90 degrees); see Phase below | 0 |
+| BASE+8+k | 160 + 4k / 288 + 4k | [15:0] | playback k delay after the playback start, `radio_clk` cycles, 0 = none | 0 |
+| BASE+12+k | 176 + 4k / 304 + 4k | [31:0] | playback k phase step: added to the phase on every burst start, an angle, 2^32 = one full turn (`0x4000_0000` = 90 degrees); the first burst after switching the playback on plays phase 0; see Phase below | 0 |
 | BASE+16+k | 192 + 4k / 320 + 4k | [31:0] | playback k amplitude, `{im[15:0], re[15:0]}` | `0x00004000` |
 | BASE+20+k | 208 + 4k / 336 + 4k | [31:0] | playback k sample memory[pointer] = `{I[15:0], Q[15:0]}`, then pointer + 1 | init file |
 | BASE+24+k | 224 + 4k / 352 + 4k | [15:0] | playback k amplitude2 memory[pointer], then pointer + 1 | init file |
 | BASE+28+k | 240 + 4k / 368 + 4k | [11:0] | playback k amplitude2 offset: the memory read address is offset - counter | 0 |
-| 14 | 56 | [11:0] | amplitude2 counter start, shared by all eight playbacks (see below) | 0 |
-| | | [31:12] | `a2_global_offset_speed`: amplitude2 counter step per capture start, shared, 2^8 = one entry (see below) | `0x00100` |
+| 14 | 56 | [11:0] | amplitude2 counter start; one counter for all eight playbacks (see below) | 0 |
+| | | [31:12] | `a2_global_offset_speed`: amplitude2 counter step per trigger, 2^8 = one entry (see below) | `0x00100` |
 | 18 | 72 | - | apply: puts the parameters written so far into effect (see below) | - |
 | 19 | 76 | - | apply pulse out on `RX_PLAY_APPLY_OUT`: every board it reaches on `RX_PLAY_APPLY_IN` applies (see below) | - |
+| 20 | 80 | [15:0] | playback start delay, radio 0: `radio_clk` cycles after the trigger, 0 = in the trigger's cycle | 0 |
+| | | [31:16] | playback start delay, radio 1 | 0 |
 
 **Apply.** Writing a parameter register (BASE+0, BASE+2, BASE+3,
-BASE+8 to BASE+19, BASE+28 to BASE+31 and register 14) only stores the
-value. The playbacks run on mid registers, copies made by the apply: an
-apply copies all of them, both radios and register 14, in the same
-`radio_clk` cycle, so a whole set of changes takes effect at once. A write
-to register 18 (any value) applies on this board, and so does every rising
-edge on the `RX_PLAY_APPLY_IN` pin (next paragraph). Until then everything
-keeps running on the values of the last apply; at reset both hold the reset
-values. The pointer (BASE+1) and the memory registers (BASE+20 to BASE+27)
-act at once, without an apply, and so does `enable_playback` (register 0
-[0]). A parameter written after the apply, even in the next cycle, waits
-for the next apply. To rewrite a memory, switch its playback off with a
-write to BASE+0 and an apply.
+BASE+8 to BASE+19, BASE+28 to BASE+31 and registers 14 and 20) only stores
+the value. An apply copies all of them, both radios and registers 14 and
+20, in the same `radio_clk` cycle: these are the applied values (read back
+in `[63:32]`, below). A write to register 18 (any value) applies on this
+board, and so does every rising edge on the `RX_PLAY_APPLY_IN` pin (next
+paragraph). The enable bits (BASE+0) act from the cycle after the apply.
+Everything else goes burst by burst (from build 1.13):
+
+- **Every trigger takes the applied values** for the bursts it starts: its
+  start delay (register 20), and each playback's delay, phase step,
+  amplitude, amplitude2 offset and correction. Its amplitude2 counter value
+  as well: the first trigger after an apply takes register 14's start.
+- **Each playback keeps them** from its playback start to the end of its
+  burst, however long its delay. A burst therefore plays the values applied
+  when its trigger came.
+- **A set applied together** reaches the bursts of the first trigger after
+  the apply whole, on every playback of both radios. No burst mixes old and
+  new values, and a burst already waiting or playing at the apply finishes
+  with the old ones. A trigger in the apply's own cycle still takes the old
+  ones.
+- **The phase step** is what a burst's start adds to the phase of the burst
+  after it. So the first burst with a new step still plays the phase reached
+  before it, and the burst after it is the first one the new step moves
+  (Phase timing below).
+
+Until an apply everything keeps running on the values of the last one; at
+reset both hold the reset values. Before build 1.13 each value took effect
+at its own moment instead: the delay at the next playback start, the
+offset and step at the next burst start, the correction and amplitude in the
+cycle after the apply, partway through the burst in flight. The pointer
+(BASE+1) and the memory registers (BASE+20 to BASE+27) act at once, without
+an apply, and so does `enable_playback` (register 0 [0]). A parameter
+written after the apply, even in the next cycle, waits for the next apply.
+To rewrite a memory, switch its playback off with a write to BASE+0 and an
+apply.
 
 **Applying on several boards at once** (`top/rx_play_apply.v`). Write the
 parameters on every board, then write register 19 (any value) on one of
@@ -599,53 +642,108 @@ together.
   sync with the `radio_clk` lock) and whose cables are equally long sample
   the pulse on the same edge and apply in the same cycle; a pulse reaching
   the pins right at a `radio_clk` edge can make some apply one cycle later.
-  Applies landing during a burst mix old and new values in it as any apply
-  does (Applying coefficients below), so time the write between bursts.
+  As with register 18, the bursts of the first trigger after the apply are
+  the first with the new values, so boards that apply in the same cycle
+  switch on the same trigger (a pulse landing within a cycle of a trigger
+  edge can put some boards one trigger later).
 - **Input:** asynchronous, with the FPGA's pull-down, so a board without a
   cable never applies from the pin. An input already high when the board
   comes out of reset counts as a rising edge.
 - **Checking:** slot 25 counts the applies by register 18 and by the pin,
   and the pulses sent, and shows the input's level. After a pulse, every
-  board's pin count should have gone up by one.
+  board's pin count should have gone up by one. A pin count that rises with
+  no pulse sent is an apply at a moment nobody chose: the input picked up
+  something else. Its pair partner, `START_PULSE_N` (`B16_L16_N`, JP1-18),
+  toggles on every board with register 0 [8] set, and an input wire left
+  open in a cable only has the weak pull-down to hold it.
 
-Readback slot = register number (`peek64` offset 8 x slot) for BASE+0 to
-BASE+19 and BASE+28 to BASE+31, as written, applied or not; register 14
-reads back in slot 22, and slot 25 has the apply counts.
-Slot BASE+20+k is playback k's status: `[63:48]` sin and `[47:32]` cos the
-last burst was rotated by (2^15 = 1.0; 0 and `0x7FFF` before the first
-burst), `[21:2]` its amplitude2 counter, 2^8 = one entry like the step
-(`[21:10]` entries: the next capture start uses entry offset - entries;
-`[9:2]` fraction), `[1]` playing, `[0]` waiting out the delay.
+**Readback** (`peek64` offset = 8 x slot). The parameter registers read
+back in the slot of their own number: `[31:0]` as written, applied or not,
+and `[63:32]` the applied copy, the one the next trigger takes, in the same
+layout (from build 1.13; older builds read 0 there). The two halves differ while a
+write waits for an apply, so after an apply they must be equal: a half that
+differs is a value that did not take effect. The shared parts read back
+elsewhere: the amplitude2 counter in slot 21, register 14 in slot 22, the
+apply counts in slot 25 and register 20 (start delays) in slot 26 (see
+[Readback](#readback)); slots 22 and 26 also carry the applied copy.
+`scripts/parse_reg_log.py` decodes these reads and marks each one
+`[applied]` or `[NOT APPLIED; in effect: ...]`.
+
+| Slot | Slot, radio 0 / 1 | `peek64` offset, radio 0 / 1 | Contents |
+|---|---|---|---|
+| BASE+0 | 32 / 64 | 256 / 512 | `[3:0]` enable bits as written, `[35:32]` applied |
+| BASE+1 | 33 / 65 | 264 / 520 | `[11:0]` memory write pointer now (it moves with every memory write) |
+| BASE+2 | 34 / 66 | 272 / 528 | `[23:0]` correction, real part, as written, `[55:32]` applied |
+| BASE+3 | 35 / 67 | 280 / 536 | `[23:0]` correction, imaginary part, as written, `[55:32]` applied |
+| BASE+4 to BASE+7 | 36-39 / 68-71 | 288-312 / 544-568 | 0 (no registers) |
+| BASE+8+k | 40+k / 72+k | 320 + 8k / 576 + 8k | `[15:0]` playback k delay as written, `[47:32]` applied |
+| BASE+12+k | 44+k / 76+k | 352 + 8k / 608 + 8k | `[31:0]` playback k phase step as written, `[63:32]` applied (the phase itself: sin and cos in the status, next) |
+| BASE+16+k | 48+k / 80+k | 384 + 8k / 640 + 8k | `[31:0]` playback k amplitude `{im, re}` as written, `[63:32]` applied |
+| BASE+20+k | 52+k / 84+k | 416 + 8k / 672 + 8k | playback k status (next table), not the sample memory |
+| BASE+24+k | 56+k / 88+k | 448 + 8k / 704 + 8k | 0 (the amplitude2 memory does not read back) |
+| BASE+28+k | 60+k / 92+k | 480 + 8k / 736 + 8k | `[11:0]` playback k amplitude2 offset as written, `[43:32]` applied |
+
+Playback k's status, slot BASE+20+k:
+
+| Bits | Contents |
+|---|---|
+| `[63:48]` | sin of the rotation the last burst used, 2^15 = 1.0; 0 before the first burst |
+| `[47:32]` | cos of that rotation; `0x7FFF` before the first burst |
+| `[31:24]` | CORDIC restarts by the watchdog (wraps; see Phase timing below). Rising: that playback's CORDIC was stuck and has been reset |
+| `[23:22]` | 0 |
+| `[21:2]` | the shared amplitude2 counter, the same in every status slot (slot 21 `[19:0]`): the value the next trigger takes, 2^8 = one entry like the step, `[21:10]` entries (that trigger's bursts play entry offset - entries), `[9:2]` fraction |
+| `[1]` | playing: a burst is being read from the sample memory |
+| `[0]` | waiting out the delay |
 
 - **Formats:** two's complement, 2^14 = 1.0, for every coefficient:
   correction parts 24 bits (range -512 to just under 512), amplitude and
   amplitude2 16 bits (-2.0 to just under 2.0). 1.0 is `0x004000` /
-  `0x4000`. The phase is an angle, not a coefficient (next).
-- **Phase:** register BASE+12+k holds the phase difference phi as
-  `round(phi / 2pi * 2^32)` mod 2^32: `0x4000_0000` = 90 degrees,
-  `0xC000_0000` = 270 = -90 degrees. A CORDIC per playback
-  (`top/recursive_cordic.v`) turns it, rounded half up to 16 bits (steps of
-  360 / 65536 = 0.0055 degrees), into cos and sin, 2^15 = 1.0. The burst is
-  multiplied by cos + j sin (rounded half up, 15 fraction bits dropped). They
-  are within 1.5 LSB of 32767 * cos / sin and never above `0x7FFF`, so the
-  stage is about 3e-5 (0.0003 dB) below unity gain; phase 0 gives cos 32767,
-  sin 1.
-- **Phase timing:** each burst start of a playback starts the CORDIC on the
-  phase applied at that moment, and the result is ready 195 `radio_clk`
-  cycles later. A burst uses the newest result there is 10 cycles after its
-  start (the cycle before its first sample reaches the multiplier), all the
-  way through. So a phase applied before a burst start is used from the
-  burst after it: that start computes it, the burst itself keeps the result
-  of an earlier start. Bursts closer than 195 cycles get it later: a start
-  while the CORDIC is busy is kept and computed when it is free (one at a
-  time). While a playback is off (its bit or `enable_playback`) its CORDIC
-  runs back to back, so the first burst after switching it on already uses
-  the phase applied before.
+  `0x4000`. The phase step is an angle, not a coefficient (next).
+- **Phase:** register BASE+12+k holds the phase step d as
+  `round(d / 2pi * 2^32)` mod 2^32: `0x4000_0000` = 90 degrees,
+  `0xC000_0000` = 270 = -90 degrees. Burst m after playback k is switched on
+  (m = 0, 1, ...) plays phase m * d: 0 for the first, d more for every next
+  one (bursts T apart: a frequency of d / (2pi T)). The sum keeps 32 bits and
+  wraps at one turn, so a small step adds up without loss. Switching the
+  playback off (its bit or `enable_playback`) puts the phase back to 0. A
+  CORDIC per playback (`top/recursive_cordic.v`) turns each burst's phase,
+  rounded half up to 16 bits (steps of 360 / 65536 = 0.0055 degrees), into
+  cos and sin, 2^15 = 1.0. The burst is multiplied by cos + j sin (rounded
+  half up, 15 fraction bits dropped). They are within 1.5 LSB of
+  32767 * cos / sin and never above `0x7FFF`, so the stage is about 3e-5
+  (0.0003 dB) below unity gain; phase 0 gives cos 32767, sin 1. The status
+  slot shows the sin and cos the last burst played.
+- **Phase timing:** the cycle after a burst starts, the burst's own step
+  (the one its trigger took) is added to the phase and the CORDIC starts on
+  the sum, the next burst's phase; the result is ready 196 `radio_clk`
+  cycles after the burst's start. A burst uses the newest result there is
+  10 cycles after its start (the cycle before its first sample reaches the
+  multiplier), all the way through. So burst m + 1 plays burst m's phase
+  plus burst m's step, and the first burst with a new step still plays the
+  phase reached before it. A burst less than 196 cycles after the one
+  before can play an older phase: a start while the CORDIC is busy is kept
+  and computed when it is free (one at a time); the sum still counts every
+  start, so later bursts are right again. While a playback is off its
+  CORDIC runs back to back on phase 0, so the first burst after switching
+  it on plays 0.
+- **CORDIC watchdog:** `radio_rst` only comes when the FPGA is configured,
+  but every UHD start resets the AD9361 (RESETB) and reprograms its clocks,
+  a multi-chip sync re-times them, and `radio_clk` comes from its DATA_CLK.
+  A CORDIC upset this way can stop finishing: Vivado encodes the state
+  machine of its steps one-hot (`synth_1` log, `RecursiveCordicElementary`),
+  and a state that is none of the three has no way out. Without the
+  watchdog, every later burst then kept the last rotation, which is phase 0
+  if the playback was off at the time, whatever step was applied; nothing
+  but configuring the FPGA cleared it. Now a CORDIC still busy 256 cycles
+  after a start (a run takes 195) is reset and runs again on the current
+  phase. Bursts in between play the last good rotation. Status `[31:24]`
+  counts these resets.
 - **Math:** each of the four products is rounded half up (+0.5, then the 14
   fraction bits dropped, 15 for the phase) and saturated to 24 bits. A stage can take a sample
   past 16 bits (by up to 2^8) without clipping, as long as a later stage
   brings it back. The four playbacks are summed and added to I and Q of the
-  RX sample, saturating at `0x7FFF` / `0x8000`. The ADC's 12 bits sit in
+  RX sample (subtracted on radio 1, see above), saturating at `0x7FFF` /
+  `0x8000`. The ADC's 12 bits sit in
   [15:4], so a full-scale memory sample (32767) is as large as a full-scale
   ADC sample. Real RX samples are not delayed by any of this.
 - **Memories:** per playback, a 928-entry sample memory (starts with
@@ -655,45 +753,59 @@ burst), `[21:2]` its amplitude2 counter, 2^8 = one entry like the step
   pointer, then data. Writes past a memory's end are dropped, but the
   pointer still moves. Rewrite a memory with its playback off, or a burst
   can mix old and new entries.
-- **amplitude2:** every playback has an amplitude2 counter, 12 bits of
-  entries and 8 of fraction. A capture start plays its whole burst with
-  memory entry (offset[k] - counter entries) mod 4096 (pulse-to-pulse
-  amplitude), then the counter adds `a2_global_offset_speed` (register 14
-  [31:12], shared). `0x00100` is one entry per capture start, so
+- **amplitude2:** one amplitude2 counter serves all eight playbacks of both
+  radios (`rx_playback_a2_counter` in `top/rx_playback.v`), 12 bits of
+  entries and 8 of fraction; each playback keeps its own offset. Every
+  trigger (`PPS_IN_EXT`, or the internal start pulse with register 0 [1])
+  takes the counter's value, then the counter adds `a2_global_offset_speed`
+  (register 14 [31:12]). It counts whether or not `enable_playback`, the
+  playbacks, TX or RX are on, except that the internal start pulse only
+  runs while `enable_playback` is set. All bursts of that trigger's playback
+  starts, on both radios, play memory entry (offset[k] - entries of the
+  value it took) mod 4096 (pulse-to-pulse amplitude), even if a long delay
+  ends after the next trigger. `0x00100` is one entry per trigger, so
   consecutive bursts read the memory downwards from the offset; `0x00040`
-  is a quarter entry (each entry for four bursts); 0 holds the counter.
+  is a quarter entry (each entry for four triggers); 0 holds the counter.
   The counter wraps at 4096 entries, so a step of `0x80000` or more goes
   backwards: `0xFFF00` is one entry back, reading the memory upwards. The
-  offset is the one in effect when the burst starts (after the delay).
-  The first apply after a write to register 14 loads all eight counters
-  (enabled or not) with its [11:0], fraction 0, in the cycle the other
-  parameters change; a capture start in that cycle still uses the old
-  counter. An apply with no register 14 write since the one before leaves
-  the counters running. A disabled playback (its bit or `enable_playback`
-  off) holds its counter at the applied register 14 [11:0], so after
-  switching it on the first burst uses entry offset - that start. The
-  status slot shows the counter.
+  offset is the one the burst's trigger took, like its other values (Apply
+  above). The first apply after a write to register 14 loads the counter
+  with its [11:0], fraction 0, so the next trigger takes that start value,
+  together with the other new values; a trigger in the apply's cycle still
+  takes the old value. An apply with no register 14 write since the
+  one before leaves the counter running. Switching a playback on or off
+  does not touch the counter: a playback switched on joins at the
+  counter's current value. Slot 21 shows the counter.
 - **Register 14 holds both** start and step, and every write sets both:
   write `(step << 12) | start`. The start alone (bits [31:12] zero) means
-  step 0, counters standing still. Changing the step also reloads the
-  counters (at the apply). Reset `0x0010_0000`: start 0, one entry per
-  capture start.
-- **Timing:** a capture start in cycle c starts the burst in cycle c + delay,
-  and entry n is added to the ADC sample that reaches the radio in cycle
-  c + delay + 33 + n (`LATENCY` = 33). Compared with a real signal, the burst
-  sits delay + 33 samples (full rate, before decimation) after the ADC sample
-  of the capture start. Set delay = N - 33 to place it N samples later.
-- **Restarts** follow the DAC memories' rules: a capture start while the
-  delay runs restarts the delay; one mid-burst restarts the burst at entry
-  0. A burst cut short keeps its own amplitude2 entry. With capture starts
-  exactly 928 cycles apart (the internal start pulse's period) and a fixed
-  delay, consecutive bursts follow each other without a gap or overlap.
-- **Applying coefficients:** an applied correction or amplitude takes
-  effect for the samples entering that multiplier from then on, so a burst
-  can briefly see old and new values mixed between stages. Apply between
-  bursts if that matters; writing alone changes nothing. The phase only
-  changes between bursts (Phase timing above), the offset at a burst start
-  and the delay at a capture start.
+  step 0, the counter standing still. Changing the step also reloads the
+  counter (at the apply). Reset `0x0010_0000`: start 0, one entry per
+  trigger. Slot 22 shows it as written in `[31:0]`, the step in effect in
+  `[63:44]`, and in `[32]` whether a write still waits for the apply that
+  loads its start.
+- **Timing:** a trigger in cycle t gives the playback start in cycle
+  c = t + S (S = register 20 [15:0] for radio 0, [31:16] for radio 1; S
+  and the delay as that trigger took them), which starts the burst in cycle
+  c + delay, and entry n is added to the ADC
+  sample that reaches the radio in cycle t + S + delay + 33 + n (`LATENCY` =
+  33). The ADC capture start (register 5, delay A) does not take part: in
+  the received stream the burst sits S + delay + 33 - A samples (full rate,
+  before decimation) after the ADC sample of the capture start, and moving
+  the capture with A moves the burst the other way in the stream. With A
+  fixed, set S + delay = N - 33 to place it N samples after the trigger.
+- **Restarts** follow the DAC memories' rules: a trigger while the start
+  delay S runs restarts it; a playback start while a playback's delay runs
+  restarts that delay, with the values of the new playback start's trigger;
+  one mid-burst restarts the burst at entry 0. A burst cut short keeps its
+  own values, amplitude2 entry and phase; the restart counts as the next
+  burst and plays the next phase. With triggers exactly 928 cycles
+  apart (the internal start pulse's period) and fixed delays, consecutive
+  bursts follow each other without a gap or overlap.
+- **One set of coefficients per burst:** a burst keeps one correction,
+  rotation, amplitude and amplitude2 entry from its first sample to its
+  last. Each multiplier takes the next burst's coefficient on the cycle that
+  burst's first sample reaches it, and samples of the burst before, still in
+  the pipeline, keep theirs. Writing alone changes nothing (Apply above).
 
 ### Build version (readback slot 0)
 
@@ -750,14 +862,15 @@ higher bits 0. Version 1.5 reads `0x010005`.
 | 18 | 144 | register 13 as written: `[31:16] PLAY_EXTERNAL_TX_ENABLE_N delay, [15:0] PLAY_EXTERNAL_TX_ENABLE_P delay` |
 | 19 | 152 | in effect: `[32] delay override, [31:16] PLAY_EXTERNAL_TX_ENABLE_N delay, [15:0] PLAY_EXTERNAL_TX_ENABLE_P delay` |
 | 20 | 160 | `radio_clk` phase lock status: `[15:8] corrections made (wraps), [2] lock in charge (2-channel mode and register 0 [12] = 0), [1] RX_FRAME alternating, [0] radio_clk rising on the channel 1 word`; see below |
-| 21 | 168 | not used, reads 0 |
-| 22 | 176 | register 14 as written: `[31:12] a2_global_offset_speed, [11:0] counter start` (RX playback amplitude2) |
+| 21 | 168 | RX playback amplitude2 counter (one for all playbacks), 2^8 = one entry: `[51:32]` the value the latest trigger took (its bursts play entry offset - `[51:40]`), `[19:0]` the value the next trigger takes (`[19:8]` entries); see [RX playback](#rx-playback-registers-32-63-and-64-95) |
+| 22 | 176 | register 14: as written `[31:12] a2_global_offset_speed, [11:0] counter start` (RX playback amplitude2); applied: `[63:44]` the step in effect, `[32]` a write whose start the next apply loads (1 after a register 14 write, 0 once applied) |
 | 23 | 184 | register 17 as written: `[16] frame lock-in enable, [15:0] edges to pass` |
 | 24 | 192 | RX_FRAME / TX_FRAME lock-in: `[47:32] edge index (first edge = 0, held at the lock-in), [21] waiting, [20] armed, [19:18] TX_FRAME pair, [17:16] RX_FRAME pair (both at the last lock-in), [15:0] lock-ins (wraps)`; see above |
 | 25 | 200 | RX playback apply: `[48]` `RX_PLAY_APPLY_IN` now (after the synchronizer), `[47:32]` pulses sent on `RX_PLAY_APPLY_OUT` (register 19 writes not dropped), `[31:16]` applies by `RX_PLAY_APPLY_IN`, `[15:0]` applies by register 18; the counts wrap |
-| 26-31 | 208-248 | not used, read 0 |
-| 32-55, 60-63 | 256-440, 480-504 | RX playback, radio 0: slot = register number, see RX playback |
-| 64-87, 92-95 | 512-696, 736-760 | RX playback, radio 1 |
+| 26 | 208 | register 20, RX playback start delays: as written `[31:16] radio 1, [15:0] radio 0`; applied `[63:48] radio 1, [47:32] radio 0` |
+| 27-31 | 216-248 | not used, read 0 |
+| 32-63 | 256-504 | RX playback, radio 0: parameter registers (`[31:0]` as written, `[63:32]` applied), playback status in 52-55, 0 in 36-39 and 56-59; slot by slot under [RX playback](#rx-playback-registers-32-63-and-64-95) (Readback) |
+| 64-95 | 512-760 | RX playback, radio 1: the same, status in 84-87, 0 in 68-71 and 88-91 |
 
 Slot 0 was added after commit `ddedeb7`, and every other slot below 32 moved
 up by one with it: host code written before that reads slot n (n < 32) must
@@ -908,7 +1021,7 @@ auto c14 = [](double re, double im) -> uint32_t {      // {im, re}, 0x4000 = 1.0
     };
     return (part(im) << 16) | part(re);
 };
-auto turn32 = [](double rad) -> uint32_t {            // phase: 2^32 = one full turn
+auto turn32 = [](double rad) -> uint32_t {            // phase step: 2^32 = one full turn
     return uint32_t(int64_t(std::llround(rad / (2.0 * M_PI) * 4294967296.0)));
 };
 auto a2_step = [](double entries) -> uint32_t {       // register 14 [31:12]: 256 = one entry
@@ -924,13 +1037,14 @@ for (int k = 0; k < 4; k++) {
 }
 rxp(RXP0 + 2, 0x004000);                              // correction 1.0 (24-bit parts)
 rxp(RXP0 + 3, 0);
-rxp(RXP0 + 8, 200 - 33);                              // playback 0: 200 samples after the capture start
-rxp(RXP0 + 12, turn32(0.5));                          // phase difference 0.5 rad
+rxp(20, (0u << 16) | 0u);                             // register 20: both radios' playbacks start on the trigger
+rxp(RXP0 + 8, 200 - 33);                              // playback 0: 200 samples after the trigger
+rxp(RXP0 + 12, turn32(0.5));                          // phase 0, 0.5, 1.0, ... rad on bursts 0, 1, 2, ...
 rxp(RXP0 + 16, c14(0.1, 0.0));                        // amplitude 0.1
 rxp(RXP0 + 28, 100);                                  // playback 0 reads amplitude2 from entry 100 - counter
-rxp(14, (a2_step(1.0) << 12) | 0);                    // all eight amplitude2 counters to 0, one entry per capture start
+rxp(14, (a2_step(1.0) << 12) | 0);                    // amplitude2 counter (all playbacks) to 0, one entry per trigger
 rxp(RXP0 + 0, 0x1);                                   // playback 0 on (with enable_playback)
-rxp(18, 0);                                           // apply: all of the above take effect together
+rxp(18, 0);                                           // apply: the next trigger's bursts play all of the above
 // On several boards at once instead: write the parameters on each, then
 // rxp(19, 0) on one; its pulse on RX_PLAY_APPLY_OUT, cabled to every board's
 // RX_PLAY_APPLY_IN (its own included), applies on all of them.
@@ -938,11 +1052,15 @@ uint64_t ap = regs->peek64(200);                      // slot 25: RX playback ap
 uint16_t applies     = ap & 0xFFFF;                   // by register 18
 uint16_t pin_applies = (ap >> 16) & 0xFFFF;           // by RX_PLAY_APPLY_IN
 uint16_t pulses_sent = (ap >> 32) & 0xFFFF;           // on RX_PLAY_APPLY_OUT
+uint64_t ph = regs->peek64(8 * (RXP0 + 12));          // playback 0 phase step: {applied, as written}
+bool step_applied = uint32_t(ph >> 32) == uint32_t(ph);   // false: that value is not in effect
+uint64_t a2 = regs->peek64(168);                      // slot 21: the amplitude2 counter, 256 = one entry (like the step)
+uint32_t amp2_next = a2 & 0xFFFFF;                    // the next trigger's bursts: entry (100 - (amp2_next >> 8)) mod 4096
+uint32_t amp2_last = (a2 >> 32) & 0xFFFFF;            // the latest trigger's bursts: entry (100 - (amp2_last >> 8)) mod 4096
 uint64_t st = regs->peek64(8 * (RXP0 + 20));          // playback 0 status
-uint32_t amp2_counter = (st >> 2) & 0xFFFFF;         // amplitude2 counter, 256 = one entry (like the step)
-uint16_t amp2_entries = amp2_counter >> 8;           // next burst: entry (100 - amp2_entries) mod 4096
 int16_t  rot_cos = int16_t((st >> 32) & 0xFFFF);     // rotation of the last burst, 32767 = 1.0
 int16_t  rot_sin = int16_t(st >> 48);
+uint8_t  cordic_restarts = (st >> 24) & 0xFF;         // CORDIC watchdog resets (wraps)
 
 // RX starting on the trigger: plain "start now" command, generous timeout
 uhd::stream_args_t sa("sc16");
