@@ -264,23 +264,30 @@ void GlobalData::processChannels() {
 }
 
 void GlobalData::u220_recv() {
-	const size_t first_board = u220_group.active_boards()[0];
-	auto packet_cnt          = u220_group.board(first_board)->get_stats().rx_packet_cnt;
-	auto u220_cycles         = u220_group.board(first_board)->get_stats().cycles_completed;
+	const size_t first_board       = u220_group.active_boards()[0];
+	static size_t u220_cycles      = 0;
+	static bool pending_buffer     = false;
+	static int u220_buffer_idx     = 0;
+	auto packet_cnt                = u220_group.board(first_board)->get_stats().rx_packet_cnt;
 
 	if (!u220_cycles) {
 		t_start = PISystemTime::current();
 	}
 
 	if (dma.can_send()) {
+		if (pending_buffer) {
+			int ret         = dma.send();
+			u220_buffer_idx = dma.get_submitted() % TX_BUFFER_COUNT;
+			if (ret != 0) {
+				fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
+			}
+		}
+		pending_buffer = true;
 		for (const auto board_index: u220_group.active_boards()) {
-			u220_group.board(board_index)->receive();
+			const auto error = u220_group.board(board_index)->receive(u220_buffer_idx);
+			pending_buffer &= (error == uhd::rx_metadata_t::ERROR_CODE_NONE);
 		}
-		// }
-		int ret = dma.send();
-		if (ret != 0) {
-			fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
-		}
+		u220_cycles = u220_group.board(first_board)->get_stats().cycles_completed;
 		return;
 	}
 

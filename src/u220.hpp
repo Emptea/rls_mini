@@ -42,6 +42,7 @@ struct u220_stats {
 	size_t rx_packet_cnt       = 0;
 	uint64_t rx_recv_total_us  = 0;
 	uint64_t rx_recv_max_us    = 0;
+	uint32_t rx_chunk_counter  = 0;
 
 	// TX errors
 	size_t tx_underruns        = 0;
@@ -138,7 +139,7 @@ public:
 	void stop_transmission();
 
 	void start_reception(double settling_time);
-	void receive();
+	uhd::rx_metadata_t::error_code_t receive(const int active_buffer_idx);
 	void stop_and_drain_rx();
 	void stop_reception();
 

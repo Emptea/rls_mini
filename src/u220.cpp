@@ -360,50 +360,52 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 	}
 }
 
-void U220::receive() {
-	const auto recv_start = std::chrono::steady_clock::now();
-	const int received_buffer        = active_buffer_idx.load();
-	const size_t samples_per_channel = rx_stream->recv(rx_buffer_ptrs[received_buffer], board_config.rx_spb, rx_metadata, rx_timeout);
+uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
+	const auto recv_start            = std::chrono::steady_clock::now();
+	const size_t samples_per_channel = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout);
 	size_t num_rx_samps              = samples_per_channel * 2;
-	const auto recv_us    = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - recv_start).count();
-	rx_timeout            = rx_burst_pkt_time; // small timeout for subsequent recv
+	const auto recv_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - recv_start).count();
+	rx_timeout         = rx_burst_pkt_time; // small timeout for subsequent recv
 
 
 	rx_errors_worker(rx_metadata.error_code);
 	if (num_rx_samps) {
-		active_buffer_idx = (received_buffer + 1) % TX_BUFFER_COUNT;
 		stats.cycles_completed++;
 		stats.rx_recv_total_us += recv_us;
-		stats.rx_recv_max_us = std::max<uint64_t>(stats.rx_recv_max_us, recv_us);
+		stats.rx_recv_max_us   = std::max<uint64_t>(stats.rx_recv_max_us, recv_us);
+		stats.rx_chunk_counter = *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
 	}
 	stats.rx_packet_cnt += num_rx_samps;
 	// piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
 	// 	   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[0]) + 1)
 	// 	   << "serial" << serial;
-	const uint32_t n_samp_per_round = static_cast<uint32_t>(std::lround(0.5 / 46.4e-6));
-	// if (stats.rx_packet_cnt > 2 * (n_samp_per_round - 1) && stats.rx_packet_cnt < 2 * (n_samp_per_round + board_config.rx_spb * 101)) {
-	constexpr size_t dump_stride = 4;
-	constexpr size_t dump_packets_per_channel = 150;
-	if (samples_per_channel > 0 && stats.cycles_completed % dump_stride == 0 &&
-	    stats.cycles_completed <= dump_stride * dump_packets_per_channel) {
+	constexpr double revolution_time = 2.0;
+	constexpr double block_time      = 20 * 46.4e-6;
+	constexpr size_t dump_stride     = 15;
+	const double block_start         = (stats.cycles_completed - 1) * block_time;
+	constexpr size_t n_turn        = 10;
+	if (samples_per_channel > 0 && block_start >= (n_turn - 1) * revolution_time && block_start < n_turn * revolution_time &&
+	    stats.cycles_completed % dump_stride == 0) {
 		for (int ch: {0, 1}) {
 			auto ch_ptr = dump_queue[ch].getRef();
-			ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[received_buffer][ch], samples_per_channel));
+			ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
 		}
 	}
+
 
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
 		for (int ch: {0, 1}) {
 			auto ch_ptr = rx_queue[ch].getRef();
-			ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[received_buffer][ch], samples_per_channel));
+			ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
 		}
 
 		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.cycles_completed
 			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6)
-			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[received_buffer][0])
-			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[received_buffer][0]) + 1);
+			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0])
+			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
 		// PRINT_U220_STATS(stats);
 	}
+	return rx_metadata.error_code;
 }
 
 bool U220::sync() {
