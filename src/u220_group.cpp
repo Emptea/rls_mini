@@ -52,9 +52,9 @@ void U220Group::setup_one_board(size_t i) {
 	u->set_rx_adc_delay(cfg_.rx_adc_delay[ch0], cfg_.rx_adc_delay[ch1]);
 	u->set_rx_en_delay(cfg_.rx_en_delay[ch0], cfg_.rx_en_delay[ch1]);
 
-	u->set_play_gpio_tx_enable(0b11);
-	u->set_play_gpio_rx_enable(0b11);
-	u->set_play_rx_insert_count(1);
+	u->set_play_gpio_tx_enable(cfg_.tx_gpio_enable);
+	u->set_play_gpio_rx_enable(cfg_.rx_gpio_enable);
+	u->set_play_rx_insert_count(cfg_.rx_insert_count);
 
 	uint8_t enable_mask = 0;
 
@@ -81,7 +81,7 @@ void U220Group::setup_one_board(size_t i) {
 
 		u->set_rx_playback_enable(channel, mask);
 	}
-	u->set_rx_playback_start_delay(253, 253);
+	u->set_rx_playback_start_delay(cfg_.imitator_start_delay[ch0], cfg_.imitator_start_delay[ch1]);
 }
 
 void U220Group::reset_time(uint32_t value) {

@@ -20,7 +20,14 @@
 #include <pivaluetree_conversions.h>
 #include <thread>
 
-GlobalData::GlobalData(): GlobalDataEth(this), cfg(), u220_group(cfg), imitator_u220(u220_group) {
+GlobalData::GlobalData()
+	: GlobalDataEth(this)
+	, cfg()
+	, u220_group(cfg)
+	, imitator_u220(u220_group)
+	, cpm_rr(techlaser, imitator_u220)
+	, cpm_poi(cfg.dma_enabled)
+	, cpm_cit(imitator_u220) {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
 
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
@@ -130,18 +137,16 @@ void GlobalData::start() {
 	});
 
 	piCout << "Imitator init";
-
-	std::array<ImitatorU220::TargetParams, 4> targets{};
-
-	for (size_t i = 0; i < 4; ++i) {
-		targets[i] = {cfg.target_az[i], cfg.target_um[i], cfg.target_dist[i], cfg.target_vel[i], cfg.target_osl[i]};
-	}
-
-	imitator_u220.set_params(targets);
+	cpm_cit.set_shtat(cfg);
 	// imitator_u220.set_opu(0.0, 0.0);
 	cpm_rr.set_vr(CpmRr::RotationCommand::Simulator);
 
 	imitator_u220.apply(0.0);
+
+	global->sendMessage(set_POI_Kvit());
+	global->sendMessage(set_CIT_Kvit());
+	global->sendMessage(set_RR_Kvit());
+
 
 	// 1_s .sleep();
 
@@ -431,20 +436,20 @@ void GlobalData::cpm_loop() {
 		// Проверка stat — 1 Гц
 		if (++tick2 >= 100) {
 			tick2 = 0;
-			for (const auto i: u220_group.active_boards()) {
-				auto * fpga = u220_group.fpga(i);
-				for (size_t radio = 0; radio < 2; ++radio) {
-					fpga->log_rx_playback_status(radio);
-					fpga->log_rx_playback_phase(radio);
-					fpga->log_rx_playback_enable(radio);
-					fpga->log_rx_playback_correction(radio);
-					fpga->log_rx_playback_delay(radio);
-					fpga->log_rx_playback_amplitude(radio);
-					fpga->log_rx_playback_dn_offset(radio);
-				}
-				fpga->log_rx_playback_dn_counter();
-				fpga->log_rx_playback_start_delay();
-			}
+			// for (const auto i: u220_group.active_boards()) {
+			// 	auto * fpga = u220_group.fpga(i);
+			// 	for (size_t radio = 0; radio < 2; ++radio) {
+			// 		fpga->log_rx_playback_status(radio);
+			// 		fpga->log_rx_playback_phase(radio);
+			// 		fpga->log_rx_playback_enable(radio);
+			// 		fpga->log_rx_playback_correction(radio);
+			// 		fpga->log_rx_playback_delay(radio);
+			// 		fpga->log_rx_playback_amplitude(radio);
+			// 		fpga->log_rx_playback_dn_offset(radio);
+			// 	}
+			// 	fpga->log_rx_playback_dn_counter();
+			// 	fpga->log_rx_playback_start_delay();
+			// }
 		}
 
 		next += period;
@@ -794,7 +799,7 @@ void GlobalData::received_CIT_KU(const Protocol_RLS_Mini::CIT_KU & msg) {
 		dst.osl      = src[i]->getAttenuation();
 	}
 
-	cpm_cit.set_targets(targets);
+	cpm_cit.set_targets(targets, 2);
 
 	global->sendMessage(set_CIT_Kvit());
 }

@@ -37,6 +37,7 @@ public:
 	                   const std::array<double, 4> & target_dist,
 	                   const std::array<double, 4> & target_osl);
 
+	void set_targets_enabled(uint8_t mask);
 
 	// Angle in degrees, rotation speed in degrees per second.
 	// Zero speed holds the specified angle.
@@ -67,5 +68,5 @@ private:
 
 	static double attenuation_to_rcs(double attenuation_db);
 	static uint32_t velocity_to_phase(int16_t velocity_mps);
-	static std::complex<int16_t> calc_amplitude(uint16_t distance_m, size_t channel, uint16_t angle, double attenuation_db);
+	static std::complex<int16_t> calc_amplitude(double distance_m, size_t channel, double um_deg, double attenuation_db);
 };

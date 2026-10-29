@@ -120,14 +120,14 @@ private:
 	uint16_t req_test_channel = 0;
 
 	Techlaser techlaser;
-	CpmRr cpm_rr{techlaser, imitator_u220};
-	CpmPoi cpm_poi{cfg.dma_enabled};
+	CpmRr cpm_rr;
+	CpmPoi cpm_poi;
 	CpmCit cpm_cit;
 
 	struct target {
 		uint32_t n   = 0; // номер цели
 		double time  = 0; // время обнаружения
-		float az    = 0; // азимут цели. град
+		float az     = 0; // азимут цели. град
 		float um     = 0; // Угол места, град
 		float d      = 0; // Дальность, м
 		double amp   = 0; // Амплитуда сигнала цели, в ед АЦП

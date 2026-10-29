@@ -1,5 +1,8 @@
 #pragma once
 
+#include "imitator_u220.h"
+#include "mini_config.hpp"
+
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -68,9 +71,24 @@ public:
 
 	using Targets = std::array<Target, 4>;
 
-	void set_targets(const Targets & value) {
+	explicit CpmCit(ImitatorU220 & imitator): imitator(imitator) {}
+
+	void set_targets(const Targets & value, size_t count = 4) {
 		std::lock_guard<std::mutex> lock(mutex);
-		targets = value;
+		std::array<ImitatorU220::TargetParams, 4> params{};
+
+		uint8_t enable_mask = 0;
+
+		for (size_t i = 0; i < count; ++i) {
+			const auto & t = value[i];
+			params[i]      = {t.az, t.um, t.distance, static_cast<int16_t>(std::lround(t.vr)), t.osl};
+
+			if (t.on) enable_mask |= static_cast<uint8_t>(1U << i);
+		}
+
+		imitator.set_params(params);
+		imitator.set_targets_enabled(enable_mask);
+		imitator.apply(0.0);
 	}
 
 	Targets get_targets() const {
@@ -78,7 +96,25 @@ public:
 		return targets;
 	}
 
+	void set_shtat(const MiniConfig & cfg) {
+		Targets defaults{};
+
+		for (size_t i = 0; i < defaults.size(); ++i) {
+			defaults[i].reg      = Register::POA;
+			defaults[i].on       = cfg.imitator_target_en[i];
+			defaults[i].az       = static_cast<float>(cfg.target_az[i]);
+			defaults[i].distance = static_cast<float>(cfg.target_dist[i]);
+			defaults[i].um       = static_cast<float>(cfg.target_um[i]);
+			defaults[i].vr       = static_cast<float>(cfg.target_vel[i]);
+			defaults[i].osl      = static_cast<float>(cfg.target_osl[i]);
+		}
+
+		set_targets(defaults);
+	}
+
+
 private:
+	ImitatorU220 & imitator;
 	mutable std::mutex mutex;
 	Targets targets{};
 

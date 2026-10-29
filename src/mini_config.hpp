@@ -44,6 +44,7 @@ public:
 	double opu_az = 0.0;
 	std::array<bool, TARGET_COUNT> imitator_target_en{};
 	std::array<bool, CHANNEL_COUNT> imitator_channels_en{};
+	std::array<uint32_t, CHANNEL_COUNT> imitator_start_delay{};
 
 	using Signal                = std::array<uint8_t, SAMPLE_COUNT>;
 	using ComplexSignal         = std::array<std::complex<int16_t>, SAMPLE_COUNT>;

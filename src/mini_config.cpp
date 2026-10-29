@@ -421,4 +421,5 @@ void MiniConfig::load_imitator() {
 		if (channels[channel] > 1) throw std::runtime_error("Invalid imitator.channels_enable");
 		imitator_channels_en[channel] = channels[channel] == 1;
 	}
+	imitator_start_delay = get_uint_array("imitator", "start_delay");
 }
