@@ -81,6 +81,11 @@ public:
 
 		for (size_t i = 0; i < count; ++i) {
 			const auto & t = value[i];
+			targets[i]     = t;
+		}
+
+		for (size_t i = 0; i < 4; ++i) {
+			const auto & t = targets[i];
 			params[i]      = {t.az, t.um, t.distance, static_cast<int16_t>(std::lround(t.vr)), t.osl};
 
 			if (t.on) enable_mask |= static_cast<uint8_t>(1U << i);
