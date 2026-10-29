@@ -142,10 +142,19 @@ void ImitatorU220::set_opu(double angle_degrees, double speed_degps) {
 	}
 }
 
+void ImitatorU220::restart_opu(void) {
+	set_opu(opu_az_deg_, 180.0);
+}
+
+void ImitatorU220::stop_opu(void) {
+	set_opu(opu_az_deg_, 0);
+}
+
 float ImitatorU220::get_opu_az() {
 	auto status = group_.fpga(0)->get_rx_playback_status(0, 0);
 	// opu_running_ = status.playing;
 	auto az     = status.getDnDeg();
+	opu_az_deg_ = az;
 	return az;
 }
 

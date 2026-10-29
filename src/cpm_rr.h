@@ -62,7 +62,7 @@ public:
 		switch (value) {
 		case RotationCommand::Off: {
 			techlaser.stop();
-			imitator_u220.set_opu(0, 0);
+			imitator_u220.stop_opu();
 			imitator_u220.apply(0);
 		} break;
 		case RotationCommand::On: {
@@ -71,7 +71,7 @@ public:
 		} break;
 		case RotationCommand::Simulator: {
 			use_imit_opu = true;
-			imitator_u220.set_opu(0, 180);
+			imitator_u220.restart_opu();
 			imitator_u220.apply(0);
 		} break;
 		default: break;
