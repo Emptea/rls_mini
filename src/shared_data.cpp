@@ -342,23 +342,19 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 
 	static_assert(sizeof(rls::header) == 24, "Invalid header size");
 	static_assert(sizeof(rls::work_posthdr) == 8, "Invalid work_posthdr size");
-	static_assert(sizeof(rls::work_packet) == 16, "Invalid work_packet size");
+	static_assert(sizeof(rls::noise_formular) == 68, "Invalid noise_formular size");
 	static_assert(BUFFER_SIZE >= work_header_size, "DMA buffer too small");
 
-	struct rls::header * hdr          = (rls::header *)buffer;
-	struct rls::work_posthdr * work   = (struct rls::work_posthdr *)(hdr + 1);
-	struct rls::work_packet * packets = reinterpret_cast<struct rls::work_packet *>(work + 1);
-	auto nes                          = work->n_work_packets;
-	auto time_delayed                 = static_cast<uint32_t>(std::round((double)(hdr->packet_number - work->packet_number) * 46.4e-3));
-	static uint16_t n_taget           = 0;
+	struct rls::work_packet * pac = (rls::work_packet *)buffer;
+	auto nes                      = pac->posthdr.n_formulars;
 	for (size_t i = 0; i < nes; i++) {
-		struct rls::work_packet & packet = packets[i];
+		struct rls::formular & f = pac->formulars[i];
 		struct target targ;
-		targ.n                                   = n_taget++;
+		targ.n                                   = cpm_poi.nes.count;
 		targ.time                                = cpm_rr.get_compensated_time();
 		targ.az                                  = cpm_rr.get_compensated_az();
 
-		auto um_idx                              = packet.main_diagram_number;
+		auto um_idx                              = f.main_diagram_number;
 		constexpr std::array<float, 8> um_values = {
 			5.3125f,
 			15.9375f,
@@ -371,7 +367,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		};
 		// targ.um        = (double)111packet.main_amplitude / (double)packet.neighbor_amplitude;
 		targ.um        = um_values[um_idx];
-		auto range_idx = packet.range;
+		auto range_idx = f.range;
 		// TODO: перенести в константы
 		size_t tx_sig_len;
 		if (range_idx < 101) {
@@ -379,10 +375,11 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		} else {
 			tx_sig_len = 6;
 		}
-		double range                       = (range_idx + tx_sig_len / 2) / 5e6 * 299792458.0 / 2;
-		targ.d                             = range;
-		targ.porog                         = packet.rank_out * cpm_poi.get_apu_k1();
-		targ.amp                           = (double)packet.main_amplitude;
+		double range = (range_idx + tx_sig_len / 2) / 5e6 * 299792458.0 / 2;
+		targ.d       = range;
+		targ.porog   = f.rank_out * cpm_poi.get_apu_k1();
+		targ.amp     = (double)f.main_amplitude;
+		cpm_poi.nes.push(static_cast<uint16_t>(range));
 
 		constexpr double carrier_frequency = 3.6e9;
 		constexpr double c                 = 299792458.0;
@@ -390,10 +387,9 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		constexpr double pulse_period      = 46.4e-6;
 		const double wavelength            = c / carrier_frequency;
 		const double velocity_step         = wavelength / pulse_period / (2.0 * fft_size);
-		const uint32_t freq_idx            = packet.frequency_channel;
+		const uint32_t freq_idx            = f.frequency_channel;
 		const int doppler_bin              = freq_idx < 256 ? -static_cast<int>(freq_idx) : 512 - static_cast<int>(freq_idx);
 		targ.vr                            = doppler_bin * velocity_step;
-		cpm_poi.nes.push(static_cast<uint16_t>(range));
 		send_KTA_VO(targ);
 
 		printf("Target #%zu: "
@@ -405,13 +401,13 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		       "frequency_channel=%u, "
 		       "rank_out=%u\n",
 		       i + 1,
-		       static_cast<unsigned>(packet.range),
-		       packet.main_amplitude,
-		       packet.neighbor_amplitude,
-		       static_cast<unsigned>(packet.main_diagram_number),
-		       static_cast<unsigned>(packet.neighbor_diagram_side),
-		       static_cast<unsigned>(packet.frequency_channel),
-		       packet.rank_out);
+		       static_cast<unsigned>(f.range),
+		       f.main_amplitude,
+		       f.neighbor_amplitude,
+		       static_cast<unsigned>(f.main_diagram_number),
+		       static_cast<unsigned>(f.neighbor_diagram_side),
+		       static_cast<unsigned>(f.frequency_channel),
+		       f.rank_out);
 	}
 }
 
