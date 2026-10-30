@@ -121,6 +121,11 @@ public:
 
 	float get_current_az() const {
 		auto az = use_imit_opu ? imitator_u220.get_opu_az() : techlaser.getAngleCurrent();
+		if (last_opu_az > 270.0 && az < 90.0) {
+			rotation_completed = true;
+		}
+		last_opu_az = az;
+
 		az += daz;
 		az = std::fmod(az, 360.0);
 		if (az < 0.0) az += 360.0;
@@ -135,25 +140,35 @@ public:
 		return az;
 	}
 
+	bool take_rotation_completed() const {
+		const bool result  = rotation_completed;
+		rotation_completed = false;
+		return result;
+	}
+
 private:
 	Techlaser & techlaser;
 	ImitatorU220 & imitator_u220;
 
-	RotationCommand kuvr = RotationCommand::Off; // Последняя команда вращения
-	RotationState vr     = RotationState::Off;   // Текущее состояние вращения
+	RotationCommand kuvr            = RotationCommand::Off; // Последняя команда вращения
+	RotationState vr                = RotationState::Off;   // Текущее состояние вращения
 
-	bool kuizl           = false; // Последняя команда излучения
-	bool izl             = false; // Текущее состояние излучения
-	bool ant             = false; // Состояние подключения антенны
+	bool kuizl                      = false; // Последняя команда излучения
+	bool izl                        = false; // Текущее состояние излучения
+	bool ant                        = false; // Состояние подключения антенны
 
-	bool use_imit_opu    = false;
+	bool use_imit_opu               = false;
 
-	uint8_t ispr_kan     = 0; // Исправность приёмных каналов
+	mutable double last_opu_az      = 0;
+	mutable bool rotation_completed = false;
 
-	float daz            = 0.0f; // Азимутальная поправка датчика, градусы
-	float dd_poi         = 0.0f; // Поправка дальности ПОИ, метры
-	float daz_poi        = 0.0f; // Азимутальная поправка ПОИ, градусы
+	uint8_t ispr_kan                = 0; // Исправность приёмных каналов
+
+	float daz                       = 0.0f; // Азимутальная поправка датчика, градусы
+	float dd_poi                    = 0.0f; // Поправка дальности ПОИ, метры
+	float daz_poi                   = 0.0f; // Азимутальная поправка ПОИ, градусы
 
 	std::atomic<double> time_offset{0.0};
-	std::atomic<double> signal_processing_delay{0.0239424}; // (paramRLSmini.N_ddr/2+paramRLSmini.M_az/2*paramRLSmini.frqScl)*paramRLSmini.pulsePeriod
+	std::atomic<double> signal_processing_delay{
+		0.0239424}; // (paramRLSmini.N_ddr/2+paramRLSmini.M_az/2*paramRLSmini.frqScl)*paramRLSmini.pulsePeriod
 };

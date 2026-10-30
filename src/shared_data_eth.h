@@ -44,6 +44,15 @@ public:
 		eth_rlso_send->send(addr, data);
 	}
 
+	void sendMessage(PIByteArray data, ushort port) {
+		changeEndian(data);
+		PIMutexLocker locker(send_mutex);
+		if (!eth_rlso_send) return;
+
+		PINetworkAddress addr("193.1.1.255", port);
+		eth_rlso_send->send(addr, data);
+	}
+
 	// clang-format off
 	/// Удалить ненужные
 	// void received_CIT_Zapros      (const Protocol_RLS_Mini::CIT_Zapros     & msg) {piCout << "rec msg" << "received_CIT_Zapros   ";}

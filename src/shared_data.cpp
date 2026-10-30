@@ -269,11 +269,11 @@ void GlobalData::processChannels() {
 }
 
 void GlobalData::u220_recv() {
-	const size_t first_board       = u220_group.active_boards()[0];
-	static size_t u220_cycles      = 0;
-	static bool pending_buffer     = false;
-	static int u220_buffer_idx     = 0;
-	auto packet_cnt                = u220_group.board(first_board)->get_stats().rx_packet_cnt;
+	const size_t first_board   = u220_group.active_boards()[0];
+	static size_t u220_cycles  = 0;
+	static bool pending_buffer = false;
+	static int u220_buffer_idx = 0;
+	auto packet_cnt            = u220_group.board(first_board)->get_stats().rx_packet_cnt;
 
 	if (!u220_cycles) {
 		t_start = PISystemTime::current();
@@ -393,7 +393,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		const uint32_t freq_idx            = packet.frequency_channel;
 		const int doppler_bin              = freq_idx < 256 ? -static_cast<int>(freq_idx) : 512 - static_cast<int>(freq_idx);
 		targ.vr                            = doppler_bin * velocity_step;
-
+		cpm_poi.nes.push(static_cast<uint16_t>(range));
 		send_KTA_VO(targ);
 
 		printf("Target #%zu: "
@@ -427,7 +427,7 @@ void GlobalData::cpm_loop() {
 
 	while (!cpm_thread.isStopping()) {
 		// PI — 100 Гц
-		global->sendMessage(set_PI());
+		send_PI();
 
 		// Проверка RR — 10 Гц
 		if (++tick >= 10) {
@@ -637,9 +637,10 @@ void GlobalData::send_KTA_VO(struct target targ) {
 
 
 void GlobalData::send_PI() {
-	Protocol_RLS_Mini::PI ans;
-
-	global->sendMessage(ans);
+	Protocol_RLS_Mini::PI pi = set_PI();
+	PIByteArray data         = piSerialize(pi);
+	data.append(cpm_poi.nes.data.data(), pi.nes * sizeof(uint16_t));
+	global->sendMessage(data, Protocol_RLS_Mini::PI::Port);
 }
 
 Protocol_RLS_Mini::PI GlobalData::set_PI() {
@@ -650,7 +651,11 @@ Protocol_RLS_Mini::PI GlobalData::set_PI() {
 	pi.setDegreesAz(cpm_rr.get_compensated_az());
 
 	pi.zona = cpm_poi.get_zona_val();
-	pi.nes  = cpm_poi.get_nes();
+	pi.nes  = cpm_poi.nes.count;
+
+	if (cpm_rr.take_rotation_completed()) {
+		cpm_poi.nes.clear();
+	}
 
 	return pi;
 }

@@ -19,6 +19,19 @@ public:
 		AfterLou  = 1,
 	};
 
+	struct Nes {
+		uint16_t count = 0;
+		std::array<uint16_t, 512> data{};
+
+		void push(uint16_t value) {
+			if (count < data.size()) data[count++] = value;
+		}
+
+		void clear() { count = 0; }
+	};
+
+	Nes nes;
+
 	explicit CpmPoi(bool dma_enabled): dma_enabled(dma_enabled) {}
 
 	// SDC — селекция движущихся целей
