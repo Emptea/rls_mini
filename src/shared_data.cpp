@@ -130,7 +130,7 @@ void GlobalData::start() {
 	}
 
 	// 0.1_s .sleep();
-
+	u220_recv_thread.setPriority(PIThread::piHighest);
 	u220_recv_thread.start([this] {
 		u220_recv();
 		if (u220_recv_thread.isStopping()) u220_group.stop_and_drain_rx();
@@ -464,26 +464,26 @@ void GlobalData::cpm_loop() {
 	}
 }
 
-static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
-	switch (control_point) {
-	case Protocol_RLS_Mini::CTRL: return rls::TP_WORK;
-	case Protocol_RLS_Mini::PHD: return rls::TP_BYPASS;
-	case Protocol_RLS_Mini::FAP: return rls::TP_FAPCH;
-	case Protocol_RLS_Mini::LOU: return rls::TP_LOU;
-	case Protocol_RLS_Mini::SF: return rls::TP_SF;
-	case Protocol_RLS_Mini::KN: return rls::TP_MAX;
-	case Protocol_RLS_Mini::AD: return rls::TP_FFT;
-	case Protocol_RLS_Mini::APU: return rls::TP_APU;
-	case Protocol_RLS_Mini::CUT: return rls::TP_CUT;
-	case Protocol_RLS_Mini::DDR: return rls::TP_DDR;
-	case Protocol_RLS_Mini::FIND: return rls::TP_FIND;
-	case Protocol_RLS_Mini::RANK: return rls::TP_RANK;
-	case Protocol_RLS_Mini::FAP_COEFFS: return rls::TP_FAPCH_COEFFS;
-	case Protocol_RLS_Mini::WEIGHT_OUT: return rls::TP_WEIGHT_OUT;
-	case Protocol_RLS_Mini::MTI: return rls::TP_MTI;
-	default: return rls::TP_WORK;
-	}
-}
+// static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
+// 	switch (control_point) {
+// 	case Protocol_RLS_Mini::CTRL: return rls::TP_WORK;
+// 	case Protocol_RLS_Mini::PHD: return rls::TP_BYPASS;
+// 	case Protocol_RLS_Mini::FAP: return rls::TP_FAPCH;
+// 	case Protocol_RLS_Mini::LOU: return rls::TP_LOU;
+// 	case Protocol_RLS_Mini::SF: return rls::TP_SF;
+// 	case Protocol_RLS_Mini::KN: return rls::TP_MAX;
+// 	case Protocol_RLS_Mini::AD: return rls::TP_FFT;
+// 	case Protocol_RLS_Mini::APU: return rls::TP_APU;
+// 	case Protocol_RLS_Mini::CUT: return rls::TP_CUT;
+// 	case Protocol_RLS_Mini::DDR: return rls::TP_DDR;
+// 	case Protocol_RLS_Mini::FIND: return rls::TP_FIND;
+// 	case Protocol_RLS_Mini::RANK: return rls::TP_RANK;
+// 	case Protocol_RLS_Mini::FAP_COEFFS: return rls::TP_FAPCH_COEFFS;
+// 	case Protocol_RLS_Mini::WEIGHT_OUT: return rls::TP_WEIGHT_OUT;
+// 	case Protocol_RLS_Mini::MTI: return rls::TP_MTI;
+// 	default: return rls::TP_WORK;
+// 	}
+// }
 
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
@@ -491,9 +491,10 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	piCout << msg;
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	// piCout << "rec msg kt" << msg.kt;
-	const auto test_point = map_kt_to_dsp(msg.kt);
+	// const auto test_point = map_kt_to_dsp(msg.kt);
+	const auto test_point = msg.kt;
 	if (cfg.dma_enabled) {
-		axi_dsp_set_output_source(test_point, msg.nkan, msg.reg_takt);
+		axi_dsp_set_output_source(test_point, msg.nkan, msg.rg);
 		axi_dsp_apply();
 	}
 	req_test_channel = msg.kt;

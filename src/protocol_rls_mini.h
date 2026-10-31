@@ -258,7 +258,8 @@ public:
 		static constexpr int16_t Type = 3;
 		static constexpr int16_t Code = 0;
 		POI_TK_Zapros(): Header(Type, Code) {} // 0 - запрос состояния системы ПОИ, 1 - запрос контрольной точки
-		uint16_t kt   = 0;                     // Код контрольной точки
+		uint8_t kt    = 0;                     // Код контрольной точки
+		uint8_t rg    = 0;                     // дальностный канал
 		uint16_t nkan = 0;                     // Номер канала
 		uint16_t reg_takt = 0; // Количество регистрируемых тактов: 0 - запрос состояния системы ПОИ, 1 - запрос контрольной точки
 	};
@@ -876,7 +877,7 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Kvit & v) {
 
 // POI_TK_Zapros
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_TK_Zapros & v) {
-	return out << "kt:" << v.kt << "nkan:" << v.nkan << "reg_takt:" << v.reg_takt;
+	return out << "kt:" << v.kt << "rg:" << v.rg << "nkan:" << v.nkan << "reg_takt:" << v.reg_takt;
 }
 
 // POI_TK_Kvit
