@@ -1,5 +1,8 @@
 #include "u220.hpp"
 
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <pistring_std.h>
 
 // clang-format off
@@ -99,7 +102,7 @@ void U220::initialize_usrp() {
 
 	usrp->set_tx_rate(user_config.rate);
 	usrp->set_rx_rate(user_config.rate);
-	board_config.rate = usrp->get_tx_rate();
+	board_config.rate = usrp->get_rx_rate();
 
 	// Configure both channels (0 and 1)
 	for (size_t ch = 0; ch < 2; ch++) {
@@ -360,57 +363,206 @@ void U220::rx_errors_worker(uhd::rx_metadata_t::error_code_t err) {
 	}
 }
 
+
 uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
-	const auto recv_start            = std::chrono::steady_clock::now();
+	using Clock               = std::chrono::steady_clock;
+
+	const auto function_start = Clock::now();
+	const auto recv_start     = function_start;
+
+	const auto elapsed_ns     = [](Clock::time_point start, Clock::time_point end) -> int64_t {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+	};
+
+	RxTraceEntry entry{};
+
+	// ------------------------------------------------------------
+	// 1. Интервал с предыдущим recv()
+	// ------------------------------------------------------------
+
+	int64_t gap_us = 0;
+
+	if (have_previous_recv) {
+		gap_us = std::chrono::duration_cast<std::chrono::microseconds>(recv_start - previous_recv_end).count();
+	}
+
+	// ------------------------------------------------------------
+	// 2. UHD recv()
+	// ------------------------------------------------------------
+
+	const auto uhd_start             = Clock::now();
+
+	entry.pre_recv_ns                = elapsed_ns(function_start, uhd_start);
+
 	const size_t samples_per_channel = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout);
-	size_t num_rx_samps              = samples_per_channel * 2;
-	const auto recv_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - recv_start).count();
-	rx_timeout         = rx_burst_pkt_time; // small timeout for subsequent recv
 
+	const auto recv_end              = Clock::now();
 
-	rx_errors_worker(rx_metadata.error_code);
+	entry.uhd_recv_ns                = elapsed_ns(uhd_start, recv_end);
+
+	const uint64_t recv_us           = std::chrono::duration_cast<std::chrono::microseconds>(recv_end - recv_start).count();
+
+	previous_recv_end                = recv_end;
+	have_previous_recv               = true;
+
+	// ------------------------------------------------------------
+	// 3. Время последнего принятого отсчёта
+	// ------------------------------------------------------------
+
+	const bool valid_samples =
+		samples_per_channel > 0 && rx_metadata.error_code == uhd::rx_metadata_t::ERROR_CODE_NONE && rx_metadata.has_time_spec;
+
+	if (valid_samples) {
+		const double first_sample_time = rx_metadata.time_spec.get_real_secs();
+
+		last_sample_time               = first_sample_time + static_cast<double>(samples_per_channel - 1) / board_config.rate;
+	}
+
+	// ------------------------------------------------------------
+	// 4. Привязка времени USRP для entry.lag_estimate_ms
+	// ------------------------------------------------------------
+
+	const auto lag_start = Clock::now();
+
+	if (valid_samples && (!have_device_time_reference || recv_end - device_time_reference_host >= std::chrono::seconds(1))) {
+		const auto host_before     = Clock::now();
+
+		const double device_now    = usrp->get_time_now().get_real_secs();
+
+		const auto host_after      = Clock::now();
+
+		device_time_reference_host = host_before + (host_after - host_before) / 2;
+
+		device_time_reference_usrp = device_now;
+		have_device_time_reference = true;
+	}
+
+	entry.lag_check_ns     = elapsed_ns(lag_start, Clock::now());
+
+	// ------------------------------------------------------------
+	// 5. Формирование RxTraceEntry
+	// ------------------------------------------------------------
+
+	const auto trace_start = Clock::now();
+
+	entry.iteration        = rx_iteration++;
+
+	entry.start_ns         = std::chrono::duration_cast<std::chrono::nanoseconds>(recv_start.time_since_epoch()).count();
+
+	entry.end_ns           = std::chrono::duration_cast<std::chrono::nanoseconds>(recv_end.time_since_epoch()).count();
+
+	entry.gap_us           = gap_us;
+	entry.recv_us          = static_cast<int64_t>(recv_us);
+
+	entry.samples          = samples_per_channel;
+	entry.error_code       = static_cast<int>(rx_metadata.error_code);
+	entry.has_time_spec    = rx_metadata.has_time_spec;
+
+	if (rx_metadata.has_time_spec) {
+		entry.sample_time = rx_metadata.time_spec.get_real_secs();
+	}
+
+	entry.last_sample_time = last_sample_time;
+
+	if (have_device_time_reference && std::isfinite(last_sample_time)) {
+		const double elapsed_s             = std::chrono::duration<double>(recv_end - device_time_reference_host).count();
+
+		const double estimated_device_time = device_time_reference_usrp + elapsed_s;
+
+		entry.lag_estimate_ms              = (estimated_device_time - last_sample_time) * 1000.0;
+
+		entry.lag_reference_age_us = std::chrono::duration_cast<std::chrono::microseconds>(recv_end - device_time_reference_host).count();
+	}
+
+	entry.trace_ns            = elapsed_ns(trace_start, Clock::now());
+
+	// ------------------------------------------------------------
+	// 6. Основная обработка RX
+	// ------------------------------------------------------------
+
+	const size_t num_rx_samps = samples_per_channel * 2;
+
+	rx_timeout                = rx_burst_pkt_time;
+
 	if (num_rx_samps) {
 		stats.cycles_completed++;
 		stats.rx_recv_total_us += recv_us;
 		stats.rx_recv_max_us   = std::max<uint64_t>(stats.rx_recv_max_us, recv_us);
 		stats.rx_chunk_counter = *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
 	}
+
 	stats.rx_packet_cnt += num_rx_samps;
-	// piCout << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.rx_packet_cnt
-	// 	   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[0]) << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[0]) + 1)
-	// 	   << "serial" << serial;
+
 	constexpr double revolution_time = 2.0;
 	constexpr double block_time      = 20 * 46.4e-6;
 	constexpr size_t dump_stride     = 15;
-	const double block_start         = (stats.cycles_completed - 1) * block_time;
 	constexpr size_t n_turn          = 10;
 
-	
+	const double block_start         = (stats.cycles_completed - 1) * block_time;
+
+	// ------------------------------------------------------------
+	// 7. Dump queue
+	// ------------------------------------------------------------
+
+	const auto dump_start            = Clock::now();
+
 	if (samples_per_channel > 0 && block_start >= (n_turn - 1) * revolution_time && block_start < n_turn * revolution_time &&
 	    stats.cycles_completed % dump_stride == 0) {
 		for (int ch: {0, 1}) {
 			auto ch_ptr = dump_queue[ch].getRef();
+
 			ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
 		}
 	}
 
-	if (samples_per_channel > 0 && rx_metadata.error_code == uhd::rx_metadata_t::ERROR_CODE_NONE) {
-		for (int ch: {0, 1}) {
-			auto ref = rx_queue[ch].getRef();
-			ref->clear();
-			ref->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
-		}
+	entry.dump_queue_ns              = elapsed_ns(dump_start, Clock::now());
+
+	// ------------------------------------------------------------
+	// 8. Основная RX queue
+	// ------------------------------------------------------------
+
+	const auto queue_start           = Clock::now();
+
+	// if (samples_per_channel > 0 && rx_metadata.error_code == uhd::rx_metadata_t::ERROR_CODE_NONE) {
+	// 	for (int ch: {0, 1}) {
+	// 		auto ref = rx_queue[ch].getRef();
+
+	// 		ref->clear();
+
+	// 		ref->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
+	// 	}
+	// }
+
+	entry.rx_queue_ns                = elapsed_ns(queue_start, Clock::now());
+
+	// ------------------------------------------------------------
+	// 9. Периодическое логирование — БЕЗ ИЗМЕНЕНИЙ
+	// ------------------------------------------------------------
+
+	const auto logging_start         = Clock::now();
+	static auto cached_last_pps_time = 0;
+	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
+		const auto last_pps  = usrp->get_time_last_pps();
+		cached_last_pps_time = last_pps.get_full_secs();
+
+		piCout << serial << "Recv " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.cycles_completed
+			   << "last PPS time:" << cached_last_pps_time << "s or" << last_pps.get_tick_count(5e6)
+			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
 	}
 
-	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
-		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.cycles_completed
-			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6)
-			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0])
-			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
-		// PRINT_U220_STATS(stats);
-	}
+	entry.logging_ns       = elapsed_ns(logging_start, Clock::now());
+
+	// ------------------------------------------------------------
+	// 10. Итоговая трассировка
+	// ------------------------------------------------------------
+
+	entry.receive_total_ns = elapsed_ns(function_start, Clock::now());
+	entry.last_pps_time    = cached_last_pps_time;
+	rx_trace.push(entry);
+
 	return rx_metadata.error_code;
 }
+
 
 bool U220::sync() {
 	PISystemTime sync_time = PISystemTime::current();
@@ -447,17 +599,26 @@ void U220::start_sync() {
 }
 
 void U220::start_reception(double settling_time) {
-	const double rate        = usrp->get_rx_rate();
-	auto start_time          = usrp->get_time_now() + uhd::time_spec_t(settling_time);
-	rx_burst_pkt_time        = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
-	rx_timeout               = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
+	const double rate = usrp->get_rx_rate();
+	auto start_time   = usrp->get_time_now() + uhd::time_spec_t(settling_time);
+	rx_burst_pkt_time = std::max<float>(0.100f, (2 * user_config.rx_spb / rate));
+	rx_timeout        = settling_time + rx_burst_pkt_time; // expected settling time + padding for first recv
 
 	// setup streaming
 
+	rx_trace.clear();
+	rx_iteration               = 0;
+
+	have_previous_recv         = false;
+
+	last_sample_time           = std::numeric_limits<double>::quiet_NaN();
+
+	have_device_time_reference = false;
+
 	// print_config(board_config);
-	rx_stream_cmd.num_samps  = board_config.rx_spb;
-	rx_stream_cmd.stream_now = false;
-	rx_stream_cmd.time_spec  = start_time;
+	rx_stream_cmd.num_samps    = board_config.rx_spb;
+	rx_stream_cmd.stream_now   = false;
+	rx_stream_cmd.time_spec    = start_time;
 	// rx_stream_cmd.time_spec  = uhd::time_spec_t(0, 4640, 5e6);
 	rx_stream->issue_stream_cmd(rx_stream_cmd);
 
@@ -612,4 +773,66 @@ uint8_t U220::get_ensm_state() {
 	auto tree = usrp->get_device()->get_tree();
 
 	return static_cast<uint8_t>(tree->access<int>("/mboards/0/ensm/state").get());
+}
+
+void uhd_recv_diagnostics::reset() {
+	calls             = 0;
+	samples           = 0;
+
+	recv_total_us     = 0;
+	recv_max_us       = 0;
+
+	interval_total_us = 0;
+	interval_max_us   = 0;
+
+	partial_reads     = 0;
+	zero_reads        = 0;
+	overflows         = 0;
+	rx_lag_last_ms    = 0.0;
+	rx_lag_max_ms     = 0.0;
+	rx_lag_min_ms     = 0.0;
+	rx_lag_total_ms   = 0.0;
+	rx_lag_count      = 0;
+}
+
+void uhd_recv_diagnostics::print(const PIString & serial) {
+	if (calls == 0) return;
+
+	const double avg_recv     = static_cast<double>(recv_total_us) / calls;
+	const double avg_interval = calls > 1 ? static_cast<double>(interval_total_us) / (calls - 1) : 0.0;
+	const double lag_avg      = rx_lag_count ? rx_lag_total_ms / rx_lag_count : 0.0;
+
+	printf("\n========== UHD RECV %s ==========\n"
+	       "Calls:            %llu\n"
+	       "Samples:          %llu\n"
+	       "Recv avg/max:     %.1f / %llu us\n"
+	       "Interval avg/max: %.1f / %llu us\n"
+	       "Partial reads:    %llu\n"
+	       "Zero reads:       %llu\n"
+	       "Overflows:        %llu\n"
+	       "RX lag last/avg/min/max: %.3f / %.3f / %.3f / %.3f ms\n"
+	       "RX lag count: %llu\n"
+	       "====================================\n",
+
+	       PIString2StdString(serial).c_str(),
+
+	       (unsigned long long)calls,
+	       (unsigned long long)samples,
+
+	       avg_recv,
+	       (unsigned long long)recv_max_us,
+
+	       avg_interval,
+	       (unsigned long long)interval_max_us,
+
+	       (unsigned long long)partial_reads,
+	       (unsigned long long)zero_reads,
+	       (unsigned long long)overflows,
+	       rx_lag_last_ms,
+	       lag_avg,
+	       rx_lag_min_ms,
+	       rx_lag_max_ms,
+	       (unsigned long long)rx_lag_count);
+
+	reset();
 }

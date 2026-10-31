@@ -4,6 +4,7 @@
 #include "imitator_u220.h"
 #include "mini_config.hpp"
 #include "protocol_rls_mini.h"
+#include "rx_cycle_trace.hpp"
 #include "user_u220.h"
 
 #include <algorithm>
@@ -11,6 +12,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <piliterals_bytes.h>
 #include <piliterals_time.h>
@@ -18,6 +20,7 @@
 #include <pistring_std.h>
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
+#include <string>
 #include <thread>
 
 GlobalData::GlobalData()
@@ -276,16 +279,66 @@ void GlobalData::processChannels() {
 }
 
 void GlobalData::u220_recv_software() {
-	static int buffer_idx = 0;
+	using Clock                 = std::chrono::steady_clock;
+
+	static int buffer_idx       = 0;
+	static bool overflow_dumped = false;
+	static uint64_t iteration   = 0;
+	static RxCycleTraceBuffer<8192> rx_cycle_trace;
+	static Clock::time_point previous_start{};
+
+	const auto cycle_start = Clock::now();
+
+	RxCycleTraceEntry cycle{};
+	cycle.iteration = iteration++;
+
+	cycle.start_ns  = std::chrono::duration_cast<std::chrono::nanoseconds>(cycle_start.time_since_epoch()).count();
+
+	if (previous_start != Clock::time_point{}) {
+		cycle.cycle_period_us = std::chrono::duration_cast<std::chrono::microseconds>(cycle_start - previous_start).count();
+	}
+
+	previous_start         = cycle_start;
+
+	bool overflow_detected = false;
 
 	for (const auto board_index: u220_group.active_boards()) {
-		auto * board     = u220_group.board(board_index);
-		const auto error = board->receive(buffer_idx);
+		auto * board       = u220_group.board(board_index);
 
-		if (error != uhd::rx_metadata_t::ERROR_CODE_NONE) {
-			continue;
+		const auto start   = Clock::now();
+		const auto error   = board->receive(buffer_idx);
+		const auto end     = Clock::now();
+
+		const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+
+		if (board_index < 4) {
+			cycle.board_receive_us[board_index] = elapsed;
+			cycle.board_error[board_index]      = static_cast<int>(error);
+		}
+
+		cycle.recv_total_us += elapsed;
+
+		if (elapsed > 5000) {
+			piCout << "SLOW U220 RECEIVE:" << board->get_serial() << elapsed << "us";
+		}
+
+		if (error == uhd::rx_metadata_t::ERROR_CODE_OVERFLOW) {
+			overflow_detected = true;
 		}
 	}
+
+	cycle.cycle_us    = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - cycle_start).count();
+
+	cycle.overhead_us = cycle.cycle_us - cycle.recv_total_us;
+
+	// Обязательно записываем каждый цикл, включая цикл overflow.
+	rx_cycle_trace.push(cycle);
+
+	if (overflow_detected && !overflow_dumped) {
+		overflow_dumped = true;
+		dump_rx_traces(rx_cycle_trace.snapshot());
+	}
+
 	buffer_idx = (buffer_idx + 1) % TX_BUFFER_COUNT;
 }
 
@@ -485,6 +538,38 @@ void GlobalData::cpm_loop() {
 	}
 }
 
+void GlobalData::dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_entries) {
+	namespace fs = std::filesystem;
+	const auto timestamp =
+		std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+	const std::string suffix = std::to_string(timestamp);
+	const fs::path log_dir   = "logs";
+	std::error_code ec;
+	fs::create_directories(log_dir, ec);
+	if (ec) {
+		piCout << "ERROR: cannot create logs directory:" << StdString2PIString(ec.message());
+		return;
+	}
+
+	const fs::path rx_filename    = log_dir / ("rx_overflow_" + suffix + ".csv");
+	const fs::path cycle_filename = log_dir / ("rx_cycle_overflow_" + suffix + ".csv");
+	const bool cycle_saved        = write_rx_cycle_csv(cycle_entries, cycle_filename.string());
+	if (!cycle_saved) {
+		piCout << "ERROR: cannot save" << StdString2PIString(cycle_filename.string());
+	}
+
+	std::vector<BoardRxTraceEntry> all_entries;
+	for (const auto board_index: u220_group.active_boards()) {
+		auto * board             = u220_group.board(board_index);
+		const std::string serial = PIString2StdString(board->get_serial());
+		const auto snapshot      = board->get_rx_trace();
+		for (const auto & entry: snapshot) {
+			all_entries.push_back({serial, entry});
+		}
+	}
+	write_rx_trace_csv(std::move(all_entries), rx_filename.string());
+}
+
 // static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
 // 	switch (control_point) {
 // 	case Protocol_RLS_Mini::CTRL: return rls::TP_WORK;
@@ -508,8 +593,9 @@ void GlobalData::cpm_loop() {
 
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
-	piCout << "rec msg" << "received_POI_TK_Zapros";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_POI_TK_Zapros";
+	// piCout << msg;
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	// piCout << "rec msg kt" << msg.kt;
 	// const auto test_point = map_kt_to_dsp(msg.kt);
@@ -583,60 +669,68 @@ Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
 }
 
 void GlobalData::received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg) {
-	piCout << "rec msg" << "received_RR_Zapros    ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_RR_Zapros    ";
+	// piCout << msg;
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg) {
-	piCout << "rec msg" << "received_RR_Vr        ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_RR_Vr        ";
+	// piCout << msg;
 	cpm_rr.set_vr(static_cast<CpmRr::RotationCommand>(msg.par));
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
-	piCout << "rec msg" << "received_RR_Izl       ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_RR_Izl       ";
+	// piCout << msg;
 	cpm_rr.set_izl(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Ant(const Protocol_RLS_Mini::RR_Ant & msg) {
-	piCout << "rec msg" << "received_RR_Ant       ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_RR_Ant       ";
+	// piCout << msg;
 	cpm_rr.set_ant(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_TTek(const Protocol_RLS_Mini::RR_TTek & msg) {
-	piCout << "rec msg" << "received_RR_TTek      ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_RR_TTek      ";
+	// piCout << msg;
 	cpm_rr.set_current_time(msg.getSeconds());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_AzPopr(const Protocol_RLS_Mini::RR_AzPopr & msg) {
-	piCout << "rec msg" << "received_RR_AzPopr    ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_RR_AzPopr    ";
+	// piCout << msg;
 	cpm_rr.set_daz(msg.getDegrees());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg) {
-	piCout << "rec msg" << "received_RR_DPopr_POI ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_RR_DPopr_POI ";
+	// piCout << msg;
 	cpm_rr.set_dd_poi(msg.dd);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg) {
-	piCout << "rec msg" << "received_RR_AzPopr_POI";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_RR_AzPopr_POI";
+	// piCout << msg;
 	cpm_rr.set_daz_poi(msg.getDegrees());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
@@ -731,16 +825,18 @@ Protocol_RLS_Mini::CIT_Kvit GlobalData::set_CIT_Kvit() {
 
 
 void GlobalData::received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg) {
-	piCout << "rec msg" << "received_POI_Zapros   ";
-	piCout << msg;
+	// TODO: добавить в конфиг//
+	// piCout << "rec msg" << "received_POI_Zapros   ";
+	// piCout << msg;
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
 
 
 void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
-	piCout << "rec msg" << "received_POI_Shtat    ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_POI_Shtat    ";
+	// piCout << msg;
 	cpm_poi.set_shtat();
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
@@ -748,8 +844,9 @@ void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
 
 
 void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
-	piCout << "rec msg" << "received_POI_SDC      ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_POI_SDC      ";
+	// piCout << msg;
 	cpm_poi.set_sdc(msg.par == 1);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
@@ -757,8 +854,9 @@ void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 
 
 void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
-	piCout << "rec msg" << "received_POI_DSA      ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_POI_DSA      ";
+	// piCout << msg;
 	cpm_poi.set_dsa(msg.par == 1, msg.vr_n, msg.vr_k);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
@@ -766,8 +864,9 @@ void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 
 
 void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
-	piCout << "rec msg" << "received_POI_APU      ";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_POI_APU      ";
+	// piCout << msg;
 	// TODO: msg.getLevelk2() - непонятно почему дБ если у нас шататно ноль
 	// а порог может быть нулем
 	cpm_poi.set_apu(msg.getLevelk1(), 0);
@@ -777,8 +876,9 @@ void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 
 
 void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
-	piCout << "rec msg" << "received_POI_Zona";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_POI_Zona";
+	// piCout << msg;
 	if (msg.k1 <= 1 && msg.k2 <= 7) {
 		cpm_poi.set_zona_params(static_cast<CpmPoi::ZoneCalcStage>(msg.k1), msg.k2);
 	} else {
@@ -790,8 +890,9 @@ void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 
 
 void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
-	piCout << "rec msg" << "received_POI_Kan";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_POI_Kan";
+	// piCout << msg;
 	cpm_poi.set_kan(msg.kan);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
@@ -799,16 +900,18 @@ void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
 
 
 void GlobalData::received_CIT_Zapros(const Protocol_RLS_Mini::CIT_Zapros & msg) {
-	piCout << "rec msg" << "received_CIT_Zapros";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_CIT_Zapros";
+	// piCout << msg;
 	Protocol_RLS_Mini::CIT_Kvit ans = set_CIT_Kvit();
 	global->sendMessage(ans);
 }
 
 
 void GlobalData::received_CIT_KU(const Protocol_RLS_Mini::CIT_KU & msg) {
-	piCout << "rec msg" << "received_CIT_KU";
-	piCout << msg;
+	// TODO: добавить в конфиг
+	// piCout << "rec msg" << "received_CIT_KU";
+	// piCout << msg;
 
 	const Protocol_RLS_Mini::ImitatorTarget * src[] = {&msg.it1, &msg.it2};
 

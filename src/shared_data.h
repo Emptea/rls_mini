@@ -15,6 +15,7 @@
 #include "u220_group.h"
 #include "uhd_utils.hpp"
 #include "user_u220.h"
+#include "rx_cycle_trace.hpp"
 
 #include <array>
 #include <pivaluetree.h>
@@ -53,8 +54,9 @@ public:
 		.cpu_format = "sc16",
 		.otw_format = "sc16",
 		.pps        = "internal",
-		.tx_spb     = 545200,
-		.rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf
+		.tx_spb     = 9360,
+		// .rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf
+		.rx_spb     = 9360*2   //  if you want to print hdr add 40 more samples to buf
 	};
 
 	static GlobalData * instance();
@@ -103,6 +105,7 @@ private:
 	void u220_recv_dma();
 	void u220_recv_software();
 	void process_work_pac(const uint32_t * buffer);
+	void dump_rx_traces(const std::vector<RxCycleTraceEntry>& cycle_entries);
 
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;

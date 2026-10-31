@@ -3,6 +3,7 @@
 
 #include "../rls_fpga/dma-proxy.h"
 #include "rlso_const.hpp"
+#include "rx_trace.hpp"
 
 #include <piprotectedvariable.h>
 #include <pithread.h>
@@ -51,6 +52,40 @@ struct u220_stats {
 	size_t tx_packet_cnt       = 0;
 };
 
+struct uhd_recv_diagnostics {
+	using Clock                   = std::chrono::steady_clock;
+
+	Clock::time_point last_report = Clock::now();
+	Clock::time_point last_recv{};
+
+	bool first_recv                                      = true;
+
+	uint64_t calls                                       = 0;
+	uint64_t samples                                     = 0;
+
+	uint64_t recv_total_us                               = 0;
+	uint64_t recv_max_us                                 = 0;
+
+	uint64_t interval_total_us                           = 0;
+	uint64_t interval_max_us                             = 0;
+
+	uint64_t partial_reads                               = 0;
+	uint64_t zero_reads                                  = 0;
+	uint64_t overflows                                   = 0;
+
+	double rx_lag_last_ms                                = 0.0;
+	double rx_lag_max_ms                                 = 0.0;
+	double rx_lag_min_ms                                 = 0.0;
+	double rx_lag_total_ms                               = 0.0;
+
+	uint64_t rx_lag_count                                = 0;
+
+	std::chrono::steady_clock::time_point last_lag_check = std::chrono::steady_clock::now();
+
+	void reset();
+	void print(const PIString & serial);
+};
+
 struct u220_status {
 	bool on       = false;
 	bool rx_on[2] = {false, false};
@@ -64,6 +99,21 @@ class U220: public PIObject {
 
 private:
 	uhd::usrp::multi_usrp::sptr usrp;
+	uhd_recv_diagnostics recv_diag;
+
+	RxTraceBuffer<8192> rx_trace;
+
+	uint64_t rx_iteration = 0;
+
+	RxClock::time_point previous_recv_end{};
+	bool have_previous_recv = false;
+
+	double last_sample_time = std::numeric_limits<double>::quiet_NaN();
+
+	// Привязка времени USRP к steady_clock
+	RxClock::time_point device_time_reference_host{};
+	double device_time_reference_usrp = 0.0;
+	bool have_device_time_reference   = false;
 
 	uhd::rx_streamer::sptr rx_stream;
 	PIVector<VectorComplexS> rx_buffer;
@@ -108,6 +158,7 @@ protected:
 	PIThread rx_thread;
 
 public:
+	std::vector<RxTraceEntry> get_rx_trace() const { return rx_trace.snapshot(); }
 	U220(const PIString & serial = "",
 	     const PIString & args   = "recv_frame_size=4104,num_recv_frames=128,send_frame_size=8192,num_send_frames=512",
 	     uint64_t num_samps      = 0,
