@@ -383,7 +383,9 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 	constexpr double block_time      = 20 * 46.4e-6;
 	constexpr size_t dump_stride     = 15;
 	const double block_start         = (stats.cycles_completed - 1) * block_time;
-	constexpr size_t n_turn        = 10;
+	constexpr size_t n_turn          = 10;
+
+	
 	if (samples_per_channel > 0 && block_start >= (n_turn - 1) * revolution_time && block_start < n_turn * revolution_time &&
 	    stats.cycles_completed % dump_stride == 0) {
 		for (int ch: {0, 1}) {
@@ -392,13 +394,15 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 		}
 	}
 
+	if (samples_per_channel > 0 && rx_metadata.error_code == uhd::rx_metadata_t::ERROR_CODE_NONE) {
+		for (int ch: {0, 1}) {
+			auto ref = rx_queue[ch].getRef();
+			ref->clear();
+			ref->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
+		}
+	}
 
 	if (stats.rx_packet_cnt % (board_config.rx_spb * 5000) == 0) {
-		for (int ch: {0, 1}) {
-			auto ch_ptr = rx_queue[ch].getRef();
-			ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
-		}
-
 		piCout << serial << "Received " << num_rx_samps << "/" << board_config.rx_spb * 2 << "pkt_cnt" << stats.cycles_completed
 			   << "last PPS time:" << usrp->get_time_last_pps().get_real_secs() << "s or" << usrp->get_time_last_pps().get_tick_count(5e6)
 			   << "hdr:" << PICoutManipulators::Hex << *((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0])
@@ -585,7 +589,6 @@ void U220::enable_external_lo() {
 	}
 
 	tree->access<int>(path).set(1);
-
 }
 
 void U220::ensm_to_alert() {

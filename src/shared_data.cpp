@@ -131,10 +131,17 @@ void GlobalData::start() {
 
 	// 0.1_s .sleep();
 	u220_recv_thread.setPriority(PIThread::piHighest);
-	u220_recv_thread.start([this] {
-		u220_recv();
-		if (u220_recv_thread.isStopping()) u220_group.stop_and_drain_rx();
-	});
+	if (cfg.dma_enabled) {
+		u220_recv_thread.start([this] {
+			u220_recv_dma();
+			if (u220_recv_thread.isStopping()) u220_group.stop_and_drain_rx();
+		});
+	} else {
+		u220_recv_thread.start([this] {
+			u220_recv_software();
+			if (u220_recv_thread.isStopping()) u220_group.stop_and_drain_rx();
+		});
+	}
 
 	piCout << "Imitator init";
 	cpm_cit.set_shtat(cfg);
@@ -268,7 +275,21 @@ void GlobalData::processChannels() {
 	}
 }
 
-void GlobalData::u220_recv() {
+void GlobalData::u220_recv_software() {
+	static int buffer_idx = 0;
+
+	for (const auto board_index: u220_group.active_boards()) {
+		auto * board     = u220_group.board(board_index);
+		const auto error = board->receive(buffer_idx);
+
+		if (error != uhd::rx_metadata_t::ERROR_CODE_NONE) {
+			continue;
+		}
+	}
+	buffer_idx = (buffer_idx + 1) % TX_BUFFER_COUNT;
+}
+
+void GlobalData::u220_recv_dma() {
 	const size_t first_board   = u220_group.active_boards()[0];
 	static size_t u220_cycles  = 0;
 	static bool pending_buffer = false;
@@ -319,18 +340,18 @@ void GlobalData::u220_recv() {
 
 		if (u220_group.active_boards().isEmpty()) return;
 
-		if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
-			for (const auto board_index: u220_group.active_boards()) {
-				auto * board = u220_group.board(board_index);
-				auto ref1    = current_channels.getRef();
-				auto ref2    = adc_channels.getRef();
+		// if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
+		// 	for (const auto board_index: u220_group.active_boards()) {
+		// 		auto * board = u220_group.board(board_index);
+		// 		auto ref1    = current_channels.getRef();
+		// 		auto ref2    = adc_channels.getRef();
 
-				for (int channel: {0, 1}) {
-					const int global_channel = 2 * board_index + channel;
-					(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
-				}
-			}
-		}
+		// 		for (int channel: {0, 1}) {
+		// 			const int global_channel = 2 * board_index + channel;
+		// 			(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
+		// 		}
+		// 	}
+		// }
 		// if (u220_cycles > 0) {
 		// 	notifier_channels.notify();
 		// }
@@ -522,17 +543,18 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 			data     = *ref;
 		}
 		set_data(data, data_cnt);
-	} else if (test_point == rls::TP_BYPASS) {
-		VectorComplexS data;
-		{
-			auto ref = adc_channels.getRef();
-			data     = (*ref)[msg.nkan];
+	} else if (test_point == rls::TP_SDR) {
+		const size_t board_index = msg.nkan / 2;
+		const size_t channel     = msg.nkan % 2;
+		auto * board             = u220_group.board(board_index);
+
+		if (board) {
+			VectorComplexS data = board->take_rx_queue_and_clear(channel);
+			data_cnt            = (232 + 2 * cfg.rx_insert_count) * 3;
+			set_data(data, data_cnt);
+		} else {
+			ans.setData(zero_vector);
 		}
-		data_cnt = (232 + 2 * cfg.rx_insert_count) * 3;
-		set_data(data, data_cnt);
-	} else {
-		data_cnt = 232;
-		ans.setData(zero_vector);
 	}
 
 	ans.nw = static_cast<uint16_t>(data_cnt);

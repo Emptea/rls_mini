@@ -100,6 +100,8 @@ private:
 
 	void write_dump_hex(const char * filename) const;
 	void u220_recv();
+	void u220_recv_dma();
+	void u220_recv_software();
 	void process_work_pac(const uint32_t * buffer);
 
 	PIValueTree main_config;
