@@ -211,6 +211,7 @@ void MiniConfig::load_settings() {
 		if (values[ch] > 1) throw std::runtime_error("Invalid tx.use_ext_file_sg");
 		use_ext_file_sg[ch] = values[ch] == 1;
 	}
+	log_cpm_msg = get_uint("log", "cpm_msg") == 1;
 }
 
 void MiniConfig::load_signal(const std::string & filename, ChannelSignals & signals) {

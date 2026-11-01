@@ -599,12 +599,8 @@ void GlobalData::dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_ent
 
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_POI_TK_Zapros";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
-	// piCout << "rec msg kt" << msg.kt;
-	// const auto test_point = map_kt_to_dsp(msg.kt);
 	const auto test_point = msg.kt;
 	if (cfg.dma_enabled) {
 		axi_dsp_set_output_source(test_point, msg.nkan, msg.rg);
@@ -678,68 +674,52 @@ Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
 }
 
 void GlobalData::received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_RR_Zapros    ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_RR_Vr        ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_rr.set_vr(static_cast<CpmRr::RotationCommand>(msg.par));
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_RR_Izl       ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_rr.set_izl(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_Ant(const Protocol_RLS_Mini::RR_Ant & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_RR_Ant       ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_rr.set_ant(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 
 void GlobalData::received_RR_TTek(const Protocol_RLS_Mini::RR_TTek & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_RR_TTek      ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_rr.set_current_time(msg.getSeconds());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_AzPopr(const Protocol_RLS_Mini::RR_AzPopr & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_RR_AzPopr    ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_rr.set_daz(msg.getDegrees());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_RR_DPopr_POI ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_rr.set_dd_poi(msg.dd);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
 void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_RR_AzPopr_POI";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_rr.set_daz_poi(msg.getDegrees());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
@@ -834,18 +814,14 @@ Protocol_RLS_Mini::CIT_Kvit GlobalData::set_CIT_Kvit() {
 
 
 void GlobalData::received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg) {
-	// TODO: добавить в конфиг//
-	// piCout << "rec msg" << "received_POI_Zapros   ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
 
 
 void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_POI_Shtat    ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_poi.set_shtat();
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
@@ -853,9 +829,7 @@ void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
 
 
 void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_POI_SDC      ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_poi.set_sdc(msg.par == 1);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
@@ -863,9 +837,7 @@ void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 
 
 void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_POI_DSA      ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_poi.set_dsa(msg.par == 1, msg.vr_n, msg.vr_k);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
@@ -873,9 +845,7 @@ void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 
 
 void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_POI_APU      ";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	// TODO: msg.getLevelk2() - непонятно почему дБ если у нас шататно ноль
 	// а порог может быть нулем
 	cpm_poi.set_apu(msg.getLevelk1(), 0);
@@ -885,9 +855,7 @@ void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 
 
 void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_POI_Zona";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	if (msg.k1 <= 1 && msg.k2 <= 7) {
 		cpm_poi.set_zona_params(static_cast<CpmPoi::ZoneCalcStage>(msg.k1), msg.k2);
 	} else {
@@ -899,9 +867,7 @@ void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 
 
 void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_POI_Kan";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	cpm_poi.set_kan(msg.kan);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
@@ -909,18 +875,14 @@ void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
 
 
 void GlobalData::received_CIT_Zapros(const Protocol_RLS_Mini::CIT_Zapros & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_CIT_Zapros";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 	Protocol_RLS_Mini::CIT_Kvit ans = set_CIT_Kvit();
 	global->sendMessage(ans);
 }
 
 
 void GlobalData::received_CIT_KU(const Protocol_RLS_Mini::CIT_KU & msg) {
-	// TODO: добавить в конфиг
-	// piCout << "rec msg" << "received_CIT_KU";
-	// piCout << msg;
+	log_cpm_msg(__func__, msg);
 
 	const Protocol_RLS_Mini::ImitatorTarget * src[] = {&msg.it1, &msg.it2};
 

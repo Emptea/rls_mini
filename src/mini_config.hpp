@@ -54,6 +54,8 @@ public:
 	ChannelSignals rx_en_sg{};
 	ChannelComplexSignals tx_dac_sg{};
 
+	bool log_cpm_msg = false;
+
 private:
 	using Section    = std::map<std::string, std::string>;
 	using ConfigData = std::map<std::string, Section>;
