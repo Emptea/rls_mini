@@ -151,7 +151,9 @@ void ImitatorU220::stop_opu(void) {
 }
 
 float ImitatorU220::get_opu_az() {
-	auto status = group_.fpga(0)->get_rx_playback_status(0, 0);
+	const auto & active = group_.active_boards();
+	if (active.isEmpty()) return opu_az_deg_;
+	auto status = group_.fpga(active[0])->get_rx_playback_status(0, 0);
 	// opu_running_ = status.playing;
 	auto az     = status.getDnDeg();
 	opu_az_deg_ = az;
@@ -159,9 +161,7 @@ float ImitatorU220::get_opu_az() {
 }
 
 float ImitatorU220::get_opu_azago(double ago_sec) {
-	auto status = group_.fpga(0)->get_rx_playback_status(0, 0);
-	// opu_running_ = status.playing;
-	auto cur_az = status.getDnDeg();
+	auto cur_az = get_opu_az();
 	auto az_ago = cur_az - opu_speed_degps_ * ago_sec;
 	az_ago      = std::fmod(az_ago, 360.0);
 	if (az_ago < 0.0) az_ago += 360.0;

@@ -93,30 +93,30 @@ public:
 	void set_zona_val(const uint32_t (&data)[2][8]) { zona_val_sq = data[static_cast<size_t>(zona_stage)][zona_ch_num]; }
 	double get_zona_val() const { return zona_val_sq; }
 
-	// TODO: где считать? Нужен ли Set?
-	uint16_t get_nes() const { return 0; }
-	uint16_t set_nes() const { return 0; }
-
+	// ISPR_KAN — исправность приёмных каналов
+	// Целое без знака, 0–255
+	uint8_t get_ispr_kan() const { return ispr_kan; }
+	void set_ispr_kan(uint8_t value) { ispr_kan = value; }
 
 	// KAN — маска подключённых каналов
 	uint8_t get_kan() const {
-		if (dma_enabled) return kan;
-		return kan;
+		if (dma_enabled) return kan & ispr_kan;
+		return kan & ispr_kan;
 		// return axi_dsp_get_channel_mask();
 	}
 
 	void set_kan(uint8_t value) {
-		kan = value;
+		kan = value & ispr_kan;
 		if (!dma_enabled) return;
 		axi_dsp_set_channel_mask(uint32_t(value));
 	}
 
 	// Штатные настройки ПОИ
 	void set_shtat() {
-		sdc         = true;
-		dsa_is_on   = false;
+		sdc       = true;
+		dsa_is_on = false;
 
-		kan         = 0xFF;
+		set_kan(0xFF);
 
 		dsa_vr_n    = 0;
 		dsa_vr_k    = 0;
@@ -134,7 +134,7 @@ public:
 		axi_dsp_set_motion_selector(1, sdc);
 		axi_dsp_set_cfar_level(apu_k1);
 		axi_dsp_set_median_detector_coef(apu_k2);
-		axi_dsp_set_channel_mask(kan);
+		axi_dsp_apply();
 	}
 
 	void set_dma_enabled(bool value) { dma_enabled = value; }
@@ -145,6 +145,7 @@ private:
 	bool sdc                 = false;
 	bool dsa_is_on           = false;
 
+	uint8_t ispr_kan         = 0; // Исправность приёмных каналов
 	uint8_t kan              = 0;
 
 	uint16_t dsa_vr_n        = 0;

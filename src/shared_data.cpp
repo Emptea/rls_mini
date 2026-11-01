@@ -64,20 +64,26 @@ void GlobalData::init() {
 	cpm_poi.set_dma_enabled(cfg.dma_enabled);
 	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
-	auto dit                        = devices.begin();
 	void * tx0_buf[TX_BUFFER_COUNT];
 	void * tx1_buf[TX_BUFFER_COUNT];
 
 
 	uint8_t ispr_kan = 0;
+
 	for (size_t i = 0; i < u220_group.board_count(); ++i) {
-		if (dit != devices.end() && StdString2PIString(dit->first) == u220_group.board(i)->get_serial()) {
-			u220_group.activate_board(i);
-			++dit;
-			ispr_kan |= (1 << (2 * i)) | (1 << (2 * i + 1));
+		auto * board = u220_group.board(i);
+		if (!board) continue;
+		const std::string serial = PIString2StdString(board->get_serial());
+		if (devices.find(serial) == devices.end()) {
+			piCout << "U220 not connected:" << board->get_serial();
+			continue;
 		}
+		piCout << "Activating U220:" << board->get_serial() << "index:" << i;
+		u220_group.activate_board(i);
+		ispr_kan |= static_cast<uint8_t>((1u << (2 * i)) | (1u << (2 * i + 1)));
 	}
-	cpm_rr.set_ispr_kan(ispr_kan);
+
+	cpm_poi.set_ispr_kan(ispr_kan);
 
 	if (u220_group.active_boards().isEmpty()) {
 		piCout << "No active U220 boards";
@@ -110,7 +116,7 @@ void GlobalData::init() {
 		axi_dsp_set_output_source(0, 0, 0);
 		auto v = axi_dsp_get_output_source();
 		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE;
-		axi_dsp_set_channel_mask((uint32_t)cpm_rr.get_ispr_kan());
+		axi_dsp_set_channel_mask(ispr_kan);
 		axi_dsp_apply();
 	}
 	first_transfer = false;
@@ -632,7 +638,10 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	} else if (test_point == rls::TP_SDR) {
 		const size_t board_index = msg.nkan / 2;
 		const size_t channel     = msg.nkan % 2;
-		auto * board             = u220_group.board(board_index);
+		if (msg.nkan >= 8 || !(cpm_poi.get_ispr_kan() & (1u << msg.nkan))) {
+			return;
+		}
+		auto * board = u220_group.board(board_index);
 
 		if (board) {
 			VectorComplexS data = board->take_rx_queue_and_clear(channel);
@@ -657,7 +666,7 @@ Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
 	kvit.izl      = cpm_rr.get_izl();
 	kvit.ant      = cpm_rr.get_ant();
 
-	kvit.ispr_kan = cpm_rr.get_ispr_kan();
+	kvit.ispr_kan = cpm_poi.get_ispr_kan();
 
 	kvit.setDegreesDaz(cpm_rr.get_daz());
 	kvit.dd_poi = static_cast<int16_t>(cpm_rr.get_dd_poi());

@@ -93,11 +93,6 @@ public:
 	bool get_ant() const { return ant; }
 	void set_ant(bool val) { ant = val; }
 
-	// ISPR_KAN — исправность приёмных каналов
-	// Целое без знака, 0–255
-	uint8_t get_ispr_kan() const { return ispr_kan; }
-	void set_ispr_kan(uint8_t value) { ispr_kan = value; }
-
 	// DAZ — азимутальная поправка к датчику, градусы
 	// В протоколе: int16_t, ЦМР = 0.0054931640625°
 	float get_daz() const { return daz; }
@@ -161,8 +156,6 @@ private:
 
 	mutable double last_opu_az      = 0;
 	mutable bool rotation_completed = false;
-
-	uint8_t ispr_kan                = 0; // Исправность приёмных каналов
 
 	float daz                       = 0.0f; // Азимутальная поправка датчика, градусы
 	float dd_poi                    = 0.0f; // Поправка дальности ПОИ, метры

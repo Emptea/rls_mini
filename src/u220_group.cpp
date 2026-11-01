@@ -215,7 +215,6 @@ void U220Group::activate_board(size_t i) {
 	boards_[i]->init();
 	fpga_[i]                  = new UserU220(boards_[i]->get_usrp());
 	const PIString & serial   = boards_[i]->get_serial();
-	const size_t board_number = static_cast<size_t>(std::stoul(serial.mid(4).data()));
 	fpga_[i]->set_reg_logger(&reg_logger_, i);
 	active_boards_.push_back(i);
 }
