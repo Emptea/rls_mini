@@ -55,8 +55,8 @@ public:
 		.otw_format = "sc16",
 		.pps        = "internal",
 		.tx_spb     = 9360,
-		// .rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf
-		.rx_spb     = 9360 * 2  //  if you want to print hdr add 40 more samples to buf
+		.rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf
+								// .rx_spb     = 9360 * 1  //  if you want to print hdr add 40 more samples to buf
 	};
 
 	static GlobalData * instance();
@@ -106,6 +106,8 @@ private:
 	void u220_recv_software();
 	void process_work_pac(const uint32_t * buffer);
 	void dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_entries);
+	RxCycleTraceBuffer<32768> rx_cycle_trace;
+	bool overflow_dumped = false;
 
 	PIValueTree main_config;
 	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;

@@ -21,7 +21,10 @@
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
 #include <string>
+#include <sys/syscall.h>
 #include <thread>
+#include <unistd.h>
+
 
 GlobalData::GlobalData()
 	: GlobalDataEth(this)
@@ -148,7 +151,10 @@ void GlobalData::start() {
 	} else {
 		u220_recv_thread.start([this] {
 			u220_recv_software();
-			if (u220_recv_thread.isStopping()) u220_group.stop_and_drain_rx();
+			if (u220_recv_thread.isStopping()) {
+				dump_rx_traces(rx_cycle_trace.snapshot());
+				u220_group.stop_and_drain_rx();
+			}
 		});
 	}
 
@@ -272,29 +278,35 @@ void GlobalData::write_dump_hex(const char * filename) const {
 }
 
 void GlobalData::processChannels() {
-	notifier_channels.wait();
-	if (process_thread.isStopping()) return; // if stop() called simply leave
-	if (!cfg.dma_enabled) return;
-	const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
-	if (buffer) {
-		const auto * hdr   = reinterpret_cast<const rls::header *>(buffer);
-		const size_t words = std::min<size_t>(rls::get_rx_words_per_buf(hdr->tp), BUFFER_SIZE / sizeof(uint32_t));
-		auto ref           = dma_channel_buf.getRef();
-		*ref               = PIVector<uint32_t>(buffer, words);
-	}
+	// notifier_channels.wait();
+	// if (process_thread.isStopping()) return; // if stop() called simply leave
+	// if (!cfg.dma_enabled) return;
+	// const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
+	// if (buffer) {
+	// 	const auto * hdr   = reinterpret_cast<const rls::header *>(buffer);
+	// 	const size_t words = std::min<size_t>(rls::get_rx_words_per_buf(hdr->tp), BUFFER_SIZE / sizeof(uint32_t));
+	// 	auto ref           = dma_channel_buf.getRef();
+	// 	*ref               = PIVector<uint32_t>(buffer, words);
+	// }
 }
 
 void GlobalData::u220_recv_software() {
-	using Clock                 = std::chrono::steady_clock;
+	using Clock             = std::chrono::steady_clock;
 
-	static int buffer_idx       = 0;
-	static bool overflow_dumped = false;
-	static uint64_t iteration   = 0;
-	static RxCycleTraceBuffer<8192> rx_cycle_trace;
+
+	static bool tid_printed = false;
+
+	if (!tid_printed) {
+		tid_printed = true;
+		piCout << "U220 RX TID:" << syscall(SYS_gettid);
+	}
+
+	static int buffer_idx     = 0;
+	static uint64_t iteration = 0;
 	static Clock::time_point previous_start{};
 
-	const auto cycle_start = Clock::now();
-
+	const auto cycle_start           = Clock::now();
+	const int64_t cycle_cpu_start_ns = rx_thread_cpu_time_ns();
 	RxCycleTraceEntry cycle{};
 	cycle.iteration = iteration++;
 
@@ -333,15 +345,20 @@ void GlobalData::u220_recv_software() {
 		}
 	}
 
-	cycle.cycle_us    = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - cycle_start).count();
-
-	cycle.overhead_us = cycle.cycle_us - cycle.recv_total_us;
+	const auto cycle_end           = RxClock::now();
+	const int64_t cycle_cpu_end_ns = rx_thread_cpu_time_ns();
+	const int64_t cycle_us         = std::chrono::duration_cast<std::chrono::microseconds>(cycle_end - cycle_start).count();
+	const int64_t cpu_us           = (cycle_cpu_end_ns - cycle_cpu_start_ns) / 1000;
+	const int64_t off_cpu_us       = cycle_us > cpu_us ? cycle_us - cpu_us : 0;
+	cycle.cycle_us                 = cycle_us;
+	cycle.cpu_us                   = cpu_us;
+	cycle.off_cpu_us               = off_cpu_us;
+	cycle.overhead_us              = cycle.cycle_us - cycle.recv_total_us;
 
 	// Обязательно записываем каждый цикл, включая цикл overflow.
 	rx_cycle_trace.push(cycle);
 
-	if (overflow_detected && !overflow_dumped) {
-		overflow_dumped = true;
+	if (overflow_detected) {
 		dump_rx_traces(rx_cycle_trace.snapshot());
 	}
 
@@ -382,10 +399,49 @@ void GlobalData::u220_recv_dma() {
 		u220_recv_thread.stopAndWait();
 	}
 
-	const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
-	if (buffer) {
-		const auto * hdr = reinterpret_cast<const rls::header *>(buffer);
+	// const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
+	// if (buffer) {
+	// 	const auto * hdr = reinterpret_cast<const rls::header *>(buffer);
 
+	// 	if (hdr->tp != rls::TP_WORK) {
+	// 		const size_t words = rls::get_rx_words_per_buf(hdr->tp, cfg.rx_insert_count);
+
+	// 		if (words > 0 && words <= BUFFER_SIZE / sizeof(uint32_t)) {
+	// 			auto ref = dma_channel_buf.getRef();
+	// 			*ref     = PIVector<uint32_t>(buffer, words);
+	// 		}
+	// 	} else {
+	// 		process_work_pac(buffer);
+	// 	}
+
+	// 	if (u220_group.active_boards().isEmpty()) return;
+
+	// if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
+	// 	for (const auto board_index: u220_group.active_boards()) {
+	// 		auto * board = u220_group.board(board_index);
+	// 		auto ref1    = current_channels.getRef();
+	// 		auto ref2    = adc_channels.getRef();
+
+	// 		for (int channel: {0, 1}) {
+	// 			const int global_channel = 2 * board_index + channel;
+	// 			(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
+	// 		}
+	// 	}
+	// }
+	// if (u220_cycles > 0) {
+	// 	notifier_channels.notify();
+	// }
+	// }
+}
+
+void GlobalData::u220_process_rx() {
+	while (dma.get_rx_ready_count() > 0) {
+		auto info = dma.get_rx_buffer();
+		if (!info.buffer) {
+			break;
+		}
+		const uint32_t * buffer = info.buffer;
+		const auto * hdr        = reinterpret_cast<const rls::header *>(buffer);
 		if (hdr->tp != rls::TP_WORK) {
 			const size_t words = rls::get_rx_words_per_buf(hdr->tp, cfg.rx_insert_count);
 
@@ -396,24 +452,6 @@ void GlobalData::u220_recv_dma() {
 		} else {
 			process_work_pac(buffer);
 		}
-
-		if (u220_group.active_boards().isEmpty()) return;
-
-		// if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
-		// 	for (const auto board_index: u220_group.active_boards()) {
-		// 		auto * board = u220_group.board(board_index);
-		// 		auto ref1    = current_channels.getRef();
-		// 		auto ref2    = adc_channels.getRef();
-
-		// 		for (int channel: {0, 1}) {
-		// 			const int global_channel = 2 * board_index + channel;
-		// 			(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
-		// 		}
-		// 	}
-		// }
-		// if (u220_cycles > 0) {
-		// 	notifier_channels.notify();
-		// }
 	}
 }
 
@@ -545,7 +583,12 @@ void GlobalData::cpm_loop() {
 }
 
 void GlobalData::dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_entries) {
-	namespace fs = std::filesystem;
+	if (overflow_dumped) {
+		return;
+	}
+	overflow_dumped = true;
+
+	namespace fs    = std::filesystem;
 	const auto timestamp =
 		std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 	const std::string suffix = std::to_string(timestamp);

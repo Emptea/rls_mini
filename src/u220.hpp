@@ -101,7 +101,7 @@ private:
 	uhd::usrp::multi_usrp::sptr usrp;
 	uhd_recv_diagnostics recv_diag;
 
-	RxTraceBuffer<8192> rx_trace;
+	RxTraceBuffer<32768> rx_trace;
 
 	uint64_t rx_iteration = 0;
 
