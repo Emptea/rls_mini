@@ -56,7 +56,7 @@ public:
 		.pps        = "internal",
 		.tx_spb     = 9360,
 		.rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf
-								// .rx_spb     = 9360 * 1  //  if you want to print hdr add 40 more samples to buf
+	                            // .rx_spb     = 9360 * 1  //  if you want to print hdr add 40 more samples to buf
 	};
 
 	static GlobalData * instance();
@@ -100,11 +100,25 @@ private:
 	GlobalData();
 	~GlobalData();
 
+	struct sdr_buffer_info {
+		const complexs * buffer = nullptr;
+		size_t samples          = 0;
+	};
+
+	struct sdr_queue {
+		sdr_buffer_info buffer;
+		bool ready = false;
+		std::mutex mutex;
+	};
+
+	sdr_queue sdr_rx;
+
 	void write_dump_hex(const char * filename) const;
 	void u220_recv();
 	void u220_recv_dma();
 	void u220_recv_software();
 	void process_work_pac(const uint32_t * buffer);
+	void process_kt_pac(const uint32_t * buffer);
 	void dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_entries);
 	RxCycleTraceBuffer<32768> rx_cycle_trace;
 	bool overflow_dumped = false;
@@ -118,7 +132,8 @@ private:
 	PIThread cpm_thread;
 	void cpm_loop();
 
-	void process_rx_buffers();
+	void process_rx_buffers_dma();
+	void process_rx_buffers_software();
 	std::thread rx_processing_thread;
 	std::atomic<bool> rx_processing_running{true};
 
@@ -145,6 +160,19 @@ private:
 		double porog = 0; // Порог обнаружения, в ед АЦП
 		float vr     = 0; // Радиальная скорость, 1 м/с
 	};
+
+	struct pending_tk_request {
+		bool active       = false;
+		rls::tp tp        = rls::TP_WORK;
+		uint8_t kt        = 0;
+		uint8_t rg        = 0;
+		uint16_t nkan     = 0;
+		uint16_t reg_takt = 0;
+		size_t words      = 0;
+	};
+
+	pending_tk_request pending_tk;
+	std::mutex pending_tk_mutex;
 
 	void send_KTA_VO(struct target targ);
 	void send_PI();

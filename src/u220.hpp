@@ -240,6 +240,8 @@ public:
 	uint8_t get_ensm_state();
 
 	uhd::usrp::multi_usrp::sptr get_usrp() { return usrp; }
+
+	const complexs * get_rx_buffer(int buffer_idx, int channel) const { return rx_buffer_ptrs[buffer_idx][channel]; }
 };
 
 #endif // U220_HPP

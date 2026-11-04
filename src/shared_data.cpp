@@ -157,16 +157,21 @@ void GlobalData::start() {
 		});
 	}
 
-	if (cfg.dma_enabled) {
-		rx_processing_running.store(true);
+	rx_processing_running.store(true);
 
-		rx_processing_thread = std::thread([this]() {
+	rx_processing_thread = std::thread([this] {
+		if (cfg.dma_enabled) {
 			while (rx_processing_running.load()) {
-				process_rx_buffers();
+				process_rx_buffers_dma();
 				std::this_thread::sleep_for(std::chrono::microseconds(100));
 			}
-		});
-	}
+		} else {
+			while (rx_processing_running.load()) {
+				process_rx_buffers_software();
+				std::this_thread::sleep_for(std::chrono::microseconds(100));
+			}
+		}
+	});
 
 	piCout << "Imitator init";
 	cpm_cit.set_shtat(cfg);
@@ -336,11 +341,24 @@ void GlobalData::u220_recv_software() {
 	bool overflow_detected = false;
 
 	for (const auto board_index: u220_group.active_boards()) {
-		auto * board       = u220_group.board(board_index);
+		auto * board     = u220_group.board(board_index);
 
-		const auto start   = Clock::now();
-		const auto error   = board->receive(buffer_idx);
-		const auto end     = Clock::now();
+		const auto start = Clock::now();
+		const auto error = board->receive(buffer_idx);
+		const auto end   = Clock::now();
+
+		if (error == uhd::rx_metadata_t::ERROR_CODE_NONE) {
+			std::lock_guard<std::mutex> lock(pending_tk_mutex);
+
+			if (pending_tk.active && pending_tk.kt == rls::TP_SDR && pending_tk.nkan / 2 == board_index) {
+				std::lock_guard<std::mutex> sdr_lock(sdr_rx.mutex);
+
+				sdr_rx.buffer     = {board->get_rx_buffer(buffer_idx, pending_tk.nkan % 2), pending_tk.words};
+				sdr_rx.ready      = true;
+				pending_tk.active = false;
+			}
+		}
+
 
 		const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
@@ -449,7 +467,24 @@ void GlobalData::u220_recv_dma() {
 	// }
 }
 
-void GlobalData::process_rx_buffers() {
+void GlobalData::process_rx_buffers_software() {
+	sdr_buffer_info info;
+
+	{
+		std::lock_guard<std::mutex> lock(sdr_rx.mutex);
+
+		if (!sdr_rx.ready) return;
+
+		info         = sdr_rx.buffer;
+		sdr_rx.ready = false;
+	}
+
+	Protocol_RLS_Mini::POI_TK_Kvit ans;
+	ans.setData(info.buffer, static_cast<int>(info.samples));
+	global->sendMessage(ans);
+}
+
+void GlobalData::process_rx_buffers_dma() {
 	while (dma.get_rx_ready_count() > 0) {
 		auto info           = dma.get_rx_buffer();
 
@@ -458,15 +493,8 @@ void GlobalData::process_rx_buffers() {
 
 		if (hdr->tp == rls::TP_WORK) {
 			process_work_pac(buffer);
-		}
-
-		if (hdr->tp != rls::TP_WORK) {
-			const size_t words = rls::get_rx_words_per_buf(hdr->tp, cfg.rx_insert_count);
-
-			if (words > 0 && words <= BUFFER_SIZE / sizeof(uint32_t)) {
-				auto ref = dma_channel_buf.getRef();
-				*ref     = PIVector<uint32_t>(buffer, words);
-			}
+		} else {
+			process_kt_pac(buffer);
 		}
 	}
 }
@@ -543,6 +571,25 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		       static_cast<unsigned>(f.frequency_channel),
 		       f.rank_out);
 	}
+}
+
+void GlobalData::process_kt_pac(const uint32_t * buffer) {
+	const auto * hdr = reinterpret_cast<const rls::header *>(buffer);
+
+	size_t words     = 0;
+
+	{
+		std::lock_guard<std::mutex> lock(pending_tk_mutex);
+
+		if (!pending_tk.active || hdr->tp != pending_tk.kt || hdr->range != pending_tk.rg || hdr->channel != pending_tk.nkan) {
+			return;
+		}
+		words             = pending_tk.words;
+		pending_tk.active = false;
+	}
+	Protocol_RLS_Mini::POI_TK_Kvit ans;
+	ans.setData(buffer, words);
+	global->sendMessage(ans);
 }
 
 void GlobalData::cpm_loop() {
@@ -656,59 +703,111 @@ void GlobalData::dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_ent
 // 	}
 // }
 
+namespace {
+
+constexpr bool kt_uses_rg(rls::tp tp) {
+	switch (tp) {
+	case rls::TP_DDR:
+	case rls::TP_FFT:
+	case rls::TP_MAX: {
+		return true;
+	}
+	default: {
+		return false;
+	}
+	}
+}
+
+constexpr bool kt_uses_channel(rls::tp tp) {
+	switch (tp) {
+	case rls::TP_BYPASS:
+	case rls::TP_CUT:
+	case rls::TP_FAPCH:
+	case rls::TP_LOU:
+	case rls::TP_SF:
+	case rls::TP_MTI:
+	case rls::TP_DDR:
+	case rls::TP_FFT: {
+		return true;
+	}
+	default: {
+		return false;
+	}
+	}
+}
+
+} // namespace
+
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	log_cpm_msg(__func__, msg);
-	Protocol_RLS_Mini::POI_TK_Kvit ans;
-	const auto test_point = msg.kt;
 	if (cfg.dma_enabled) {
-		axi_dsp_set_output_source(test_point, msg.nkan, msg.rg);
+		std::lock_guard<std::mutex> lock(pending_tk_mutex);
+		const auto tp       = static_cast<rls::tp>(msg.kt);
+		pending_tk.kt       = msg.kt;
+		pending_tk.rg       = kt_uses_rg(tp) ? msg.rg : 0;
+		pending_tk.nkan     = kt_uses_channel(tp) ? msg.nkan : 0;
+		pending_tk.reg_takt = msg.reg_takt;
+		pending_tk.words    = rls::get_rx_words_per_buf(msg.kt, cfg.rx_insert_count);
+		pending_tk.active =
+			msg.reg_takt == 1 && msg.kt != rls::TP_WORK && pending_tk.words > 0 && pending_tk.words <= BUFFER_SIZE / sizeof(uint32_t);
+
+		axi_dsp_set_output_source(msg.kt, msg.nkan, msg.rg);
 		axi_dsp_apply();
-	}
-	req_test_channel = msg.kt;
-	req_test_point   = true;
-
-	int data_cnt     = 0;
-	if (msg.kt != Protocol_RLS_Mini::CTRL && msg.reg_takt == 1) {
-		data_cnt = rls::get_rx_words_per_buf(test_point, cfg.rx_insert_count);
 	} else {
-		// TODO get all dsp regs state and pack them into one packet
+		std::lock_guard<std::mutex> lock(pending_tk_mutex);
+
+		pending_tk.kt     = msg.kt;
+		pending_tk.nkan   = msg.nkan;
+		pending_tk.words  = (232 + 2 * cfg.rx_insert_count) * 3;
+		pending_tk.active = msg.kt == rls::TP_SDR && msg.reg_takt == 1 && msg.nkan < 8 && (cpm_poi.get_ispr_kan() & (1u << msg.nkan));
 	}
+	// const auto test_point = msg.kt;
+	// req_test_channel      = msg.kt;
+	// req_test_point        = true;
 
-	const auto set_data = [&](const auto & data, size_t count) {
-		if (data.isEmpty()) {
-			ans.setData(zero_vector);
-			return;
-		}
-		ans.setData(data, std::min(data.size(), count));
-	};
+	// Protocol_RLS_Mini::POI_TK_Kvit ans;
+	// int data_cnt = 0;
+	// if (msg.kt != rls::CTRL && msg.reg_takt == 1) {
+	// 	data_cnt = rls::get_rx_words_per_buf(test_point, cfg.rx_insert_count);
+	// } else {
+	// 	// TODO get all dsp regs state and pack them into one packet
+	// }
 
-	if (cfg.dma_enabled) {
-		PIVector<uint32_t> data;
-		{
-			auto ref = dma_channel_buf.getRef();
-			data     = *ref;
-		}
-		set_data(data, data_cnt);
-	} else if (test_point == rls::TP_SDR) {
-		const size_t board_index = msg.nkan / 2;
-		const size_t channel     = msg.nkan % 2;
-		if (msg.nkan >= 8 || !(cpm_poi.get_ispr_kan() & (1u << msg.nkan))) {
-			return;
-		}
-		auto * board = u220_group.board(board_index);
+	// const auto set_data = [&](const auto & data, size_t count) {
+	// 	if (data.isEmpty()) {
+	// 		ans.setData(zero_vector);
+	// 		return;
+	// 	}
+	// 	ans.setData(data, std::min(data.size(), count));
+	// };
 
-		if (board) {
-			VectorComplexS data = board->take_rx_queue_and_clear(channel);
-			data_cnt            = (232 + 2 * cfg.rx_insert_count) * 3;
-			set_data(data, data_cnt);
-		} else {
-			ans.setData(zero_vector);
-		}
-	}
+	// if (cfg.dma_enabled) {
+	// 	PIVector<uint32_t> data;
+	// 	{
+	// 		auto ref = dma_channel_buf.getRef();
+	// 		data     = *ref;
+	// 	}
+	// 	set_data(data, data_cnt);
+	// } else if (test_point == rls::TP_SDR) {
+	// 	const size_t board_index = msg.nkan / 2;
+	// 	const size_t channel     = msg.nkan % 2;
+	// 	if (msg.nkan >= 8 || !(cpm_poi.get_ispr_kan() & (1u << msg.nkan))) {
+	// 		return;
+	// 	}
+	// 	auto * board = u220_group.board(board_index);
 
-	ans.nw = static_cast<uint16_t>(data_cnt);
-	global->sendMessage(ans);
+	// 	if (board) {
+	// 		VectorComplexS data = board->take_rx_queue_and_clear(channel);
+	// 		data_cnt            = (232 + 2 * cfg.rx_insert_count) * 3;
+	// 		set_data(data, data_cnt);
+	// 	} else {
+	// 		ans.setData(zero_vector);
+	// 	}
+	// }
+
+	// ans.nw = static_cast<uint16_t>(data_cnt);
+	// global->sendMessage(ans);
 }
 
 Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
