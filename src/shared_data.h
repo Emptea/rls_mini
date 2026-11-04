@@ -118,6 +118,10 @@ private:
 	PIThread cpm_thread;
 	void cpm_loop();
 
+	void process_rx_buffers();
+	std::thread rx_processing_thread;
+	std::atomic<bool> rx_processing_running{true};
+
 	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
 	VectorComplexS zero_vector;
 

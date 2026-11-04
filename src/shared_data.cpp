@@ -142,7 +142,6 @@ void GlobalData::start() {
 	}
 
 	// 0.1_s .sleep();
-	u220_recv_thread.setPriority(PIThread::piHighest);
 	if (cfg.dma_enabled) {
 		u220_recv_thread.start([this] {
 			u220_recv_dma();
@@ -154,6 +153,17 @@ void GlobalData::start() {
 			if (u220_recv_thread.isStopping()) {
 				dump_rx_traces(rx_cycle_trace.snapshot());
 				u220_group.stop_and_drain_rx();
+			}
+		});
+	}
+
+	if (cfg.dma_enabled) {
+		rx_processing_running.store(true);
+
+		rx_processing_thread = std::thread([this]() {
+			while (rx_processing_running.load()) {
+				process_rx_buffers();
+				std::this_thread::sleep_for(std::chrono::microseconds(100));
 			}
 		});
 	}
@@ -193,6 +203,11 @@ void GlobalData::stop() {
 		while (dma.get_completed() < dma.get_submitted()) {
 			if (dma.receive() != 0) break;
 		}
+	}
+
+	rx_processing_running.store(false);
+	if (rx_processing_thread.joinable()) {
+		rx_processing_thread.join();
 	}
 
 	stopEth();
@@ -396,7 +411,7 @@ void GlobalData::u220_recv_dma() {
 	int ret = dma.receive();
 	if (ret != 0) {
 		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
-		u220_recv_thread.stopAndWait();
+		u220_recv_thread.stop();
 	}
 
 	// const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
@@ -434,14 +449,17 @@ void GlobalData::u220_recv_dma() {
 	// }
 }
 
-void GlobalData::u220_process_rx() {
+void GlobalData::process_rx_buffers() {
 	while (dma.get_rx_ready_count() > 0) {
-		auto info = dma.get_rx_buffer();
-		if (!info.buffer) {
-			break;
+		auto info           = dma.get_rx_buffer();
+
+		const auto * buffer = info.buffer;
+		const auto * hdr    = reinterpret_cast<const rls::header *>(buffer);
+
+		if (hdr->tp == rls::TP_WORK) {
+			process_work_pac(buffer);
 		}
-		const uint32_t * buffer = info.buffer;
-		const auto * hdr        = reinterpret_cast<const rls::header *>(buffer);
+
 		if (hdr->tp != rls::TP_WORK) {
 			const size_t words = rls::get_rx_words_per_buf(hdr->tp, cfg.rx_insert_count);
 
@@ -449,8 +467,6 @@ void GlobalData::u220_process_rx() {
 				auto ref = dma_channel_buf.getRef();
 				*ref     = PIVector<uint32_t>(buffer, words);
 			}
-		} else {
-			process_work_pac(buffer);
 		}
 	}
 }
