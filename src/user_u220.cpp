@@ -155,7 +155,7 @@ void UserU220::set_play_rx_insert_count(uint32_t rx_insert_count) {
 
 // TODO: сделай нормално лол
 void UserU220::reset_time(uint32_t vita_time) {
-	write_reg(WrReg::RESET_TIME, vita_time << 16 | 0x11);
+	write_reg(WrReg::RESET_TIME, vita_time << 16 | 0x3);
 }
 
 void UserU220::set_play_start_tx() {

@@ -163,12 +163,12 @@ void GlobalData::start() {
 		if (cfg.dma_enabled) {
 			while (rx_processing_running.load()) {
 				process_rx_buffers_dma();
-				std::this_thread::sleep_for(std::chrono::microseconds(100));
+				std::this_thread::sleep_for(std::chrono::microseconds(1000));
 			}
 		} else {
 			while (rx_processing_running.load()) {
 				process_rx_buffers_software();
-				std::this_thread::sleep_for(std::chrono::microseconds(100));
+				std::this_thread::sleep_for(std::chrono::microseconds(1000));
 			}
 		}
 	});
