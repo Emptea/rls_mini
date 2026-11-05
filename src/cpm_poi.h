@@ -8,6 +8,22 @@
 
 class CpmPoi {
 public:
+	static constexpr std::size_t N       = 512;
+	static constexpr double FREQ         = 9.23e9;
+	static constexpr double SAMPLE_FREQ  = 5e6;
+	static constexpr double PULSE_PERIOD = 232.0 / SAMPLE_FREQ;
+	static constexpr double LAMBDA       = 299792458.0 / FREQ;
+
+	static constexpr auto VR_ARRAY       = [] {
+        std::array<double, N> v{};
+        constexpr double step = -LAMBDA / (2.0 * PULSE_PERIOD * N);
+
+        for (std::size_t i = 0; i < N; ++i)
+            v[i] = (i < N / 2 ? int(i) : int(i) - int(N)) * step;
+
+        return v;
+	}();
+
 	struct Dsa {
 		bool is_on;
 		uint16_t vr_n;
@@ -57,6 +73,19 @@ public:
 		dsa_is_on = onoff;
 		dsa_vr_n  = vr_n;
 		dsa_vr_k  = vr_k;
+
+		std::array<uint32_t, N / 32> mask;
+		mask.fill(~uint32_t{0});
+
+		for (std::size_t i = 0; i < N; ++i) {
+			const double speed = VR_ARRAY[i] < 0 ? -VR_ARRAY[i] : VR_ARRAY[i];
+
+			if (speed >= dsa_vr_n && speed <= dsa_vr_k) mask[i / 32] &= ~(uint32_t{1} << (i % 32));
+		}
+
+		for (uint32_t reg_index = 0; reg_index < 16; ++reg_index) {
+			axi_dsp_set_frequency_selection(mask[reg_index], reg_index);
+		}
 	}
 
 	// APU — пороги обнаружения
