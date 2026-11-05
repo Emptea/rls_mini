@@ -124,7 +124,6 @@ private:
 	bool overflow_dumped = false;
 
 	PIValueTree main_config;
-	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
 	PIThreadNotifier notifier_channels;
 	PIThread process_thread;
 	PIThread u220_recv_thread;
@@ -136,9 +135,6 @@ private:
 	void process_rx_buffers_software();
 	std::thread rx_processing_thread;
 	std::atomic<bool> rx_processing_running{true};
-
-	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
-	VectorComplexS zero_vector;
 
 	double time;
 	PIProtectedVariable<PIVector<uint32_t>> dma_channel_buf;

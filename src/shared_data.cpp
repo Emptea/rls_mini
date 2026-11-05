@@ -4,6 +4,7 @@
 #include "imitator_u220.h"
 #include "mini_config.hpp"
 #include "protocol_rls_mini.h"
+#include "rls_const.hpp"
 #include "rx_cycle_trace.hpp"
 #include "user_u220.h"
 
@@ -82,8 +83,7 @@ void GlobalData::init() {
 		}
 	}
 	cpm_poi.set_dma_enabled(cfg.dma_enabled);
-	cpm_pot.set_dsa(1, 30, 180);
-	zero_vector.resize(232 * 3, {0, 0});
+	cpm_poi.set_dsa(1, 30, 180);
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	void * tx0_buf[TX_BUFFER_COUNT];
 	void * tx1_buf[TX_BUFFER_COUNT];
@@ -225,7 +225,6 @@ void GlobalData::start() {
 		u220_group.fpga(board_index)->set_play_start_tx();
 	}
 }
-
 
 void GlobalData::stop() {
 	cpm_thread.stopAndWait();
@@ -543,47 +542,29 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 	auto nes = pac->posthdr.n_formulars;
 	for (size_t i = 0; i < nes; i++) {
 		const auto & f = pac->formulars[i];
-		struct target targ;
-		targ.n                                   = cpm_poi.nes.count;
-		targ.time                                = cpm_rr.get_compensated_time();
-		targ.az                                  = cpm_rr.get_compensated_az();
+		struct target targ {};
+		targ.n                  = cpm_poi.nes.count;
+		targ.time               = cpm_rr.get_compensated_time();
+		targ.az                 = cpm_rr.get_compensated_az();
 
-		auto um_idx                              = f.main_diagram_number;
-		constexpr std::array<float, 8> um_values = {
-			5.3125f,
-			15.9375f,
-			26.5625f,
-			37.1875f,
-			47.8125f,
-			58.4375f,
-			69.0625f,
-			79.6875f,
-		};
+		auto um_idx             = f.main_diagram_number;
 		// targ.um        = (double)111packet.main_amplitude / (double)packet.neighbor_amplitude;
-		targ.um        = um_values[um_idx];
-		auto range_idx = f.range;
-		// TODO: перенести в константы
-		size_t tx_sig_len;
-		if (range_idx < 101) {
-			tx_sig_len = 40;
-		} else {
-			tx_sig_len = 6;
-		}
-		double range = (range_idx + tx_sig_len / 2) / 5e6 * 299792458.0 / 2;
-		targ.d       = range;
-		targ.porog   = f.rank_out * cpm_poi.get_apu_k1();
-		targ.amp     = (double)f.main_amplitude;
-		cpm_poi.nes.push(static_cast<uint16_t>(range));
+		targ.um                 = rls::UM_VALUES[um_idx];
 
-		constexpr double carrier_frequency = 3.6e9;
-		constexpr double c                 = 299792458.0;
-		constexpr double fft_size          = 512.0;
-		constexpr double pulse_period      = 46.4e-6;
-		const double wavelength            = c / carrier_frequency;
-		const double velocity_step         = wavelength / pulse_period / (2.0 * fft_size);
-		const uint32_t freq_idx            = f.frequency_channel;
-		const int doppler_bin              = freq_idx < 256 ? -static_cast<int>(freq_idx) : 512 - static_cast<int>(freq_idx);
-		targ.vr                            = doppler_bin * velocity_step;
+		auto range_idx          = f.range;
+		const size_t tx_sig_len = range_idx < rls::RX_LEN_NEAR ? rls::TX_LEN_NEAR : rls::TX_LEN_FAR;
+		double range            = (range_idx + tx_sig_len / 2.0) / rls::SAMPLE_RATE * rls::LIGHT_SPEED / 2.0;
+		cpm_poi.nes.push(static_cast<uint16_t>(range));
+		targ.d                  = range;
+
+		targ.porog              = f.rank_out * cpm_poi.get_apu_k1();
+
+		targ.amp                = (double)f.main_amplitude;
+
+		const uint32_t freq_idx = f.frequency_channel;
+		const int doppler_bin   = freq_idx < rls::FFT_HALF_SIZE ? -static_cast<int>(freq_idx) : rls::FFT_SIZE - static_cast<int>(freq_idx);
+		targ.vr                 = doppler_bin * rls::VELOCITY_STEP;
+
 		send_KTA_VO(targ);
 
 		printf("Target #%zu: "

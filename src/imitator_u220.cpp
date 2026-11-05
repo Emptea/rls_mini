@@ -1,7 +1,6 @@
 #include "imitator_u220.h"
 
 #include "../rls_fpga/rls.hpp"
-#include "rlso_const.hpp"
 #include "u220.hpp"
 #include "u220_group.h"
 #include "user_u220.h"
