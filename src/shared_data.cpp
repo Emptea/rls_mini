@@ -82,6 +82,7 @@ void GlobalData::init() {
 		}
 	}
 	cpm_poi.set_dma_enabled(cfg.dma_enabled);
+	cpm_pot.set_dsa(1, 30, 180);
 	zero_vector.resize(232 * 3, {0, 0});
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	void * tx0_buf[TX_BUFFER_COUNT];
