@@ -20,11 +20,28 @@
 #include <pistring_std.h>
 #include <pitime.h>
 #include <pivaluetree_conversions.h>
+#include <pthread.h>
+#include <sched.h>
 #include <string>
 #include <sys/syscall.h>
 #include <thread>
 #include <unistd.h>
 
+
+bool set_rx_realtime_priority() {
+	sched_param param{};
+	param.sched_priority = 30;
+
+	const int err        = pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+
+	if (err != 0) {
+		piCout << "RX SCHED_FIFO error:" << strerror(err);
+		return false;
+	}
+
+	piCout << "RX SCHED_FIFO priority = 30";
+	return true;
+}
 
 GlobalData::GlobalData()
 	: GlobalDataEth(this)
@@ -144,16 +161,29 @@ void GlobalData::start() {
 	// 0.1_s .sleep();
 	if (cfg.dma_enabled) {
 		u220_recv_thread.start([this] {
+			static thread_local bool initialized = false;
+
+			if (!initialized) {
+				initialized = true;
+				set_rx_realtime_priority();
+			}
+
 			u220_recv_dma();
-			if (u220_recv_thread.isStopping()) u220_group.stop_and_drain_rx();
+
+			if (u220_recv_thread.isStopping()) {
+				u220_group.stop_and_drain_rx();
+			}
 		});
 	} else {
 		u220_recv_thread.start([this] {
-			u220_recv_software();
-			if (u220_recv_thread.isStopping()) {
-				dump_rx_traces(rx_cycle_trace.snapshot());
-				u220_group.stop_and_drain_rx();
+			static thread_local bool initialized = false;
+
+			if (!initialized) {
+				initialized = true;
+				set_rx_realtime_priority();
 			}
+
+			u220_recv_software();
 		});
 	}
 
