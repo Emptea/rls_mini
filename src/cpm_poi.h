@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../rls_fpga/rls.hpp"
 #include "axi_dsp.h"
 
 #include <cstdint>
@@ -83,6 +84,7 @@ public:
 
 
 	void set_zona_params(ZoneCalcStage stage, uint16_t ch_num) {
+		if (ch_num >= 8) return;
 		zona_stage  = stage;
 		zona_ch_num = ch_num;
 	}
@@ -90,7 +92,17 @@ public:
 	ZoneCalcStage get_zona_stage() const { return zona_stage; }
 	uint16_t get_zona_ch_num() const { return zona_ch_num; }
 
-	void set_zona_val(const uint32_t (&data)[2][8]) { zona_val_sq = data[static_cast<size_t>(zona_stage)][zona_ch_num]; }
+	void set_zona_val(const rls::noise_formular & nf) {
+		if (zona_ch_num >= 8) return;
+		switch (zona_stage) {
+		case ZoneCalcStage::BeforeLou: {
+			zona_val_sq = nf.noise_fap[zona_ch_num];
+		} break;
+		case ZoneCalcStage::AfterLou: {
+			zona_val_sq = nf.noise_lou[zona_ch_num];
+		} break;
+		}
+	}
 	double get_zona_val() const { return zona_val_sq; }
 
 	// ISPR_KAN — исправность приёмных каналов

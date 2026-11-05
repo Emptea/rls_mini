@@ -537,10 +537,11 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 	static_assert(sizeof(rls::noise_formular) == 68, "Invalid noise_formular size");
 	static_assert(BUFFER_SIZE >= work_header_size, "DMA buffer too small");
 
-	struct rls::work_packet * pac = (rls::work_packet *)buffer;
-	auto nes                      = pac->posthdr.n_formulars;
+	const auto * pac = reinterpret_cast<const rls::work_packet *>(buffer);
+	cpm_poi.set_zona_val(pac->nf);
+	auto nes = pac->posthdr.n_formulars;
 	for (size_t i = 0; i < nes; i++) {
-		struct rls::formular & f = pac->formulars[i];
+		const auto & f = pac->formulars[i];
 		struct target targ;
 		targ.n                                   = cpm_poi.nes.count;
 		targ.time                                = cpm_rr.get_compensated_time();
@@ -605,9 +606,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 
 void GlobalData::process_kt_pac(const uint32_t * buffer) {
 	const auto * hdr = reinterpret_cast<const rls::header *>(buffer);
-
 	size_t words     = 0;
-
 	{
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);
 
