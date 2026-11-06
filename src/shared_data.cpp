@@ -920,6 +920,7 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	ans.setDistance(targ.d);
 	ans.setAmpPorogSp(targ.amp, targ.porog);
 	ans.setVelocity(targ.vr);
+	piCout << ans;
 	global->sendMessage(ans);
 }
 

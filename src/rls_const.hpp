@@ -9,7 +9,7 @@ namespace rls {
 
 // Общие физические константы
 inline constexpr double LIGHT_SPEED             = 299792458.0;
-inline constexpr double CARRIER_FREQUENCY       = 3.6e9;
+inline constexpr double CARRIER_FREQUENCY       = 9.23e9;
 inline constexpr double SAMPLE_RATE             = 5e6;
 
 // Параметры обработки
