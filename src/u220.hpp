@@ -5,6 +5,7 @@
 #include "rlso_const.hpp"
 #include "rx_trace.hpp"
 
+#include <atomic>
 #include <piprotectedvariable.h>
 #include <pithread.h>
 #include <stdint.h>
@@ -119,6 +120,8 @@ private:
 	PIVector<VectorComplexS> rx_buffer;
 	PIProtectedVariable<PIQueue<VectorComplexS>> rx_queue[2];
 	PIProtectedVariable<PIQueue<VectorComplexS>> dump_queue[2];
+	std::atomic_bool rx_dump_requested{false};
+	size_t rx_dump_blocks_remaining = 0;
 	PIVector<complexs *> rx_buffer_ptrs[TX_BUFFER_COUNT];
 	std::atomic_int active_buffer_idx{0};
 	uhd::rx_metadata_t rx_metadata;
@@ -211,6 +214,8 @@ public:
 	double get_rx_freq_for_ch(size_t channel) const { return usrp ? usrp->get_rx_freq(channel) : 0; };
 	double get_rx_gain_for_ch(size_t channel) const { return usrp ? usrp->get_rx_gain(channel) : 0; };
 	VectorComplexS take_rx_queue_and_clear(int index);
+	// Start/restart a one-revolution dump on the next received block.
+	void start_rx_dump();
 	VectorComplexS take_dump_queue_and_clear(int index);
 	VectorComplexS take_rx_queue(int index);
 	VectorComplexS get_rx_queue(int index);

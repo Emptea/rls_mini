@@ -256,6 +256,10 @@ VectorComplexS U220::take_rx_queue_and_clear(int index) {
 	return ret;
 }
 
+void U220::start_rx_dump() {
+	rx_dump_requested.store(true);
+}
+
 VectorComplexS U220::take_dump_queue_and_clear(int index) {
 	if (index < 0 || index >= 2) return {};
 	auto ref = dump_queue[index].getRef();
@@ -496,9 +500,7 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 	constexpr double revolution_time = 2.0;
 	constexpr double block_time      = 20 * 46.4e-6;
 	constexpr size_t dump_stride     = 15;
-	constexpr size_t n_turn          = 10;
-
-	const double block_start         = (stats.cycles_completed - 1) * block_time;
+	const size_t dump_blocks         = static_cast<size_t>(std::ceil(revolution_time / block_time));
 
 	// ------------------------------------------------------------
 	// 7. Dump queue
@@ -506,12 +508,19 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 
 	const auto dump_start            = Clock::now();
 
-	if (samples_per_channel > 0 && block_start >= (n_turn - 1) * revolution_time && block_start < n_turn * revolution_time &&
-	    stats.cycles_completed % dump_stride == 0) {
-		for (int ch: {0, 1}) {
-			auto ch_ptr = dump_queue[ch].getRef();
-
-			ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
+	if (samples_per_channel > 0) {
+		if (rx_dump_requested.exchange(false)) {
+			for (auto & queue: dump_queue) queue.getRef()->clear();
+			rx_dump_blocks_remaining = dump_blocks;
+		}
+		if (rx_dump_blocks_remaining > 0) {
+			--rx_dump_blocks_remaining;
+			if ((dump_blocks - rx_dump_blocks_remaining) % dump_stride == 0 && samples_per_channel == 4680) {
+				for (int ch: {0, 1}) {
+					auto ch_ptr = dump_queue[ch].getRef();
+					ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
+				}
+			}
 		}
 	}
 
