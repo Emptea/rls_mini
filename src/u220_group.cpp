@@ -6,6 +6,7 @@
 #include "user_reg_logger.h"
 #include "user_u220.h"
 
+#include <cmath>
 #include <piliterals_time.h>
 
 U220Group::U220Group(const MiniConfig & cfg): cfg_(cfg) {}
@@ -17,6 +18,33 @@ U220Group::~U220Group() {
 
 	for (auto * u: boards_) {
 		delete u;
+	}
+}
+
+void U220Group::start_rx_dump() {
+	rx_dump_requested.store(true);
+}
+
+void U220Group::dump_rx_buffers(size_t board_index, int buffer_idx) {
+	if (board_index >= rx_dump_blocks_remaining.size()) return;
+	const size_t samples = board(board_index)->get_rx_samples();
+	if (samples == 0) return;
+	constexpr double revolution_time = 2.0;
+	constexpr double block_time = 20 * 46.4e-6;
+	constexpr size_t dump_stride = 15;
+	const size_t dump_blocks = static_cast<size_t>(std::ceil(revolution_time / block_time));
+
+	if (rx_dump_requested.exchange(false)) {
+		for (auto & channel: dump_channels) channel.clear();
+		rx_dump_blocks_remaining.fill(dump_blocks);
+	}
+	auto & remaining = rx_dump_blocks_remaining[board_index];
+	if (remaining == 0) return;
+	--remaining;
+	if ((dump_blocks - remaining) % dump_stride != 0 || samples != 4680) return;
+	for (int channel: {0, 1}) {
+		const auto * buffer = board(board_index)->get_rx_buffer(buffer_idx, channel);
+		dump_channels[2 * board_index + channel].append(VectorComplexS(buffer, samples));
 	}
 }
 

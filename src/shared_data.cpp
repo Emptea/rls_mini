@@ -263,17 +263,8 @@ void GlobalData::stop() {
 		u220_group.fpga(i)->set_play_stop_tx();
 	}
 
-	for (auto & channel: dump_channels) {
-		channel.clear();
-	}
 	for (size_t i: u220_group.active_boards()) {
 		u220_group.fpga(i)->set_play_stop_tx();
-		for (int channel = 0; channel < 2; ++channel) {
-			const size_t global_channel = 2 * i + channel;
-			if (global_channel < dump_channels.size()) {
-				dump_channels[global_channel] = u220_group.board(i)->take_dump_queue_and_clear(channel);
-			}
-		}
 	}
 	write_dump_hex("rx_dump.hex");
 	const auto cycles_completed =
@@ -303,6 +294,7 @@ void GlobalData::stop() {
 }
 
 void GlobalData::write_dump_hex(const char * filename) const {
+	const auto & dump_channels = u220_group.dump_channels;
 	std::ofstream file(filename, std::ios::binary | std::ios::trunc);
 	if (!file) {
 		piCout << "Cannot open RX dump:" << filename;
@@ -383,6 +375,7 @@ void GlobalData::u220_recv_software() {
 		const auto start = Clock::now();
 		const auto error = board->receive(buffer_idx);
 		const auto end   = Clock::now();
+		u220_group.dump_rx_buffers(board_index, buffer_idx);
 
 		if (error == uhd::rx_metadata_t::ERROR_CODE_NONE) {
 			std::lock_guard<std::mutex> lock(pending_tk_mutex);
@@ -457,6 +450,7 @@ void GlobalData::u220_recv_dma() {
 		pending_buffer = true;
 		for (const auto board_index: u220_group.active_boards()) {
 			const auto error = u220_group.board(board_index)->receive(u220_buffer_idx);
+			u220_group.dump_rx_buffers(board_index, u220_buffer_idx);
 			pending_buffer &= (error == uhd::rx_metadata_t::ERROR_CODE_NONE);
 		}
 		u220_cycles = u220_group.board(first_board)->get_stats().cycles_completed;

@@ -256,23 +256,6 @@ VectorComplexS U220::take_rx_queue_and_clear(int index) {
 	return ret;
 }
 
-void U220::start_rx_dump() {
-	rx_dump_requested.store(true);
-}
-
-VectorComplexS U220::take_dump_queue_and_clear(int index) {
-	if (index < 0 || index >= 2) return {};
-	auto ref = dump_queue[index].getRef();
-	VectorComplexS result;
-	while (!ref->isEmpty()) {
-		const auto block = ref->dequeue();
-		for (const auto & sample: block)
-			result.push_back(sample);
-	}
-	return result;
-}
-
-
 VectorComplexS U220::take_rx_queue(int index) {
 	if (index < 0 || index >= 2) return {};
 	auto ref = rx_queue[index].getRef();
@@ -399,6 +382,7 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 	entry.pre_recv_ns                = elapsed_ns(function_start, uhd_start);
 
 	const size_t samples_per_channel = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout);
+	rx_samples = samples_per_channel;
 
 	const auto recv_end              = Clock::now();
 
@@ -496,35 +480,6 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 	}
 
 	stats.rx_packet_cnt += num_rx_samps;
-
-	constexpr double revolution_time = 2.0;
-	constexpr double block_time      = 20 * 46.4e-6;
-	constexpr size_t dump_stride     = 15;
-	const size_t dump_blocks         = static_cast<size_t>(std::ceil(revolution_time / block_time));
-
-	// ------------------------------------------------------------
-	// 7. Dump queue
-	// ------------------------------------------------------------
-
-	const auto dump_start            = Clock::now();
-
-	if (samples_per_channel > 0) {
-		if (rx_dump_requested.exchange(false)) {
-			for (auto & queue: dump_queue) queue.getRef()->clear();
-			rx_dump_blocks_remaining = dump_blocks;
-		}
-		if (rx_dump_blocks_remaining > 0) {
-			--rx_dump_blocks_remaining;
-			if ((dump_blocks - rx_dump_blocks_remaining) % dump_stride == 0 && samples_per_channel == 4680) {
-				for (int ch: {0, 1}) {
-					auto ch_ptr = dump_queue[ch].getRef();
-					ch_ptr->enqueue(VectorComplexS(rx_buffer_ptrs[active_buffer_idx][ch], samples_per_channel));
-				}
-			}
-		}
-	}
-
-	entry.dump_queue_ns              = elapsed_ns(dump_start, Clock::now());
 
 	// ------------------------------------------------------------
 	// 8. Основная RX queue
