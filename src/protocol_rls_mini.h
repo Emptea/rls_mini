@@ -185,7 +185,7 @@ public:
 		static constexpr int16_t Code = 4;
 		POI_Zona(): Header(Type, Code) {}
 		uint8_t k1 = 0; // Код строба расчета зоны: 0 – в каналах (перед алгоритмом ЛОУ), 1 – в лучах (после алгоритма ЛОУ)
-		uint8_t _reserve;
+		uint8_t _reserve = 0;
 		uint16_t k2 = 0; // Код канала расчёта зоны: номер канала/луча: 0…7
 	};
 
@@ -223,9 +223,12 @@ public:
 		uint16_t dsa_vr_k = 0;
 		uint16_t apu_k1   = 0;
 		uint16_t apu_k2   = 0;
-		struct {
-			uint16_t _reserve1: 8;
-			uint16_t zona_k1  : 8;
+		union {
+			uint16_t zona_bits = 0;
+			struct {
+				uint16_t _reserve1: 8;
+				uint16_t zona_k1  : 8;
+			};
 		};
 		uint16_t zona_k2 = 0;
 		void setLevelApuk1(uint32_t v) { apu_k1 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }

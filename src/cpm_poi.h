@@ -186,8 +186,8 @@ private:
 	bool sdc                 = false;
 	bool dsa_is_on           = false;
 
-	uint8_t ispr_kan         = 0; // Исправность приёмных каналов
-	uint8_t kan              = 0;
+	uint8_t ispr_kan         = 0xff; // Исправность приёмных каналов
+	uint8_t kan              = 0xff;
 
 	uint16_t dsa_vr_n        = 0;
 	uint16_t dsa_vr_k        = 0;

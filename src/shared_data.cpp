@@ -84,6 +84,7 @@ void GlobalData::init() {
 	}
 	cpm_poi.set_dma_enabled(cfg.dma_enabled);
 	cpm_poi.set_dsa(1, 30, 180);
+	cpm_poi.set_kan(0xff);
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	void * tx0_buf[TX_BUFFER_COUNT];
 	void * tx1_buf[TX_BUFFER_COUNT];
@@ -211,9 +212,15 @@ void GlobalData::start() {
 
 	imitator_u220.apply(0.0);
 
-	global->sendMessage(set_POI_Kvit());
-	global->sendMessage(set_CIT_Kvit());
-	global->sendMessage(set_RR_Kvit());
+	auto poi_kvit = set_POI_Kvit();
+	auto cit_kvit = set_CIT_Kvit();
+	auto rr_kvit  = set_RR_Kvit();
+	piCout << poi_kvit;
+	piCout << cit_kvit;
+	piCout << rr_kvit;
+	global->sendMessage(poi_kvit);
+	global->sendMessage(cit_kvit);
+	global->sendMessage(rr_kvit);
 
 
 	// 1_s .sleep();
@@ -543,17 +550,24 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 	for (size_t i = 0; i < nes; i++) {
 		const auto & f = pac->formulars[i];
 		struct target targ {};
-		targ.n                  = cpm_poi.nes.count;
-		targ.time               = cpm_rr.get_compensated_time();
-		targ.az                 = cpm_rr.get_compensated_az();
+		targ.n         = cpm_poi.nes.count;
+		targ.time      = cpm_rr.get_compensated_time();
+		targ.az        = cpm_rr.get_compensated_az();
 
-		auto um_idx             = f.main_diagram_number;
+		auto um_idx    = f.main_diagram_number;
 		// targ.um        = (double)111packet.main_amplitude / (double)packet.neighbor_amplitude;
-		targ.um                 = rls::UM_VALUES[um_idx];
+		targ.um        = rls::UM_VALUES[um_idx];
 
-		auto range_idx          = f.range;
-		const size_t tx_sig_len = range_idx < rls::RX_LEN_NEAR ? rls::TX_LEN_NEAR : rls::TX_LEN_FAR;
-		double range            = (range_idx + tx_sig_len / 2.0) / rls::SAMPLE_RATE * rls::LIGHT_SPEED / 2.0;
+		auto range_idx = f.range;
+		size_t tx_sig_len;
+		if (range_idx < rls::RX_LEN_NEAR) {
+			tx_sig_len = rls::TX_LEN_NEAR;
+		} else {
+			tx_sig_len = rls::TX_LEN_FAR;
+			range_idx -= rls::RX_LEN_NEAR;
+		}
+
+		double range = (range_idx + tx_sig_len / 2.0) / rls::SAMPLE_RATE * rls::LIGHT_SPEED / 2.0;
 		cpm_poi.nes.push(static_cast<uint16_t>(range));
 		targ.d                  = range;
 
@@ -597,6 +611,8 @@ void GlobalData::process_kt_pac(const uint32_t * buffer) {
 		}
 		words             = pending_tk.words;
 		pending_tk.active = false;
+		axi_dsp_set_output_source(0, 0, 0);
+		axi_dsp_apply();
 	}
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	ans.setData(buffer, words);
@@ -754,7 +770,8 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 	log_cpm_msg(__func__, msg);
 	if (cfg.dma_enabled) {
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);
-		const auto tp       = static_cast<rls::tp>(msg.kt);
+		const auto tp = static_cast<rls::tp>(msg.kt);
+		if (tp == rls::TP_SDR) return;
 		pending_tk.kt       = msg.kt;
 		pending_tk.rg       = kt_uses_rg(tp) ? msg.rg : 0;
 		pending_tk.nkan     = kt_uses_channel(tp) ? msg.nkan : 0;
@@ -952,7 +969,7 @@ Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 	else
 		piCout << "Error: apu_k2 == 0";
 
-	kvit.zona_k1 = static_cast<uint16_t>(cpm_poi.get_zona_stage());
+	kvit.zona_k1 = static_cast<uint8_t>(cpm_poi.get_zona_stage());
 	kvit.zona_k2 = cpm_poi.get_zona_ch_num();
 
 	return kvit;
