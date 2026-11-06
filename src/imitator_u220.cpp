@@ -139,6 +139,11 @@ void ImitatorU220::set_opu(double angle_degrees, double speed_degps) {
 	for (const auto board_index: group_.active_boards()) {
 		group_.fpga(board_index)->set_rx_playback_dn_counter(start, static_cast<int32_t>(rounded_step));
 	}
+	apply(0);
+
+	for (const auto board_index: group_.active_boards()) {
+		piCout << "dn counter" << board_index << group_.fpga(board_index)->get_rx_playback_status(0, 0).dn_counter;
+	}
 }
 
 void ImitatorU220::restart_opu(void) {

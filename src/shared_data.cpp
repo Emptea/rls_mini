@@ -647,20 +647,20 @@ void GlobalData::cpm_loop() {
 		// Проверка stat — 1 Гц
 		if (++tick2 >= 100) {
 			tick2 = 0;
-			// for (const auto i: u220_group.active_boards()) {
-			// 	auto * fpga = u220_group.fpga(i);
-			// 	for (size_t radio = 0; radio < 2; ++radio) {
-			// 		fpga->log_rx_playback_status(radio);
-			// 		fpga->log_rx_playback_phase(radio);
-			// 		fpga->log_rx_playback_enable(radio);
-			// 		fpga->log_rx_playback_correction(radio);
-			// 		fpga->log_rx_playback_delay(radio);
-			// 		fpga->log_rx_playback_amplitude(radio);
-			// 		fpga->log_rx_playback_dn_offset(radio);
-			// 	}
-			// 	fpga->log_rx_playback_dn_counter();
-			// 	fpga->log_rx_playback_start_delay();
-			// }
+			for (const auto i: u220_group.active_boards()) {
+				auto * fpga = u220_group.fpga(i);
+				for (size_t radio = 0; radio < 2; ++radio) {
+					// fpga->log_rx_playback_status(radio);
+					// fpga->log_rx_playback_phase(radio);
+					// fpga->log_rx_playback_enable(radio);
+					// fpga->log_rx_playback_correction(radio);
+					// fpga->log_rx_playback_delay(radio);
+					fpga->log_rx_playback_amplitude(radio);
+					// fpga->log_rx_playback_dn_offset(radio);
+				}
+				// fpga->log_rx_playback_dn_counter();
+				// fpga->log_rx_playback_start_delay();
+			}
 		}
 
 		next += period;
