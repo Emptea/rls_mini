@@ -1035,7 +1035,8 @@ void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 	log_cpm_msg(__func__, msg);
 	// TODO: msg.getLevelk2() - непонятно почему дБ если у нас шататно ноль
 	// а порог может быть нулем
-	cpm_poi.set_apu(msg.getLevelk1(), 0);
+	auto k2 = msg.k2 == 0 ? 0 : msg.getLevelk2();
+	cpm_poi.set_apu(msg.getLevelk1(), k2);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }

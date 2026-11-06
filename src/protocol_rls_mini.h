@@ -840,7 +840,7 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_DSA & v) {
 
 // POI_APU
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_APU & v) {
-	return out << "k1:" << v.k1 << "k2:" << v.k2;
+	return out << "k1:" << v.getLevelk1()<< "k2:" << v.getLevelk2();
 }
 
 // POI_Zona

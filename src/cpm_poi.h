@@ -105,8 +105,9 @@ public:
 		apu_k1 = k1;
 		apu_k2 = k2;
 		if (!dma_enabled) return;
-		axi_dsp_set_cfar_level(apu_k1);
-		axi_dsp_set_median_detector_coef(apu_k2);
+		axi_dsp_set_median_detector_coef(apu_k1);
+		axi_dsp_set_cfar_level(apu_k2);
+		axi_dsp_apply();
 	}
 
 	// ZONA — параметры расчёта зоны
@@ -173,8 +174,8 @@ public:
 		axi_dsp_set_compensation_mode(0);
 		axi_dsp_set_compensation_ref(uint32_t(1575));
 		axi_dsp_set_motion_selector(1, sdc);
-		axi_dsp_set_cfar_level(apu_k1);
-		axi_dsp_set_median_detector_coef(apu_k2);
+		axi_dsp_set_median_detector_coef(apu_k1);
+		axi_dsp_set_cfar_level(apu_k2);
 		axi_dsp_apply();
 	}
 

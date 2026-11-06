@@ -30,7 +30,7 @@ std::complex<int16_t> ImitatorU220::calc_amplitude(double distance_m, size_t cha
 	const double rcs       = attenuation_to_rcs(attenuation_db);
 	distance_m             = 1e3;
 	const double magnitude = ENERGY_CONST * std::sqrt(rcs) * std::cos(um) / (distance_m * distance_m);
-	const double phase     = (2.0 * M_PI / LAMBDA) * ((-N_CHANNELS - 1) / 2.0 + static_cast<double>(channel)) * ANT_DIST * std::sin(um);
+	const double phase     = (2.0 * M_PI / LAMBDA) * (-(N_CHANNELS - 1) / 2.0 + static_cast<double>(channel)) * ANT_DIST * std::sin(um);
 	const std::complex<double> gain = magnitude * std::exp(std::complex<double>(0.0, phase));
 
 	const auto to_q14               = [](double component) -> int16_t {
@@ -100,7 +100,7 @@ void ImitatorU220::set_amplitude(const std::array<double, 4> & target_um,
 		for (size_t radio = 0; radio < 2; ++radio) {
 			std::array<uint32_t, 4> amplitudes{};
 
-			const size_t channel = 2 * board_index + radio + 1;
+			const size_t channel = 2 * board_index + radio;
 
 			for (size_t k = 0; k < 4; ++k) {
 				const auto amplitude = calc_amplitude(target_dist[k], channel, target_um[k], target_osl[k]);
