@@ -86,13 +86,13 @@ public:
 
 		for (size_t i = 0; i < 4; ++i) {
 			const auto & t = targets[i];
-			params[i]      = {t.az, t.um, t.distance, static_cast<int16_t>(std::lround(t.vr)), t.osl};
+			const auto osl = t.on ? t.osl : 200;
+			params[i] = {t.az, t.um, t.distance, static_cast<int16_t>(std::lround(t.vr)), osl};
 
-			if (t.on) enable_mask |= static_cast<uint8_t>(1U << i);
+			// if (t.on) enable_mask |= static_cast<uint8_t>(1U << i);
 		}
 
 		imitator.set_params(params);
-		imitator.set_targets_enabled(enable_mask);
 		imitator.apply(0.0);
 	}
 
@@ -114,6 +114,7 @@ public:
 			defaults[i].osl      = static_cast<float>(cfg.target_osl[i]);
 		}
 
+		imitator.set_targets_enabled(0xF);
 		set_targets(defaults);
 	}
 
