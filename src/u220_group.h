@@ -1,8 +1,11 @@
 #pragma once
 
 #include "imitator_u220.h"
+#include "rlso_const.hpp"
 #include "user_reg_logger.h"
 
+#include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <pivector.h>
@@ -27,6 +30,11 @@ public:
 	const PIVector<size_t> & active_boards() const { return active_boards_; }
 	size_t board_count() const { return boards_.size(); }
 
+	// Retained after stop; index = 2 * board_index + local channel.
+	std::array<VectorComplexS, 8> dump_channels;
+	void start_rx_dump();
+	void dump_rx_buffers(size_t board_index, int buffer_idx);
+
 	void setup();
 	void stop_and_drain_rx();
 	void reset_time(uint32_t value);
@@ -36,6 +44,9 @@ private:
 	PIVector<U220 *> boards_;
 	PIVector<UserU220 *> fpga_;
 	PIVector<size_t> active_boards_;
+
+	std::atomic_bool rx_dump_requested{false};
+	std::array<size_t, 4> rx_dump_blocks_remaining{};
 
 	const MiniConfig & cfg_;
 	UserRegLogger reg_logger_;
