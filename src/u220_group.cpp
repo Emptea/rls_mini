@@ -30,12 +30,13 @@ void U220Group::dump_rx_buffers(size_t board_index, int buffer_idx) {
 	const size_t samples = board(board_index)->get_rx_samples();
 	if (samples == 0) return;
 	constexpr double revolution_time = 2.0;
-	constexpr double block_time = 20 * 46.4e-6;
-	constexpr size_t dump_stride = 15;
-	const size_t dump_blocks = static_cast<size_t>(std::ceil(revolution_time / block_time));
+	constexpr double block_time      = 20 * 46.4e-6;
+	constexpr size_t dump_stride     = 15;
+	const size_t dump_blocks         = static_cast<size_t>(std::ceil(revolution_time / block_time));
 
 	if (rx_dump_requested.exchange(false)) {
-		for (auto & channel: dump_channels) channel.clear();
+		for (auto & channel: dump_channels)
+			channel.clear();
 		rx_dump_blocks_remaining.fill(dump_blocks);
 	}
 	auto & remaining = rx_dump_blocks_remaining[board_index];
@@ -241,8 +242,11 @@ void U220Group::activate_board(size_t i) {
 	if (fpga_[i] != nullptr) return;
 
 	boards_[i]->init();
-	fpga_[i]                  = new UserU220(boards_[i]->get_usrp());
-	const PIString & serial   = boards_[i]->get_serial();
+	fpga_[i]                = new UserU220(boards_[i]->get_usrp());
+	const PIString & serial = boards_[i]->get_serial();
 	fpga_[i]->set_reg_logger(&reg_logger_, i);
+	if (active_boards_.isEmpty()) {
+		boards_[i]->set_time_synchronizer(&time_synchronizer_);
+	}
 	active_boards_.push_back(i);
 }

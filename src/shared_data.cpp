@@ -151,6 +151,7 @@ void GlobalData::start() {
 	if (u220_group.active_boards().isEmpty()) {
 		return;
 	}
+	u220_group.reset_time_synchronizer();
 
 	for (const auto board_index: u220_group.active_boards()) {
 		// u220_group.board(board_index)->start_reception(4.64+180*0.2e-6);

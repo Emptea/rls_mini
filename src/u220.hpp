@@ -95,6 +95,7 @@ struct u220_status {
 
 void print_config(const u220_config_t & config);
 
+class UhdTimeSynchronizer;
 class U220: public PIObject {
 	PIOBJECT(U220)
 
@@ -144,7 +145,8 @@ private:
 	u220_stats stats;
 	u220_status status;
 
-	bool shutdown_done = false;
+	bool shutdown_done                       = false;
+	UhdTimeSynchronizer * time_synchronizer_ = nullptr;
 
 	void fill_buffer_with_wavetable(VectorComplexS & buffer);
 	void initialize_usrp();
@@ -246,6 +248,7 @@ public:
 	size_t get_rx_samples() const { return rx_samples; }
 	const complexs * get_rx_buffer(int buffer_idx, int channel) const { return rx_buffer_ptrs[buffer_idx][channel]; }
 	std::vector<TimeSyncTraceEntry> get_time_sync_trace() const { return time_sync_trace.snapshot(); }
+	void set_time_synchronizer(UhdTimeSynchronizer * synchronizer) { time_synchronizer_ = synchronizer; }
 };
 
 #endif // U220_HPP

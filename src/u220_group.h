@@ -2,6 +2,7 @@
 
 #include "imitator_u220.h"
 #include "rlso_const.hpp"
+#include "uhd_time_synchronizer.hpp"
 #include "user_reg_logger.h"
 
 #include <array>
@@ -39,6 +40,9 @@ public:
 	void stop_and_drain_rx();
 	void reset_time(uint32_t value);
 	void sync_ad9361();
+	std::chrono::steady_clock::time_point to_host_time(double usrp_sec) const { return time_synchronizer_.to_host(usrp_sec); }
+	double get_time_drift_ppm() const { return time_synchronizer_.drift_ppm(); }
+	void reset_time_synchronizer() { time_synchronizer_.reset(); }
 
 private:
 	PIVector<U220 *> boards_;
@@ -50,6 +54,7 @@ private:
 
 	const MiniConfig & cfg_;
 	UserRegLogger reg_logger_;
+	UhdTimeSynchronizer time_synchronizer_;
 
 	void setup_one_board(size_t board_index);
 

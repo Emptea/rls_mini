@@ -1,5 +1,7 @@
 #include "u220.hpp"
 
+#include "uhd_time_synchronizer.hpp"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -413,9 +415,12 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 	const auto lag_start = Clock::now();
 
 	if (valid_samples && (!have_device_time_reference || recv_end - device_time_reference_host >= std::chrono::seconds(1))) {
-		const auto host_before    = Clock::now();
-		const double device_now   = usrp->get_time_now().get_real_secs();
-		const auto host_after     = Clock::now();
+		const auto host_before  = Clock::now();
+		const double device_now = usrp->get_time_now().get_real_secs();
+		const auto host_after   = Clock::now();
+		if (time_synchronizer_) {
+			time_synchronizer_->update(host_before, host_after, device_now);
+		}
 		const auto host_mid       = host_before + (host_after - host_before) / 2;
 		const double host_mid_sec = std::chrono::duration<double>(host_mid.time_since_epoch()).count();
 		const double new_offset   = host_mid_sec - device_now;
