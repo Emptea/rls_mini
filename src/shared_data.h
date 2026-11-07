@@ -118,6 +118,7 @@ private:
 	void process_work_pac(const uint32_t * buffer);
 	void process_kt_pac(const uint32_t * buffer);
 	void dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_entries);
+	void dump_time_sync_traces();
 	RxCycleTraceBuffer<32768> rx_cycle_trace;
 	bool overflow_dumped = false;
 

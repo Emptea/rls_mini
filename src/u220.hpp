@@ -102,17 +102,19 @@ private:
 	uhd::usrp::multi_usrp::sptr usrp;
 	uhd_recv_diagnostics recv_diag;
 
-	RxTraceBuffer<32768> rx_trace;
+	TraceBuffer<RxTraceEntry, 32768> rx_trace;
+	TraceBuffer<TimeSyncTraceEntry, 8192> time_sync_trace;
+
 
 	uint64_t rx_iteration = 0;
 
-	RxClock::time_point previous_recv_end{};
+	std::chrono::steady_clock::time_point previous_recv_end{};
 	bool have_previous_recv = false;
 
 	double last_sample_time = std::numeric_limits<double>::quiet_NaN();
 
 	// Привязка времени USRP к steady_clock
-	RxClock::time_point device_time_reference_host{};
+	std::chrono::steady_clock::time_point device_time_reference_host{};
 	double device_time_reference_usrp = 0.0;
 	bool have_device_time_reference   = false;
 
@@ -243,6 +245,7 @@ public:
 
 	size_t get_rx_samples() const { return rx_samples; }
 	const complexs * get_rx_buffer(int buffer_idx, int channel) const { return rx_buffer_ptrs[buffer_idx][channel]; }
+	std::vector<TimeSyncTraceEntry> get_time_sync_trace() const { return time_sync_trace.snapshot(); }
 };
 
 #endif // U220_HPP

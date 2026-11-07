@@ -236,6 +236,8 @@ void GlobalData::start() {
 void GlobalData::stop() {
 	cpm_thread.stopAndWait();
 	u220_recv_thread.stopAndWait();
+	dump_rx_traces(rx_cycle_trace.snapshot());
+	dump_time_sync_traces();
 	process_thread.stop();          // mark thread for stop
 	notifier_channels.notify();     // notify thread
 	process_thread.waitForFinish(); // wait for thread really finish
@@ -326,6 +328,41 @@ void GlobalData::write_dump_hex(const char * filename) const {
 	if (!file) piCout << "Failed writing RX dump:" << filename;
 }
 
+void GlobalData::dump_time_sync_traces() {
+	namespace fs = std::filesystem;
+
+	const auto timestamp =
+		std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+	const fs::path log_dir = "logs";
+
+	std::error_code ec;
+	fs::create_directories(log_dir, ec);
+
+	if (ec) {
+		piCout << "ERROR: cannot create logs directory:" << StdString2PIString(ec.message());
+		return;
+	}
+
+	std::vector<BoardTimeSyncTraceEntry> all_entries;
+
+	for (const auto board_index: u220_group.active_boards()) {
+		auto * board             = u220_group.board(board_index);
+
+		const std::string serial = PIString2StdString(board->get_serial());
+
+		const auto snapshot      = board->get_time_sync_trace();
+
+		for (const auto & entry: snapshot) {
+			all_entries.push_back({serial, entry});
+		}
+	}
+
+	const fs::path filename = log_dir / ("time_sync_" + std::to_string(timestamp) + ".csv");
+
+	write_time_sync_csv(all_entries, filename.string());
+}
+
 void GlobalData::processChannels() {
 	// notifier_channels.wait();
 	// if (process_thread.isStopping()) return; // if stop() called simply leave
@@ -408,7 +445,7 @@ void GlobalData::u220_recv_software() {
 		}
 	}
 
-	const auto cycle_end           = RxClock::now();
+	const auto cycle_end           = std::chrono::steady_clock::now();
 	const int64_t cycle_cpu_end_ns = rx_thread_cpu_time_ns();
 	const int64_t cycle_us         = std::chrono::duration_cast<std::chrono::microseconds>(cycle_end - cycle_start).count();
 	const int64_t cpu_us           = (cycle_cpu_end_ns - cycle_cpu_start_ns) / 1000;
@@ -870,6 +907,8 @@ void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
 	log_cpm_msg(__func__, msg);
 	cpm_rr.set_izl(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
+	// TODO: убрать из фин версиии
+	u220_group.start_rx_dump();
 	global->sendMessage(ans);
 }
 
@@ -954,8 +993,8 @@ Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 	kvit.dsa_vr_n = cpm_poi.get_dsa_vr_n();
 	kvit.dsa_vr_k = cpm_poi.get_dsa_vr_k();
 
-		kvit.setLevelApuk1(cpm_poi.get_apu_k1());
-		kvit.setLevelApuk2(cpm_poi.get_apu_k2());
+	kvit.setLevelApuk1(cpm_poi.get_apu_k1());
+	kvit.setLevelApuk2(cpm_poi.get_apu_k2());
 
 	kvit.zona_k1 = static_cast<uint8_t>(cpm_poi.get_zona_stage());
 	kvit.zona_k2 = cpm_poi.get_zona_ch_num();

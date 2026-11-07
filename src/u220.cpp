@@ -382,7 +382,7 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 	entry.pre_recv_ns                = elapsed_ns(function_start, uhd_start);
 
 	const size_t samples_per_channel = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout);
-	rx_samples = samples_per_channel;
+	rx_samples                       = samples_per_channel;
 
 	const auto recv_end              = Clock::now();
 
@@ -407,20 +407,40 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 	}
 
 	// ------------------------------------------------------------
-	// 4. Привязка времени USRP для entry.lag_estimate_ms
+	// 4. Привязка времени USRP к steady_clock
 	// ------------------------------------------------------------
 
 	const auto lag_start = Clock::now();
 
 	if (valid_samples && (!have_device_time_reference || recv_end - device_time_reference_host >= std::chrono::seconds(1))) {
-		const auto host_before     = Clock::now();
+		const auto host_before    = Clock::now();
+		const double device_now   = usrp->get_time_now().get_real_secs();
+		const auto host_after     = Clock::now();
+		const auto host_mid       = host_before + (host_after - host_before) / 2;
+		const double host_mid_sec = std::chrono::duration<double>(host_mid.time_since_epoch()).count();
+		const double new_offset   = host_mid_sec - device_now;
+		double offset_delta_us    = std::numeric_limits<double>::quiet_NaN();
 
-		const double device_now    = usrp->get_time_now().get_real_secs();
+		if (have_device_time_reference) {
+			const double previous_host_sec = std::chrono::duration<double>(device_time_reference_host.time_since_epoch()).count();
+			const double previous_offset   = previous_host_sec - device_time_reference_usrp;
+			offset_delta_us                = (new_offset - previous_offset) * 1e6;
+		}
 
-		const auto host_after      = Clock::now();
+		// Сохраняем отдельную запись синхронизации.
+		TimeSyncTraceEntry sync_entry{};
 
-		device_time_reference_host = host_before + (host_after - host_before) / 2;
+		sync_entry.before_ns       = std::chrono::duration_cast<std::chrono::nanoseconds>(host_before.time_since_epoch()).count();
 
+		sync_entry.after_ns        = std::chrono::duration_cast<std::chrono::nanoseconds>(host_after.time_since_epoch()).count();
+
+		sync_entry.usrp_sec        = device_now;
+		sync_entry.offset_delta_us = offset_delta_us;
+
+		time_sync_trace.push(sync_entry);
+
+		// Обновляем рабочую привязку часов.
+		device_time_reference_host = host_mid;
 		device_time_reference_usrp = device_now;
 		have_device_time_reference = true;
 	}
@@ -450,9 +470,9 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 		entry.sample_time = rx_metadata.time_spec.get_real_secs();
 	}
 
-	entry.last_sample_time = last_sample_time;
+	entry.last_sample_time = valid_samples ? last_sample_time : std::numeric_limits<double>::quiet_NaN();
 
-	if (have_device_time_reference && std::isfinite(last_sample_time)) {
+	if (valid_samples && have_device_time_reference && std::isfinite(last_sample_time)) {
 		const double elapsed_s             = std::chrono::duration<double>(recv_end - device_time_reference_host).count();
 
 		const double estimated_device_time = device_time_reference_usrp + elapsed_s;
@@ -571,6 +591,7 @@ void U220::start_reception(double settling_time) {
 	// setup streaming
 
 	rx_trace.clear();
+	time_sync_trace.clear();
 	rx_iteration               = 0;
 
 	have_previous_recv         = false;

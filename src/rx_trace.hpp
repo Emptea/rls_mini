@@ -13,13 +13,9 @@
 #include <utility>
 #include <vector>
 
-using RxClock = std::chrono::steady_clock;
-
-
 struct RxTraceEntry {
 	uint64_t iteration           = 0;
 	int64_t last_pps_time        = 0;
-
 	int64_t start_ns             = 0;
 	int64_t end_ns               = 0;
 
@@ -29,15 +25,11 @@ struct RxTraceEntry {
 	// Существующее измерение: от начала receive() до конца UHD recv()
 	// Оставляем прежнюю семантику для сравнения со старыми CSV.
 	int64_t recv_us              = 0;
-
 	size_t samples               = 0;
 	int error_code               = 0;
-
 	bool has_time_spec           = false;
-
 	double sample_time           = std::numeric_limits<double>::quiet_NaN();
 	double last_sample_time      = std::numeric_limits<double>::quiet_NaN();
-
 	double lag_estimate_ms       = std::numeric_limits<double>::quiet_NaN();
 	int64_t lag_reference_age_us = -1;
 
@@ -57,31 +49,45 @@ struct RxTraceEntry {
 	int64_t receive_total_ns     = 0;
 };
 
+struct TimeSyncTraceEntry {
+	int64_t before_ns      = 0;
+	int64_t after_ns       = 0;
+	double usrp_sec        = 0.0;
+	double offset_delta_us = 0.0;
+};
+
 struct BoardRxTraceEntry {
 	std::string serial;
 	RxTraceEntry trace;
 };
 
+struct BoardTimeSyncTraceEntry {
+	std::string serial;
+	TimeSyncTraceEntry trace;
+};
 
-template<size_t N>
-class RxTraceBuffer {
+template<typename T, size_t N>
+class TraceBuffer {
+	static_assert(N > 0, "TraceBuffer size must be greater than zero");
+
 public:
-	void push(const RxTraceEntry & entry) {
+	void push(const T & entry) {
 		entries_[write_pos_] = entry;
 		write_pos_           = (write_pos_ + 1) % N;
-
-		if (count_ < N) ++count_;
+		if (count_ < N) {
+			++count_;
+		}
 	}
 
-	std::vector<RxTraceEntry> snapshot() const {
-		std::vector<RxTraceEntry> result;
+	std::vector<T> snapshot() const {
+		std::vector<T> result;
 		result.reserve(count_);
 
 		const size_t start = (write_pos_ + N - count_) % N;
 
-		for (size_t i = 0; i < count_; ++i)
+		for (size_t i = 0; i < count_; ++i) {
 			result.push_back(entries_[(start + i) % N]);
-
+		}
 		return result;
 	}
 
@@ -91,14 +97,13 @@ public:
 	}
 
 private:
-	std::array<RxTraceEntry, N> entries_{};
+	std::array<T, N> entries_{};
 	size_t write_pos_ = 0;
 	size_t count_     = 0;
 };
 
 inline void write_rx_trace_csv(std::vector<BoardRxTraceEntry> entries, const std::string & filename) {
 	std::ofstream file(filename);
-
 	if (!file.is_open()) {
 		return;
 	}
@@ -131,10 +136,24 @@ inline void write_rx_trace_csv(std::vector<BoardRxTraceEntry> entries, const std
 			 << e.rx_errors_ns * ns_to_us << ';' << e.dump_queue_ns * ns_to_us << ';' << e.rx_queue_ns * ns_to_us << ';'
 			 << e.logging_ns * ns_to_us << ';' << e.receive_total_ns * ns_to_us << ';' << other_ns * ns_to_us << '\n';
 
-		// Сбрасываем fixed, чтобы следующая строка сохраняла
-		// исходный формат временных меток и lag.
 		file.unsetf(std::ios::floatfield);
 	}
 
+	file.flush();
+}
+
+inline void write_time_sync_csv(const std::vector<BoardTimeSyncTraceEntry> & entries, const std::string & filename) {
+	std::ofstream file(filename);
+	if (!file) {
+		return;
+	}
+
+	file << "serial;before_ns;after_ns;usrp_sec;offset_delta_us\n";
+
+	for (const auto & item: entries) {
+		const auto & e = item.trace;
+		file << item.serial << ';' << e.before_ns << ';' << e.after_ns << ';' << std::fixed << std::setprecision(9) << e.usrp_sec << ';'
+			 << std::setprecision(3) << e.offset_delta_us << '\n';
+	}
 	file.flush();
 }
