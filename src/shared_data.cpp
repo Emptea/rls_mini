@@ -954,15 +954,8 @@ Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 	kvit.dsa_vr_n = cpm_poi.get_dsa_vr_n();
 	kvit.dsa_vr_k = cpm_poi.get_dsa_vr_k();
 
-	if (cpm_poi.get_apu_k1() > 0)
 		kvit.setLevelApuk1(cpm_poi.get_apu_k1());
-	else
-		piCout << "Error: apu_k1 == 0";
-
-	if (cpm_poi.get_apu_k2() > 0)
 		kvit.setLevelApuk2(cpm_poi.get_apu_k2());
-	else
-		piCout << "Error: apu_k2 == 0";
 
 	kvit.zona_k1 = static_cast<uint8_t>(cpm_poi.get_zona_stage());
 	kvit.zona_k2 = cpm_poi.get_zona_ch_num();
@@ -1027,9 +1020,7 @@ void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 
 void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 	log_cpm_msg(__func__, msg);
-	// TODO: msg.getLevelk2() - непонятно почему дБ если у нас шататно ноль
-	// а порог может быть нулем
-	auto k2 = msg.k2 == 0 ? 0 : msg.getLevelk2();
+	auto k2 = msg.getLevelk2();
 	cpm_poi.set_apu(msg.getLevelk1(), k2);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);

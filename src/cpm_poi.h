@@ -90,18 +90,20 @@ public:
 	}
 
 	// APU — пороги обнаружения
+	// k1 порог медианного фильтра (т.к. амлпитуда в квадрате, то порог тоже квадрат), дробное, больше нуля
+	// k2 порог P в алгоритме, целое, больше нуля
 	double get_apu_k1() const {
 		if (!dma_enabled) return apu_k1;
 		return apu_k1;
 		// return axi_dsp_get_detector_level(0);
 	}
-	double get_apu_k2() const {
+	uint32_t get_apu_k2() const {
 		if (!dma_enabled) return apu_k2;
 		return apu_k2;
 		// return axi_dsp_get_detector_level(1);
 	}
 
-	void set_apu(uint32_t k1, uint32_t k2) {
+	void set_apu(double k1, uint32_t k2) {
 		apu_k1 = k1;
 		apu_k2 = k2;
 		if (!dma_enabled) return;
@@ -111,8 +113,6 @@ public:
 	}
 
 	// ZONA — параметры расчёта зоны
-
-
 	void set_zona_params(ZoneCalcStage stage, uint16_t ch_num) {
 		if (ch_num >= 8) return;
 		zona_stage  = stage;
@@ -164,7 +164,7 @@ public:
 		dsa_vr_k    = 0;
 
 		apu_k1      = 36;
-		apu_k2      = 0;
+		apu_k2      = 1;
 
 		zona_stage  = ZoneCalcStage::BeforeLou;
 		zona_ch_num = 0;
@@ -194,7 +194,7 @@ private:
 	uint16_t dsa_vr_k        = 0;
 
 	double apu_k1            = 36;
-	double apu_k2            = 0;
+	uint32_t apu_k2          = 1;
 
 
 	ZoneCalcStage zona_stage = ZoneCalcStage::BeforeLou;

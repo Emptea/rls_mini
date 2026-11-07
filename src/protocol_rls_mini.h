@@ -172,10 +172,8 @@ public:
 		POI_APU(): Header(Type, Code) {}
 		uint16_t k1 = 0; // Коэффициент порога 1, цмр 0.5 дБ
 		uint16_t k2 = 0; // Коэффициент порога 2, цмр 0.5 дБ
-		void setLevelk1(uint32_t v) { k1 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
 		double getLevelk1() const { return std::pow(10.0, k1 * dbLSB / 10.0); }
-		void setLevelk2(uint32_t v) { k2 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
-		double getLevelk2() const { return std::pow(10.0, k2 * dbLSB / 10.0); }
+		uint32_t getLevelk2() const { return static_cast<uint32_t>(std::lround(std::pow(10.0, k2 * dbLSB / 10.0))); }
 	};
 
 
@@ -186,7 +184,7 @@ public:
 		POI_Zona(): Header(Type, Code) {}
 		uint8_t k1 = 0; // Код строба расчета зоны: 0 – в каналах (перед алгоритмом ЛОУ), 1 – в лучах (после алгоритма ЛОУ)
 		uint8_t _reserve = 0;
-		uint16_t k2 = 0; // Код канала расчёта зоны: номер канала/луча: 0…7
+		uint16_t k2      = 0; // Код канала расчёта зоны: номер канала/луча: 0…7
 	};
 
 
@@ -231,10 +229,8 @@ public:
 			};
 		};
 		uint16_t zona_k2 = 0;
-		void setLevelApuk1(uint32_t v) { apu_k1 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
-		double getLevelApuk1() const { return std::pow(10.0, apu_k1 * dbLSB / 10.0); }
+		void setLevelApuk1(double v) { apu_k1 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
 		void setLevelApuk2(uint32_t v) { apu_k2 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
-		double getLevelApuk2() const { return std::pow(10.0, apu_k2 * dbLSB / 10.0); }
 	};
 
 
@@ -840,7 +836,7 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_DSA & v) {
 
 // POI_APU
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_APU & v) {
-	return out << "k1:" << v.getLevelk1()<< "k2:" << v.getLevelk2();
+	return out << "k1:" << v.getLevelk1() << "k2:" << v.getLevelk2();
 }
 
 // POI_Zona
