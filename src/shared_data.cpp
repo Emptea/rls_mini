@@ -567,6 +567,7 @@ void GlobalData::process_rx_buffers_dma() {
 		}
 		last_packet_number = cur_packet_number;
 
+		cpm_poi.set_rx_header(*hdr);
 
 		if (hdr->tp == rls::TP_WORK) {
 			process_work_pac(buffer);
@@ -811,6 +812,22 @@ constexpr bool kt_uses_channel(rls::tp tp) {
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	log_cpm_msg(__func__, msg);
+	if (msg.reg_takt == 0 || msg.kt == 0) {
+		auto status = cpm_poi.get_status();
+		const auto & active = u220_group.active_boards();
+		if (!active.isEmpty()) status.u220_cycles = u220_group.board(active[0])->get_stats().cycles_completed;
+		for (size_t i = 0; i < u220_group.board_count() && i < status.u220_rx_overflows.size(); ++i)
+			status.u220_rx_overflows[i] = u220_group.board(i)->get_stats().rx_overflows;
+		{
+			std::lock_guard<std::mutex> lock(pending_tk_mutex);
+			pending_tk.active = false;
+		}
+		Protocol_RLS_Mini::POI_TK_Kvit ans;
+		ans.setData(&status, 1);
+		ans.nw = static_cast<uint16_t>(ans.words.size());
+		global->sendMessage(ans);
+		return;
+	}
 	if (cfg.dma_enabled) {
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);
 		const auto tp = static_cast<rls::tp>(msg.kt);

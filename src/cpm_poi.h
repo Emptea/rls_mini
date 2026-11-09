@@ -3,7 +3,9 @@
 #include "../rls_fpga/rls.hpp"
 #include "axi_dsp.h"
 
+#include <array>
 #include <cstdint>
+#include <mutex>
 
 // TODO: нужно ли axi_dsp_apply();
 
@@ -24,6 +26,28 @@ public:
 
         return v;
 	}();
+
+	// POI_TK_Kvit payload: counters in board-index order, then the latest DMA header.
+#pragma pack(push, 1)
+	struct Status {
+		uint64_t u220_cycles = 0;
+		std::array<uint64_t, 4> u220_rx_overflows{};
+		uint32_t packet_number = 0;
+		uint64_t timestamp = 0;
+	};
+#pragma pack(pop)
+	static_assert(sizeof(Status) == 52, "Unexpected POI status payload size");
+
+	void set_rx_header(const rls::header & hdr) {
+		std::lock_guard<std::mutex> lock(status_mutex);
+		status.packet_number = hdr.packet_number;
+		status.timestamp = hdr.timestamp;
+	}
+
+	Status get_status() const {
+		std::lock_guard<std::mutex> lock(status_mutex);
+		return status;
+	}
 
 	struct Dsa {
 		bool is_on;
@@ -182,6 +206,9 @@ public:
 	void set_dma_enabled(bool value) { dma_enabled = value; }
 
 private:
+	mutable std::mutex status_mutex;
+	Status status;
+
 	bool dma_enabled         = false;
 
 	bool sdc                 = false;
