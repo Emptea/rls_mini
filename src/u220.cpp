@@ -539,6 +539,12 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
 	}
 
+	size_t cur_packet_number = *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1) & 0xFFFF;
+	if ((cur_packet_number - last_packet_number) & 0xFFFF != 20) {
+		piCout << serial << "Pac drop, n_cur_pac: " << PICoutManipulators::Hex << cur_packet_number << "; n_last_pac: " << last_packet_number;
+	}
+	last_packet_number     = cur_packet_number;
+
 	entry.logging_ns       = elapsed_ns(logging_start, Clock::now());
 
 	// ------------------------------------------------------------

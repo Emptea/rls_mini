@@ -147,6 +147,7 @@ private:
 
 	bool shutdown_done                       = false;
 	UhdTimeSynchronizer * time_synchronizer_ = nullptr;
+	size_t last_packet_number = 0;
 
 	void fill_buffer_with_wavetable(VectorComplexS & buffer);
 	void initialize_usrp();

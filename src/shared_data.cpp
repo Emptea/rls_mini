@@ -561,9 +561,9 @@ void GlobalData::process_rx_buffers_dma() {
 		const auto * hdr                 = reinterpret_cast<const rls::header *>(buffer);
 		//
 		static size_t last_packet_number = 0;
-		auto cur_packet_number           = hdr->packet_number;
-		if ((cur_packet_number - last_packet_number) != 20) {
-			piCout << "Pac drop, n_cur_pac: " << cur_packet_number << "; n_last_pac: " << last_packet_number;
+		size_t cur_packet_number         = hdr->packet_number & 0xFFFF;
+		if ((cur_packet_number - last_packet_number) & 0xFFFF != 20) {
+			piCout << "Pac drop, n_cur_pac: " << PICoutManipulators::Hex << cur_packet_number << "; n_last_pac: " << last_packet_number;
 		}
 		last_packet_number = cur_packet_number;
 
