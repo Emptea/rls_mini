@@ -125,6 +125,8 @@ void GlobalData::init() {
 	}
 
 	u220_group.setup();
+	const auto u220_ip_version = u220_group.fpga(u220_group.active_boards()[0])->get_fpga_version();
+	csr_ip_ver_t axu_ip_version{};
 	u220_group.sync_ad9361();
 	// нужна задержка чтобы pps сбросился иначе в reset_time не сработает
 	2_s .sleep();
@@ -133,6 +135,7 @@ void GlobalData::init() {
 	if (cfg.dma_enabled) {
 		axi_dsp_init();
 		axi_dsp_configure();
+		axu_ip_version = axi_dsp_get_ip_ver();
 		axi_dsp_set_compensation_mode(1);
 		axi_dsp_set_expect_u220_del(cfg.rx_insert_count);
 		axi_dsp_set_output_source(0, 0, 0);
@@ -141,6 +144,7 @@ void GlobalData::init() {
 		axi_dsp_set_channel_mask(ispr_kan);
 		axi_dsp_apply();
 	}
+	cpm_poi.set_ip_versions(axu_ip_version, u220_ip_version);
 	first_transfer = false;
 }
 
