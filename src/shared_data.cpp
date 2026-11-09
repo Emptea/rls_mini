@@ -579,6 +579,10 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 	const auto * pac = reinterpret_cast<const rls::work_packet *>(buffer);
 	cpm_poi.set_zona_val(pac->nf);
 	auto nes = pac->posthdr.n_formulars;
+	if (nes > 0) {
+		rls::print_hdr(buffer);
+	}
+
 	for (size_t i = 0; i < nes; i++) {
 		const auto & f = pac->formulars[i];
 		struct target targ {};
@@ -643,12 +647,12 @@ void GlobalData::process_kt_pac(const uint32_t * buffer) {
 		}
 		words             = pending_tk.words;
 		pending_tk.active = false;
-		axi_dsp_set_output_source(0, 0, 0);
-		axi_dsp_apply();
 	}
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	ans.setData(buffer, words);
 	global->sendMessage(ans);
+	axi_dsp_set_output_source(0, 0, 0);
+	axi_dsp_apply();
 }
 
 void GlobalData::cpm_loop() {
