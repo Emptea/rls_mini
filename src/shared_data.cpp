@@ -555,10 +555,18 @@ void GlobalData::process_rx_buffers_software() {
 
 void GlobalData::process_rx_buffers_dma() {
 	while (dma.get_rx_ready_count() > 0) {
-		auto info           = dma.get_rx_buffer();
+		auto info                        = dma.get_rx_buffer();
 
-		const auto * buffer = info.buffer;
-		const auto * hdr    = reinterpret_cast<const rls::header *>(buffer);
+		const auto * buffer              = info.buffer;
+		const auto * hdr                 = reinterpret_cast<const rls::header *>(buffer);
+		//
+		static size_t last_packet_number = 0;
+		auto cur_packet_number           = hdr->packet_number;
+		if ((cur_packet_number - last_packet_number) != 20) {
+			piCout << "Pac drop, n_cur_pac: " << cur_packet_number << "; n_last_pac: " << last_packet_number;
+		}
+		last_packet_number = cur_packet_number;
+
 
 		if (hdr->tp == rls::TP_WORK) {
 			process_work_pac(buffer);
@@ -579,9 +587,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 	const auto * pac = reinterpret_cast<const rls::work_packet *>(buffer);
 	cpm_poi.set_zona_val(pac->nf);
 	auto nes = pac->posthdr.n_formulars;
-	if (nes > 0) {
-		rls::print_hdr(buffer);
-	}
+	if (nes > 0) {}
 
 	for (size_t i = 0; i < nes; i++) {
 		const auto & f = pac->formulars[i];
@@ -604,6 +610,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		}
 
 		double range = (range_idx + tx_sig_len / 2.0) / rls::SAMPLE_RATE * rls::LIGHT_SPEED / 2.0;
+		range += cpm_rr.get_dd_poi();
 		cpm_poi.nes.push(static_cast<uint16_t>(range));
 		targ.d                  = range;
 

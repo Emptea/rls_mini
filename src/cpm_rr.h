@@ -81,6 +81,8 @@ public:
 	// KUIZL — последняя полученная команда управления излучением
 	// IZL — фактическое состояние излучения
 	// false — выключить, true — включить
+	// TODO включение gain on
+	// set_play_gpio_tx_enable
 	bool get_izl() const { return izl; }
 	bool get_kuizl() const { return kuizl; }
 	void set_izl(bool value) {
@@ -129,7 +131,7 @@ public:
 	float get_compensated_az() const {
 		auto az = use_imit_opu ? imitator_u220.get_opu_azago(signal_processing_delay)
 		                       : techlaser.getAngleAgo(PISystemTime::fromSeconds(signal_processing_delay));
-		az += daz;
+		az += daz + daz_poi;
 		az = std::fmod(az, 360.0);
 		if (az < 0.0) az += 360.0;
 		return az;
