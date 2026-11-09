@@ -59,6 +59,20 @@ void U220Group::setup() {
 	}
 }
 
+bool U220Group::get_play_gpio_tx_enable() const {
+	if (active_boards_.isEmpty()) return false;
+	for (size_t i: active_boards_) {
+		if (!fpga_[i]->get_play_gpio_tx_enable()) return false;
+	}
+	return true;
+}
+
+void U220Group::set_play_gpio_tx_enable(bool enable) {
+	for (size_t i: active_boards_) {
+		fpga_[i]->set_play_gpio_tx_enable(enable);
+	}
+}
+
 void U220Group::stop_and_drain_rx() {
 	for (size_t i: active_boards_) {
 		boards_[i]->stop_and_drain_rx();

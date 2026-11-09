@@ -49,7 +49,7 @@ GlobalData::GlobalData()
 	, cfg()
 	, u220_group(cfg)
 	, imitator_u220(u220_group)
-	, cpm_rr(techlaser, imitator_u220)
+	, cpm_rr(techlaser, imitator_u220, u220_group)
 	, cpm_poi(cfg.dma_enabled)
 	, cpm_cit(imitator_u220) {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
