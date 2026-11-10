@@ -559,10 +559,9 @@ void GlobalData::process_rx_buffers_dma() {
 
 		const auto * buffer              = info.buffer;
 		const auto * hdr                 = reinterpret_cast<const rls::header *>(buffer);
-		//
 		static size_t last_packet_number = 0;
 		size_t cur_packet_number         = hdr->packet_number & 0xFFFF;
-		if ((cur_packet_number - last_packet_number) & 0xFFFF != 20) {
+		if (((cur_packet_number - last_packet_number) & 0xFFFF) != 20) {
 			piCout << "Pac drop, n_cur_pac: " << PICoutManipulators::Hex << cur_packet_number << "; n_last_pac: " << last_packet_number;
 		}
 		last_packet_number = cur_packet_number;
@@ -578,24 +577,30 @@ void GlobalData::process_rx_buffers_dma() {
 }
 
 void GlobalData::process_work_pac(const uint32_t * buffer) {
-	constexpr size_t work_header_size = sizeof(rls::header) + sizeof(rls::work_posthdr);
-
 	static_assert(sizeof(rls::header) == 24, "Invalid header size");
 	static_assert(sizeof(rls::work_posthdr) == 8, "Invalid work_posthdr size");
 	static_assert(sizeof(rls::noise_formular) == 68, "Invalid noise_formular size");
-	static_assert(BUFFER_SIZE >= work_header_size, "DMA buffer too small");
 
 	const auto * pac = reinterpret_cast<const rls::work_packet *>(buffer);
 	cpm_poi.set_zona_val(pac->nf);
 	auto nes = pac->posthdr.n_formulars;
-	if (nes > 0) {}
+	if (nes == 0) {
+		return;
+	}
+	size_t packet_number  = pac->hdr.packet_number & 0xFFFF;
+	auto * board          = u220_group.board(u220_group.active_boards()[0]);
+	const double uhd_time = board->rx_buffer_time_info.get_time(packet_number);
+	const auto host_time  = u220_group.to_host_time(uhd_time);
+
+	auto targ_az = cpm_rr.get_compensated_az(host_time);
+	// auto targ_az = cpm_rr.get_compensated_az();
 
 	for (size_t i = 0; i < nes; i++) {
 		const auto & f = pac->formulars[i];
 		struct target targ {};
 		targ.n         = cpm_poi.nes.count;
 		targ.time      = cpm_rr.get_compensated_time();
-		targ.az        = cpm_rr.get_compensated_az();
+		targ.az        = targ_az;
 
 		auto um_idx    = f.main_diagram_number;
 		// targ.um        = (double)111packet.main_amplitude / (double)packet.neighbor_amplitude;
@@ -813,7 +818,7 @@ constexpr bool kt_uses_channel(rls::tp tp) {
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	log_cpm_msg(__func__, msg);
 	if (msg.reg_takt == 0 || msg.kt == 0) {
-		auto status = cpm_poi.get_status();
+		auto status         = cpm_poi.get_status();
 		const auto & active = u220_group.active_boards();
 		if (!active.isEmpty()) status.u220_cycles = u220_group.board(active[0])->get_stats().cycles_completed;
 		for (size_t i = 0; i < u220_group.board_count() && i < status.u220_rx_overflows.size(); ++i)

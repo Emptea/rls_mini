@@ -15,6 +15,19 @@
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/thread.hpp>
 
+struct RxBufferTimeInfo {
+	double uhd_time[4096]{};
+
+	static size_t index(uint32_t packet_number) {
+		const uint16_t n = static_cast<uint16_t>(packet_number);
+		return ((n >> 2) * 3277u) & 4095u;
+	}
+
+	void set_time(uint32_t pac_num_in, double time) { uhd_time[index(pac_num_in)] = time; }
+
+	double get_time(uint32_t pac_num_out) const { return uhd_time[index(pac_num_out - 19)]; }
+};
+
 #define PRINT_U220_STATS(s) piCout << "Cycles:" << s.cycles_completed << " RX:" << s.rx_packet_cnt << "(" << s.rx_bad_packets << "err)";
 typedef struct u220_config {
 	double rate;
@@ -147,7 +160,7 @@ private:
 
 	bool shutdown_done                       = false;
 	UhdTimeSynchronizer * time_synchronizer_ = nullptr;
-	size_t last_packet_number = 0;
+	size_t last_packet_number                = 0;
 
 	void fill_buffer_with_wavetable(VectorComplexS & buffer);
 	void initialize_usrp();
@@ -184,6 +197,8 @@ public:
     });
 
 	~U220();
+
+	RxBufferTimeInfo rx_buffer_time_info = {};
 
 	void init();
 	void setup(void ** tx0_buf, void ** tx1_buf);

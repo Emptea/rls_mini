@@ -137,6 +137,17 @@ public:
 		return az;
 	}
 
+	float get_compensated_az(std::chrono::steady_clock::time_point sample_time) const {
+		const double ago_sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - sample_time).count();
+		auto az = use_imit_opu ? imitator_u220.get_opu_azago(ago_sec) : techlaser.getAngleAgo(PISystemTime::fromSeconds(ago_sec));
+
+		az += daz + daz_poi;
+		az = std::fmod(az, 360.0);
+		if (az < 0.0) az += 360.0;
+
+		return az;
+	}
+
 	bool take_rotation_completed() const {
 		const bool result  = rotation_completed;
 		rotation_completed = false;

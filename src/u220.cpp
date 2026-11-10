@@ -404,8 +404,9 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 
 	if (valid_samples) {
 		const double first_sample_time = rx_metadata.time_spec.get_real_secs();
-
-		last_sample_time               = first_sample_time + static_cast<double>(samples_per_channel - 1) / board_config.rate;
+		const uint32_t packet_number   = *(reinterpret_cast<const uint32_t *>(rx_buffer_ptrs[active_buffer_idx][0]) + 1);
+		rx_buffer_time_info.set_time(packet_number, first_sample_time);
+		last_sample_time = first_sample_time + static_cast<double>(samples_per_channel - 1) / board_config.rate;
 	}
 
 	// ------------------------------------------------------------
@@ -541,7 +542,8 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 
 	size_t cur_packet_number = *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1) & 0xFFFF;
 	if ((cur_packet_number - last_packet_number) & 0xFFFF != 20) {
-		piCout << serial << "Pac drop, n_cur_pac: " << PICoutManipulators::Hex << cur_packet_number << "; n_last_pac: " << last_packet_number;
+		piCout << serial << "Pac drop, n_cur_pac: " << PICoutManipulators::Hex << cur_packet_number
+			   << "; n_last_pac: " << last_packet_number;
 	}
 	last_packet_number     = cur_packet_number;
 
