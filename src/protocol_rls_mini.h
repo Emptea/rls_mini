@@ -357,6 +357,10 @@ public:
 			time_msw   = uint16_t(t >> 16);
 			time_lsw   = uint16_t(t);
 		}
+		void setZona(uint32_t zona_val_sq) {
+			int32_t val = 3000 - std::lround(50 * 10.0 * std::log10(zona_val_sq));
+			zona        = val < 0 ? 0 : static_cast<uint16_t>(val);
+		}
 	};
 
 

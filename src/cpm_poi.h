@@ -31,11 +31,11 @@ public:
 #pragma pack(push, 1)
 	struct Status {
 		csr_ip_ver_t axu_ip_version{}; // Raw layout: MIN_VER[15:0], MAJ_VER[31:16].
-		uint32_t u220_ip_version = 0; // get_fpga_version(): low 24 bits.
-		uint64_t u220_cycles = 0;
+		uint32_t u220_ip_version = 0;  // get_fpga_version(): low 24 bits.
+		uint64_t u220_cycles     = 0;
 		std::array<uint64_t, 4> u220_rx_overflows{};
-		uint32_t packet_number = 0;
-		uint64_t timestamp = 0;
+		uint32_t packet_number    = 0;
+		uint64_t timestamp        = 0;
 		uint64_t dma_packet_drops = 0; // Number of detected packet sequence gaps.
 	};
 #pragma pack(pop)
@@ -43,19 +43,17 @@ public:
 
 	void set_ip_versions(csr_ip_ver_t axu, uint32_t u220) {
 		std::lock_guard<std::mutex> lock(status_mutex);
-		status.axu_ip_version = axu;
+		status.axu_ip_version  = axu;
 		status.u220_ip_version = u220;
 	}
 
 	void set_rx_header(const rls::header & hdr) {
 		std::lock_guard<std::mutex> lock(status_mutex);
 		status.packet_number = hdr.packet_number;
-		status.timestamp = hdr.timestamp;
+		status.timestamp     = hdr.timestamp;
 	}
 
-	void increment_dma_packet_drops(){
-		status.dma_packet_drops++;
-	}
+	void increment_dma_packet_drops() { status.dma_packet_drops++; }
 
 	Status get_status() const {
 		std::lock_guard<std::mutex> lock(status_mutex);
@@ -170,7 +168,7 @@ public:
 		} break;
 		}
 	}
-	double get_zona_val() const { return zona_val_sq; }
+	uint32_t get_zona_val() const { return zona_val_sq; }
 
 	// ISPR_KAN — исправность приёмных каналов
 	// Целое без знака, 0–255
@@ -239,5 +237,5 @@ private:
 
 	ZoneCalcStage zona_stage = ZoneCalcStage::BeforeLou;
 	uint16_t zona_ch_num     = 0;
-	double zona_val_sq       = 1.0;
+	uint32_t zona_val_sq     = 1;
 };

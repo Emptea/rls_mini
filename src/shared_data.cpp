@@ -241,8 +241,8 @@ void GlobalData::start() {
 void GlobalData::stop() {
 	cpm_thread.stopAndWait();
 	u220_recv_thread.stopAndWait();
-	dump_rx_traces(rx_cycle_trace.snapshot());
-	dump_time_sync_traces();
+	// dump_rx_traces(rx_cycle_trace.snapshot());
+	// dump_time_sync_traces();
 	process_thread.stop();          // mark thread for stop
 	notifier_channels.notify();     // notify thread
 	process_thread.waitForFinish(); // wait for thread really finish
@@ -947,7 +947,7 @@ void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
 	cpm_rr.set_izl(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	// TODO: убрать из фин версиии
-	u220_group.start_rx_dump();
+	// u220_group.start_rx_dump();
 	global->sendMessage(ans);
 }
 
@@ -1011,7 +1011,7 @@ Protocol_RLS_Mini::PI GlobalData::set_PI() {
 	pi.setSeconds(cpm_rr.get_compensated_time());
 	pi.setDegreesAz(cpm_rr.get_compensated_az());
 
-	pi.zona = cpm_poi.get_zona_val();
+	pi.setZona(cpm_poi.get_zona_val());
 	pi.nes  = cpm_poi.nes.count;
 
 	if (cpm_rr.take_rotation_completed()) {
