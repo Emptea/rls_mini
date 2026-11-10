@@ -712,7 +712,7 @@ void GlobalData::cpm_loop() {
 					fpga->log_rx_playback_amplitude(radio);
 					// fpga->log_rx_playback_dn_offset(radio);
 				}
-				// fpga->log_rx_playback_dn_counter();
+				fpga->log_play_ctrl();
 				// fpga->log_rx_playback_start_delay();
 			}
 		}

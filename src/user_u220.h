@@ -68,6 +68,8 @@ public:
 	void set_rx_playback_dn_counter(uint16_t start, int32_t step);
 	void set_rx_playback_start_delay(uint16_t delay_radio0, uint16_t delay_radio1);
 
+	void log_play_ctrl();
+
 	void log_rx_playback_status(size_t radio);
 	void log_rx_playback_phase(size_t radio);
 	void log_rx_playback_enable(size_t radio);

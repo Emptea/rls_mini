@@ -416,6 +416,12 @@ UserU220::RxPlaybackStatus UserU220::get_rx_playback_status(size_t radio, size_t
 
 	return status;
 }
+
+void UserU220::log_play_ctrl() {
+	const auto reg = read_reg(RdReg::PLAY_CTRL_EFFECTIVE);
+	(void)reg;
+}
+
 void UserU220::log_rx_playback_status(size_t radio) {
 	const auto reg     = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::SAMPLE_MEM));
 
