@@ -129,7 +129,7 @@ void UserU220::set_play_rx_enable(uint32_t rx_enable) {
 }
 
 uint32_t UserU220::get_play_gpio_tx_enable() {
-	return (read_reg(RdReg::PLAY_CTRL_EFFECTIVE, false) >> 4) & 0x3u;
+	return (read_reg(RdReg::PLAY_CTRL, false) >> 4) & 0x3u;
 }
 
 void UserU220::set_play_gpio_tx_enable(uint32_t gpio_enable) {
@@ -418,7 +418,7 @@ UserU220::RxPlaybackStatus UserU220::get_rx_playback_status(size_t radio, size_t
 }
 
 void UserU220::log_play_ctrl() {
-	const auto reg = read_reg(RdReg::PLAY_CTRL_EFFECTIVE);
+	const auto reg = read_reg(RdReg::PLAY_CTRL);
 	(void)reg;
 }
 
