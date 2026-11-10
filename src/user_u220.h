@@ -28,6 +28,7 @@ public:
 	void set_play_gain_on_enable(uint32_t gain_on_enable);
 	void set_play_rx_enable(uint32_t rx_enable);
 
+	uint32_t get_play_gpio_tx_enable();
 	void set_play_gpio_tx_enable(uint32_t gpio_enable);
 	void set_play_gpio_rx_enable(uint32_t gpio_enable);
 	void set_play_start_pulse_enable(uint32_t start_pulse_enable);

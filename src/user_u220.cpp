@@ -128,6 +128,10 @@ void UserU220::set_play_rx_enable(uint32_t rx_enable) {
 	write_play_ctrl();
 }
 
+uint32_t UserU220::get_play_gpio_tx_enable() {
+	return (read_reg(RdReg::PLAY_CTRL_EFFECTIVE, false) >> 4) & 0x3u;
+}
+
 void UserU220::set_play_gpio_tx_enable(uint32_t gpio_enable) {
 	play_ctrl_.GPIO_TX_ENABLE = gpio_enable;
 	write_play_ctrl();

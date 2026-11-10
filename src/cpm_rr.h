@@ -2,6 +2,7 @@
 
 #include "imitator_u220.h"
 #include "techlaser.h"
+#include "u220_group.h"
 
 #include <atomic>
 #include <chrono>
@@ -26,7 +27,7 @@ public:
 		Unknown   = 3  // Состояние не определено
 	};
 
-	explicit CpmRr(Techlaser & techlaser, ImitatorU220 & imitator_u220): techlaser(techlaser), imitator_u220(imitator_u220) {
+	explicit CpmRr(Techlaser & techlaser, ImitatorU220 & imitator_u220, U220Group & u220_group): techlaser(techlaser), imitator_u220(imitator_u220), u220_group(u220_group) {
 		set_current_time(0.0);
 	}
 	~CpmRr() {}
@@ -81,13 +82,11 @@ public:
 	// KUIZL — последняя полученная команда управления излучением
 	// IZL — фактическое состояние излучения
 	// false — выключить, true — включить
-	// TODO включение gain on
-	// set_play_gpio_tx_enable
-	bool get_izl() const { return izl; }
+	bool get_izl() const { return u220_group.get_play_gpio_tx_enable(); }
 	bool get_kuizl() const { return kuizl; }
 	void set_izl(bool value) {
 		kuizl = value;
-		izl   = value;
+		u220_group.set_play_gpio_tx_enable(value);
 	}
 
 	// ANT — состояние антенны
@@ -157,12 +156,12 @@ public:
 private:
 	Techlaser & techlaser;
 	ImitatorU220 & imitator_u220;
+	U220Group & u220_group;
 
 	RotationCommand kuvr            = RotationCommand::Off; // Последняя команда вращения
 	RotationState vr                = RotationState::Off;   // Текущее состояние вращения
 
 	bool kuizl                      = false; // Последняя команда излучения
-	bool izl                        = false; // Текущее состояние излучения
 	bool ant                        = false; // Состояние подключения антенны
 
 	bool use_imit_opu               = false;
