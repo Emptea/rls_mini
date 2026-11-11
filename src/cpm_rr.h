@@ -10,6 +10,7 @@
 #include <functional>
 #include <thread>
 
+
 class CpmRr {
 public:
 	// Полученная команда управления вращением (KUVR)
@@ -27,7 +28,10 @@ public:
 		Unknown   = 3  // Состояние не определено
 	};
 
-	explicit CpmRr(Techlaser & techlaser, ImitatorU220 & imitator_u220, U220Group & u220_group): techlaser(techlaser), imitator_u220(imitator_u220), u220_group(u220_group) {
+	explicit CpmRr(Techlaser & techlaser, ImitatorU220 & imitator_u220, U220Group & u220_group)
+		: techlaser(techlaser)
+		, imitator_u220(imitator_u220)
+		, u220_group(u220_group) {
 		set_current_time(0.0);
 	}
 	~CpmRr() {}
@@ -39,22 +43,7 @@ public:
 	// VR — фактическое состояние вращения антенны
 	RotationState get_vr() const {
 		if (use_imit_opu) return imitator_u220.is_opu_running() ? RotationState::Simulator : RotationState::Off;
-
-		const auto state = techlaser.getState();
-
-		if (state.motor_error) return RotationState::Unknown;
-
-		switch (state.motor_status) {
-		case Techlaser::MotorStatus::Starting:
-		case Techlaser::MotorStatus::Rotating:
-		case Techlaser::MotorStatus::Braking:
-		case Techlaser::MotorStatus::Stopping: return RotationState::On;
-
-		case Techlaser::MotorStatus::Idle:
-		case Techlaser::MotorStatus::Hold: return RotationState::Off;
-
-		default: return RotationState::Unknown;
-		}
+		return RotationState::Unknown;
 	}
 
 	RotationCommand get_kuvr() const { return kuvr; }
@@ -62,13 +51,12 @@ public:
 		kuvr = value;
 		switch (value) {
 		case RotationCommand::Off: {
-			techlaser.stop();
 			imitator_u220.stop_opu();
 			imitator_u220.apply(0);
 		} break;
 		case RotationCommand::On: {
 			use_imit_opu = false;
-			techlaser.start(180.f);
+			sync_opu();
 		} break;
 		case RotationCommand::Simulator: {
 			use_imit_opu = true;
@@ -127,18 +115,19 @@ public:
 		if (az < 0.0) az += 360.0;
 		return az;
 	}
+
 	float get_compensated_az() const {
-		auto az = use_imit_opu ? imitator_u220.get_opu_azago(signal_processing_delay)
-		                       : techlaser.getAngleAgo(PISystemTime::fromSeconds(signal_processing_delay));
-		az += daz + daz_poi;
-		az = std::fmod(az, 360.0);
-		if (az < 0.0) az += 360.0;
-		return az;
+		const auto delay       = std::chrono::duration<double>(signal_processing_delay.load());
+
+		const auto sample_time = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(-delay);
+
+		return get_compensated_az(sample_time);
 	}
 
 	float get_compensated_az(std::chrono::steady_clock::time_point sample_time) const {
 		const double ago_sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - sample_time).count();
-		auto az = use_imit_opu ? imitator_u220.get_opu_azago(ago_sec) : techlaser.getAngleAgo(PISystemTime::fromSeconds(ago_sec));
+
+		auto az              = use_imit_opu ? imitator_u220.get_opu_azago(ago_sec) : techlaser.getAngleAgo(sample_time);
 
 		az += daz + daz_poi;
 		az = std::fmod(az, 360.0);
@@ -151,6 +140,22 @@ public:
 		const bool result  = rotation_completed;
 		rotation_completed = false;
 		return result;
+	}
+
+	void sync_opu() {
+		const auto s   = techlaser.getState();
+		const auto now = std::chrono::steady_clock::now();
+
+		if (s.angle_receive_timestamp == std::chrono::steady_clock::time_point{}) {
+			return;
+		}
+
+		if (now - s.angle_receive_timestamp > std::chrono::milliseconds(200)) {
+			return;
+		}
+
+		const double angle = techlaser.getAngleAgo(now);
+		imitator_u220.set_opu(angle, s.current_speed);
 	}
 
 private:

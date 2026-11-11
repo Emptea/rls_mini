@@ -1,10 +1,6 @@
-#ifndef techlaser_h
-#define techlaser_h
+#pragma once
 
 #include <chrono>
-#include <deque>
-#include <mutex>
-#include <pipacketextractor.h>
 #include <piprotectedvariable.h>
 #include <piserial.h>
 
@@ -15,85 +11,50 @@ public:
 	Techlaser();
 	~Techlaser();
 
-	enum class DeviceStatus {
-		Invalid = -1,
-		NotReady = 0, // Не готов (устройство переходит в него после возникновения ошибок, которые можно получить по команде $b#)
-		SelfDiag = 1, // Идет процесс самодиагностики
-		Ready = 2, // Готов (может принимать команды позиционирования, в остальных состояниях они отбрасываются)
-		Heating = 3, // Обогрев
-	};
-
-	enum class MotorStatus {
-		Invalid  = -1,
-		Idle     = 0, // Бездействие (остановка без удержания)
-		Hold     = 1, // Удержание позиции
-		Stopping = 2, // Остановка (переходный статус)
-		Starting = 3, // Разгон
-		Braking  = 4, // Торможение
-		Rotating = 5, // Равномерное движение
-	};
-
 	struct State {
-		DeviceStatus device_status = DeviceStatus::Invalid;
-		MotorStatus motor_status   = MotorStatus::Invalid;
-		bool motor_error           = false;
-		float current_angle        = 0.f; // 0 - 360
-		float current_speed        = 0.f; // °/c
-		PISystemTime angle_receive_timestamp;
+		float current_angle = 0.f; // 0 - 360
+		float current_speed = 0.f; // °/c
+		std::chrono::steady_clock::time_point angle_receive_timestamp{};
 	};
 
-	// open serial, starts receive
 	bool open(const PIString & serial);
-
-	// stop requests, receive and close serial
 	void close();
-
 	bool isOpened() const { return ser.isOpened(); }
 	bool isClosed() const { return ser.isClosed(); }
 
-	// start rotate and requests
-	void start(float rotate_speed_deg_s);
-
-	// stop rotate
-	void stop();
-
-	// current state
 	State getState() const;
-	double getAngleAgo(PISystemTime ago) const;
+	double getAngleAgo(std::chrono::steady_clock::time_point target_time) const;
 	double getAngleCurrent() const { return getState().current_angle; }
 
 private:
-	using Clock = std::chrono::steady_clock;
+	struct AngleReceiver {
+		static constexpr float LSB = 360.0f / 8192.0f;
 
-	struct Request {
-		PIByteArray bytes;
-		char command;
+		uint8_t high               = 0;
+		bool has_high              = false;
+
+		bool push(uint8_t byte, float & angle) {
+			if ((byte & 0xC0) == 0x80) {
+				high     = byte;
+				has_high = true;
+				return false;
+			}
+			if (!has_high || (byte & 0x80)) return false;
+			const uint16_t raw_angle = (static_cast<uint16_t>(high & 0x3F) << 7) | (byte & 0x7F);
+			angle                    = raw_angle * LSB;
+			has_high                 = false;
+			return true;
+		}
+
+		void reset() { has_high = false; }
 	};
 
-	void packetReceived(PIByteArray msg);
-	void processExchange();
+	void processAngleBytes(const uchar * data, ssize_t size);
 
-	std::mutex exchange_mutex;
-	std::deque<Request> control_queue;
-
-	bool polling        = false;
-	bool waiting_reply  = false;
-	char expected_reply = '\0';
-	unsigned poll_index = 0;
-
-	Clock::time_point reply_deadline{};
-	Clock::time_point next_poll_cycle{};
-
-	// Начальные значения для проверки.
-	// 200 мс — выбранный нами тайм-аут, не значение из руководства.
-	std::chrono::milliseconds reply_timeout{200};
-	std::chrono::milliseconds poll_period{50};
-
-	PIThread req_thread;
+	AngleReceiver angle_receiver;
 	PISerial ser;
-	PIPacketExtractor pext;
-	PITimeMeasurer angle_receive_tm;
 	mutable PIProtectedVariable<State> state;
+	float speed_ref_angle = 0.0f;
+	std::chrono::steady_clock::time_point speed_ref_time{};
+	bool have_speed_ref = false;
 };
-
-#endif // techlaser_h

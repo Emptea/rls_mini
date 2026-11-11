@@ -597,12 +597,12 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 	const double uhd_time = board->rx_buffer_time_info.get_time(packet_number);
 	const auto host_time  = u220_group.to_host_time(uhd_time);
 
-	auto targ_az = cpm_rr.get_compensated_az(host_time);
+	auto targ_az          = cpm_rr.get_compensated_az(host_time);
 	// auto targ_az = cpm_rr.get_compensated_az();
 
 	for (size_t i = 0; i < nes; i++) {
 		const auto & f = pac->formulars[i];
-		struct target targ {};
+		struct target targ{};
 		targ.n         = cpm_poi.nes.count;
 		targ.time      = cpm_rr.get_compensated_time();
 		targ.az        = targ_az;
@@ -689,7 +689,11 @@ void GlobalData::cpm_loop() {
 
 		// Проверка RR — 10 Гц
 		if (++tick >= 10) {
-			tick            = 0;
+			tick = 0;
+
+			if (cpm_rr.get_kuvr() == CpmRr::RotationCommand::On) {
+				cpm_rr.sync_opu();
+			}
 
 			auto current_vr = cpm_rr.get_vr();
 
@@ -1012,7 +1016,7 @@ Protocol_RLS_Mini::PI GlobalData::set_PI() {
 	pi.setDegreesAz(cpm_rr.get_compensated_az());
 
 	pi.setZona(cpm_poi.get_zona_val());
-	pi.nes  = cpm_poi.nes.count;
+	pi.nes = cpm_poi.nes.count;
 
 	if (cpm_rr.take_rotation_completed()) {
 		cpm_poi.nes.clear();

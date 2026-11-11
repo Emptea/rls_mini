@@ -18,13 +18,13 @@ public:
 	static constexpr double LAMBDA       = 299792458.0 / FREQ;
 
 	static constexpr auto VR_ARRAY       = [] {
-        std::array<double, N> v{};
-        constexpr double step = -LAMBDA / (2.0 * PULSE_PERIOD * N);
+		std::array<double, N> v{};
+		constexpr double step = -LAMBDA / (2.0 * PULSE_PERIOD * N);
 
-        for (std::size_t i = 0; i < N; ++i)
-            v[i] = (i < N / 2 ? int(i) : int(i) - int(N)) * step;
+		for (std::size_t i = 0; i < N; ++i)
+			v[i] = (i < N / 2 ? int(i) : int(i) - int(N)) * step;
 
-        return v;
+		return v;
 	}();
 
 	// POI_TK_Kvit payload: firmware versions, board counters, then the latest DMA header and DMA packet drop counter.
@@ -41,7 +41,7 @@ public:
 #pragma pack(pop)
 	static_assert(sizeof(Status) == 68, "Unexpected POI status payload size");
 
-	void set_ip_versions(csr_ip_ver_t axu, uint32_t u220) {
+	void set_ip_versions(const csr_ip_ver_t & axu, uint32_t u220) {
 		std::lock_guard<std::mutex> lock(status_mutex);
 		status.axu_ip_version  = axu;
 		status.u220_ip_version = u220;

@@ -1,47 +1,13 @@
 #include "techlaser.h"
 
-#include <cerrno>
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <fcntl.h>
 #include <linux/serial.h>
 #include <piliterals_string.h>
 #include <piliterals_time.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
-
-namespace {
-
-bool parseNumber(const PIString & text, double & value) {
-	const char * begin = text.dataAscii();
-	char * end         = nullptr;
-
-	errno              = 0;
-	value              = std::strtod(begin, &end);
-
-	return end != begin && *end == '\0' && errno != ERANGE && std::isfinite(value);
-}
-
-bool parseFaults(const PIString & text, unsigned long & value) {
-	const char * begin = text.dataAscii();
-
-	// По протоколу — 32-битное шестнадцатеричное число.
-	if (*begin == '\0' || std::strlen(begin) > 8) return false;
-
-	for (const char * p = begin; *p; ++p) {
-		if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F'))) return false;
-	}
-
-	char * end = nullptr;
-	errno      = 0;
-	value      = std::strtoul(begin, &end, 16);
-
-	return *end == '\0' && errno != ERANGE && value <= 0xffffffffUL;
-}
-
-} // namespace
 
 static bool initializeRs485(const PIString & device) {
 	const int fd = ::open(device.dataAscii(), O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -51,32 +17,15 @@ static bool initializeRs485(const PIString & device) {
 	}
 
 	serial_rs485 disabled{};
+	int rts = TIOCM_RTS;
+	bool ok = false;
 
 	if (::ioctl(fd, TIOCSRS485, &disabled) < 0) {
 		std::perror("TIOCSRS485 disable");
-		::close(fd);
-		return false;
-	}
-
-	serial_rs485 config{};
-	config.flags = SER_RS485_ENABLED | SER_RS485_RTS_ON_SEND;
-
-	bool ok      = false;
-
-	if (::ioctl(fd, TIOCSRS485, &config) < 0) {
-		std::perror("TIOCSRS485");
+	} else if (::ioctl(fd, TIOCMBIC, &rts) < 0) {
+		std::perror("TIOCMBIC RTS");
 	} else {
-		serial_rs485 actual{};
-
-		if (::ioctl(fd, TIOCGRS485, &actual) < 0) {
-			std::perror("TIOCGRS485");
-		} else {
-			const unsigned mask = SER_RS485_ENABLED | SER_RS485_RTS_ON_SEND | SER_RS485_RTS_AFTER_SEND;
-
-			ok                  = (actual.flags & mask) == config.flags;
-
-			if (!ok) std::fprintf(stderr, "Unexpected RS485 flags: 0x%x\n", actual.flags);
-		}
+		ok = true; // RTS сброшен: на твоей плате DE = 0
 	}
 
 	::close(fd);
@@ -85,282 +34,111 @@ static bool initializeRs485(const PIString & device) {
 
 
 Techlaser::Techlaser() {
-	pext.setSplitMode(PIPacketExtractor::HeaderAndFooter);
-	pext.setHeader({'$'});
-	pext.setFooter({'#'});
-
-	CONNECTL(&ser, threadedReadEvent, ([this](const uchar * data, ssize_t size) { pext.appendData(data, size); }));
-	CONNECTL(&pext, packetReceived, ([this](const uchar * data, ssize_t size) { packetReceived(PIByteArray(data, size)); }));
-	req_thread.setSlot([this] { processExchange(); });
-
-	req_thread.needLockRun(true);
+	CONNECTL(&ser, threadedReadEvent, ([this](const uchar * data, ssize_t size) {
+		if (size > 0) processAngleBytes(data, size);
+	}));
 }
-
 
 Techlaser::~Techlaser() {
 	close();
 }
 
+static FILE * uart_dump;
 
 bool Techlaser::open(const PIString & serial) {
 	close();
-
-	if (!initializeRs485(serial)) return false;
 
 	ser.setSpeed(PISerial::S115200);
 	ser.setDataBitsCount(8);
 	ser.setParameter(PISerial::ParityControl, false);
 	ser.setParameter(PISerial::TwoStopBits, false);
-
-	if (!ser.open(serial)) return false;
-
-	{
-		std::lock_guard<std::mutex> lock(exchange_mutex);
-		control_queue.clear();
-		waiting_reply   = false;
-		expected_reply  = '\0';
-		polling         = true;
-		poll_index      = 0;
-		next_poll_cycle = Clock::now();
+	if (!ser.open(serial)) {
+		return false;
 	}
-
-	if (!ser.isThreadedRead()) ser.startThreadedRead();
-
-	req_thread.start(100_Hz);
+	if (!initializeRs485(serial)) {
+		ser.close();
+		return false;
+	}
+	angle_receiver.reset();
+	uart_dump = std::fopen("techlaser_uart.csv", "w");
+	if (!ser.isThreadedRead()) {
+		ser.startThreadedRead();
+	}
 	piCout << "Techlaser: open port";
 	return true;
 }
 
 void Techlaser::close() {
-	// Не удерживаем exchange_mutex при ожидании завершения потоков.
-	req_thread.stopAndWait();
 	ser.stopAndWait();
 	ser.close();
-
-	{
-		std::lock_guard<std::mutex> lock(exchange_mutex);
-		control_queue.clear();
-		waiting_reply  = false;
-		expected_reply = '\0';
-		polling        = false;
-		poll_index     = 0;
+	if (uart_dump) {
+		std::fclose(uart_dump);
+		uart_dump = nullptr;
 	}
-
+	angle_receiver.reset();
+	have_speed_ref = false;
 	state.set({});
 }
+void Techlaser::processAngleBytes(const uchar * data, ssize_t size) {
+	float angle    = 0.0f;
+	bool updated   = false;
 
-void Techlaser::start(float rotate_speed_deg_s) {
-	if (isClosed()) return;
+	const auto now = std::chrono::steady_clock::now();
+	const auto ns  = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
 
-	if (!std::isfinite(rotate_speed_deg_s)) {
-		std::fprintf(stderr, "Techlaser: invalid rotation speed\n");
-		return;
+	if (uart_dump) {
+		std::fprintf(uart_dump, "%lld;%zd", static_cast<long long>(ns), size);
+		for (ssize_t i = 0; i < size; ++i)
+			std::fprintf(uart_dump, ";%02X", static_cast<unsigned>(data[i]));
+		std::fprintf(uart_dump, "\n");
 	}
 
-	const PIByteArray command = "$i,%1#"_a.arg(rotate_speed_deg_s).toAscii();
-
-	std::lock_guard<std::mutex> lock(exchange_mutex);
-
-	// Новое задание скорости заменяет ещё не отправленное старое.
-	// Уже ожидающая отправки остановка сохраняется.
-	for (auto it = control_queue.begin(); it != control_queue.end();) {
-		if (it->command == 'i')
-			it = control_queue.erase(it);
-		else
-			++it;
+	for (ssize_t i = 0; i < size; ++i) {
+		if (angle_receiver.push(data[i], angle)) updated = true;
 	}
 
-	control_queue.push_back(Request{command, 'i'});
+	if (!updated) return;
 
-	// polling         = true;
-	poll_index      = 0;
-	next_poll_cycle = Clock::now();
-}
+	auto ref = state.getRef();
 
-void Techlaser::stop() {
-	if (isClosed()) return;
+	if (!have_speed_ref) {
+		speed_ref_angle = angle;
+		speed_ref_time  = now;
+		have_speed_ref  = true;
+	} else {
+		const double dt = std::chrono::duration<double>(now - speed_ref_time).count();
 
-	std::lock_guard<std::mutex> lock(exchange_mutex);
+		if (dt >= 0.1) {
+			double delta = angle - speed_ref_angle;
 
-	// Отменяем все ещё не отправленные команды управления.
-	control_queue.clear();
-	control_queue.push_front(Request{"$g#"_a.toAscii(), 'g'});
+			if (delta > 180.0) delta -= 360.0;
+			if (delta < -180.0) delta += 360.0;
 
-	// Продолжаем опрос, чтобы наблюдать снижение скорости.
-	polling         = true;
-	poll_index      = 0;
-	next_poll_cycle = Clock::now();
-}
+			const float speed  = static_cast<float>(delta / dt);
+			ref->current_speed = speed;
+			// ref->current_speed = 0.7f * ref->current_speed + 0.3f * speed;
 
-void Techlaser::processExchange() {
-	if (isClosed()) return;
-
-	static const PIByteArray queries[] = {
-		"$a#"_a.toAscii(),
-		"$b#"_a.toAscii(),
-		"$c#"_a.toAscii(),
-		"$d#"_a.toAscii(),
-		"$e#"_a.toAscii(),
-	};
-
-	static const char commands[] = {'a', 'b', 'c', 'd', 'e'};
-
-	Request request{};
-
-	{
-		std::lock_guard<std::mutex> lock(exchange_mutex);
-		const auto now = Clock::now();
-
-		if (waiting_reply) {
-			if (now < reply_deadline) return;
-
-			std::fprintf(stderr, "Techlaser: timeout waiting for '%c'; continuing\n", expected_reply);
-
-			// Пропускаем запрос без ответа.
-			// Опрос и очередь управления сохраняются.
-			waiting_reply  = false;
-			expected_reply = '\0';
-		}
-
-		// Команды управления имеют приоритет над опросом.
-		if (!control_queue.empty()) {
-			request = control_queue.front();
-			control_queue.pop_front();
-		} else {
-			if (!polling) return;
-
-			if (poll_index == 0) {
-				if (now < next_poll_cycle) return;
-
-				next_poll_cycle = now + poll_period;
-			}
-
-			request.bytes   = queries[poll_index];
-			request.command = commands[poll_index];
-			poll_index      = (poll_index + 1) % 5;
-		}
-
-		// Устанавливаем ожидание до отправки,
-		// чтобы не пропустить быстрый ответ.
-		waiting_reply  = true;
-		expected_reply = request.command;
-		reply_deadline = now + reply_timeout;
-	}
-
-	// Отправляем без удержания mutex, чтобы приём мог работать.
-	// Отправляем ровно один раз.
-	const bool sent = ser.send(request.bytes);
-
-	if (!sent) {
-		std::lock_guard<std::mutex> lock(exchange_mutex);
-
-		waiting_reply  = false;
-		expected_reply = '\0';
-
-		std::fprintf(stderr, "Techlaser: failed to send '%c'; continuing\n", request.command);
-	}
-}
-
-
-void Techlaser::packetReceived(PIByteArray msg) {
-	if (msg.size() < 3 || msg[0] != '$' || msg[msg.size() - 1] != '#') return;
-
-	const char cmd = msg[1];
-
-	// Удаляем '$', букву команды и '#'.
-	msg.remove(0, 2).take_back();
-	const bool has_payload = msg.isNotEmpty();
-	PIStringList args;
-	if (has_payload) {
-		if (msg.front() != ',') return;
-
-		msg.take_front();
-		args = PIStringAscii(msg).split(',');
-	}
-
-	double value         = 0.0;
-	unsigned long faults = 0;
-
-	switch (cmd) {
-	case 'a':
-	case 'c':
-	case 'd':
-	case 'e':
-	case 'i':
-		if (args.size() != 1 || !parseNumber(args[0], value)) return;
-		break;
-
-	case 'b':
-		if (args.size() != 1 || !parseFaults(args[0], faults)) return;
-		break;
-
-	case 'g':
-	case 'X':
-		if (has_payload) return;
-		break;
-
-	default: return;
-	}
-
-	// Проверяем значения перечислений и положения.
-	if (cmd == 'a' && (value < 0 || value > 3 || std::floor(value) != value)) return;
-
-	if (cmd == 'e' && (value < 0 || value > 5 || std::floor(value) != value)) return;
-
-	if (cmd == 'c' && (value < 0 || value >= 360)) return;
-
-	std::lock_guard<std::mutex> lock(exchange_mutex);
-
-	// Чужой или запоздавший ответ не завершает текущую транзакцию.
-	if (!waiting_reply) return;
-
-	if (cmd == 'X') {
-		std::fprintf(stderr, "Techlaser: device rejected command '%c'; continuing\n", expected_reply);
-
-		waiting_reply  = false;
-		expected_reply = '\0';
-		return;
-	}
-
-	if (cmd != expected_reply) return;
-
-	{
-		auto ref = state.getRef();
-
-		switch (cmd) {
-		case 'a': ref->device_status = static_cast<DeviceStatus>(static_cast<int>(value)); break;
-		case 'b': ref->motor_error = faults != 0; break;
-		case 'c':
-			ref->current_angle           = static_cast<float>(value);
-			ref->angle_receive_timestamp = PISystemTime::current(true);
-			break;
-		case 'd': ref->current_speed = static_cast<float>(value); break;
-		case 'e': ref->motor_status = static_cast<MotorStatus>(static_cast<int>(value)); break;
-		case 'i':
-			// Ответ содержит целевую, а не текущую скорость.
-			break;
-
-		case 'g':
-			// Подтверждение команды, не завершения остановки.
-			break;
+			speed_ref_angle    = angle;
+			speed_ref_time     = now;
 		}
 	}
 
-	waiting_reply  = false;
-	expected_reply = '\0';
+	ref->current_angle           = angle;
+	ref->angle_receive_timestamp = now;
 }
 
 Techlaser::State Techlaser::getState() const {
 	return *state.getRef();
 }
 
-double Techlaser::getAngleAgo(PISystemTime ago) const {
-	auto s              = getState();
-	PISystemTime now    = PISystemTime::current(true);
-	PISystemTime target = now - ago;
-	PISystemTime dt     = target - s.angle_receive_timestamp;
-	double angle        = s.current_angle + s.current_speed * dt.toSeconds();
-	angle               = std::fmod(angle, 360.0);
-	if (angle < 0.0) angle += 360.0;
+double Techlaser::getAngleAgo(std::chrono::steady_clock::time_point target_time) const {
+	const auto s    = getState();
+	const double dt = std::chrono::duration<double>(target_time - s.angle_receive_timestamp).count();
+	double angle    = s.current_angle + s.current_speed * dt;
+	angle           = std::fmod(angle, 360.0);
+	if (angle < 0.0) {
+		angle += 360.0;
+	}
+
 	return angle;
 }

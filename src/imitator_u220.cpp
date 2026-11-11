@@ -34,12 +34,12 @@ std::complex<int16_t> ImitatorU220::calc_amplitude(double distance_m, size_t cha
 	const std::complex<double> gain = magnitude * std::exp(std::complex<double>(0.0, phase));
 
 	const auto to_q14               = [](double component) -> int16_t {
-        const double scaled = component * 16384.0;
+		const double scaled = component * 16384.0;
 
-        if (scaled <= -32768.0) return -32768;
-        if (scaled >= 32767.0) return 32767;
+		if (scaled <= -32768.0) return -32768;
+		if (scaled >= 32767.0) return 32767;
 
-        return static_cast<int16_t>(std::lround(scaled));
+		return static_cast<int16_t>(std::lround(scaled));
 	};
 
 	return {to_q14(gain.real()), to_q14(gain.imag())};
@@ -115,11 +115,6 @@ void ImitatorU220::set_amplitude(const std::array<double, 4> & target_um,
 }
 
 void ImitatorU220::set_opu(double angle_degrees, double speed_degps) {
-	if (!std::isfinite(angle_degrees) || !std::isfinite(speed_degps)) {
-		piCout << "Error: invalid OPU parameters";
-		return;
-	}
-
 	double wrapped = std::fmod(angle_degrees, 360.0);
 	if (wrapped < 0.0) wrapped += 360.0;
 
@@ -129,21 +124,16 @@ void ImitatorU220::set_opu(double angle_degrees, double speed_degps) {
 
 	const double rounded_step         = std::round(speed_degps * capture_period_s * (1048576.0 / 360.0));
 
-	if (!std::isfinite(rounded_step) || rounded_step < -524288.0 || rounded_step > 524287.0) {
-		piCout << "Error: OPU rotation speed exceeds signed 20-bit step range";
-		return;
-	}
-
-	opu_speed_degps_ = speed_degps;
+	opu_speed_degps_                  = speed_degps;
 
 	for (const auto board_index: group_.active_boards()) {
 		group_.fpga(board_index)->set_rx_playback_dn_counter(start, static_cast<int32_t>(rounded_step));
 	}
 	apply(0);
 
-	for (const auto board_index: group_.active_boards()) {
-		piCout << "dn counter" << board_index << group_.fpga(board_index)->get_rx_playback_status(0, 0).dn_counter;
-	}
+	// for (const auto board_index: group_.active_boards()) {
+	// 	piCout << "dn counter" << board_index << group_.fpga(board_index)->get_rx_playback_status(0, 0).dn_counter;
+	// }
 }
 
 void ImitatorU220::restart_opu(void) {
@@ -185,7 +175,7 @@ void ImitatorU220::set_params(const std::array<double, 4> & target_az,
 		if (!std::isfinite(target_az[k]) || !std::isfinite(target_um[k]) || !std::isfinite(target_osl[k]) || !std::isfinite(rcs) ||
 		    !std::isfinite(dist) || dist < 0.5 || dist >= 65535.5) {
 			piCout << "Error: invalid imitator target parameters, target=" << k << " az=" << target_az[k] << " um=" << target_um[k]
-				   << " osl=" << target_osl[k] << " rcs=" << rcs << " dist=" << dist;
+			       << " osl=" << target_osl[k] << " rcs=" << rcs << " dist=" << dist;
 
 			if (!std::isfinite(target_az[k])) piCout << "Invalid az";
 			if (!std::isfinite(target_um[k])) piCout << "Invalid um";
