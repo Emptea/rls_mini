@@ -212,8 +212,9 @@ void GlobalData::start() {
 
 	piCout << "Imitator init";
 	cpm_cit.set_shtat(cfg);
-	// imitator_u220.set_opu(0.0, 0.0);
-	cpm_rr.set_vr(CpmRr::RotationCommand::Simulator);
+	imitator_u220.restart_opu();
+	imitator_u220.apply(0);
+	// cpm_rr.set_vr(CpmRr::RotationCommand::Simulator);
 
 	imitator_u220.apply(0.0);
 
@@ -691,7 +692,7 @@ void GlobalData::cpm_loop() {
 		if (++tick >= 10) {
 			tick = 0;
 
-			if (cpm_rr.get_kuvr() == CpmRr::RotationCommand::On) {
+			if (cpm_rr.get_vr() != CpmRr::RotationState::Simulator) {
 				cpm_rr.sync_opu();
 			}
 

@@ -28,7 +28,7 @@ public:
 
 private:
 	struct AngleReceiver {
-		static constexpr float LSB = 360.0f / 8192.0f;
+		static constexpr float LSB = 360.0 / 7200.0;
 
 		uint8_t high               = 0;
 		bool has_high              = false;

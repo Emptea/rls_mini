@@ -115,11 +115,14 @@ void Techlaser::processAngleBytes(const uchar * data, ssize_t size) {
 			if (delta < -180.0) delta += 360.0;
 
 			const float speed  = static_cast<float>(delta / dt);
-			ref->current_speed = speed;
-			// ref->current_speed = 0.7f * ref->current_speed + 0.3f * speed;
+			// ref->current_speed = speed;
+			ref->current_speed = 0.7f * ref->current_speed + 0.3f * speed;
 
 			speed_ref_angle    = angle;
 			speed_ref_time     = now;
+			// piCout << "Tech: angle " << angle;
+			// piCout << "Tech: velocity " << speed;
+			// piCout << "Tech: raw" << PICoutManipulators::Hex << static_cast<unsigned>(data[size - 2]) << static_cast<unsigned>(data[size - 1]);
 		}
 	}
 
