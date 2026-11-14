@@ -59,8 +59,6 @@ GlobalData::GlobalData()
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
 		u220_group.add_board(u);
 	}
-
-	process_thread.start([this] { processChannels(); });
 }
 
 
@@ -244,9 +242,6 @@ void GlobalData::stop() {
 	u220_recv_thread.stopAndWait();
 	// dump_rx_traces(rx_cycle_trace.snapshot());
 	// dump_time_sync_traces();
-	process_thread.stop();          // mark thread for stop
-	notifier_channels.notify();     // notify thread
-	process_thread.waitForFinish(); // wait for thread really finish
 	t_end = PISystemTime::current();
 
 	if (cfg.dma_enabled) {
@@ -367,19 +362,6 @@ void GlobalData::dump_time_sync_traces() {
 	const fs::path filename = log_dir / ("time_sync_" + std::to_string(timestamp) + ".csv");
 
 	write_time_sync_csv(all_entries, filename.string());
-}
-
-void GlobalData::processChannels() {
-	// notifier_channels.wait();
-	// if (process_thread.isStopping()) return; // if stop() called simply leave
-	// if (!cfg.dma_enabled) return;
-	// const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
-	// if (buffer) {
-	// 	const auto * hdr   = reinterpret_cast<const rls::header *>(buffer);
-	// 	const size_t words = std::min<size_t>(rls::get_rx_words_per_buf(hdr->tp), BUFFER_SIZE / sizeof(uint32_t));
-	// 	auto ref           = dma_channel_buf.getRef();
-	// 	*ref               = PIVector<uint32_t>(buffer, words);
-	// }
 }
 
 void GlobalData::u220_recv_software() {
@@ -603,7 +585,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 
 	for (size_t i = 0; i < nes; i++) {
 		const auto & f = pac->formulars[i];
-		struct target targ{};
+		struct target targ {};
 		targ.n         = cpm_poi.nes.count;
 		targ.time      = cpm_rr.get_compensated_time();
 		targ.az        = targ_az;
@@ -636,22 +618,22 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 
 		send_KTA_VO(targ);
 
-		printf("Target #%zu: "
-		       "range=%u, "
-		       "main_amplitude=%u, "
-		       "neighbor_amplitude=%u, "
-		       "main_diagram_number=%u, "
-		       "neighbor_diagram_side=%u, "
-		       "frequency_channel=%u, "
-		       "rank_out=%u\n",
-		       i + 1,
-		       static_cast<unsigned>(f.range),
-		       f.main_amplitude,
-		       f.neighbor_amplitude,
-		       static_cast<unsigned>(f.main_diagram_number),
-		       static_cast<unsigned>(f.neighbor_diagram_side),
-		       static_cast<unsigned>(f.frequency_channel),
-		       f.rank_out);
+		// printf("Target #%zu: "
+		//        "range=%u, "
+		//        "main_amplitude=%u, "
+		//        "neighbor_amplitude=%u, "
+		//        "main_diagram_number=%u, "
+		//        "neighbor_diagram_side=%u, "
+		//        "frequency_channel=%u, "
+		//        "rank_out=%u\n",
+		//        i + 1,
+		//        static_cast<unsigned>(f.range),
+		//        f.main_amplitude,
+		//        f.neighbor_amplitude,
+		//        static_cast<unsigned>(f.main_diagram_number),
+		//        static_cast<unsigned>(f.neighbor_diagram_side),
+		//        static_cast<unsigned>(f.frequency_channel),
+		//        f.rank_out);
 	}
 }
 
@@ -997,7 +979,7 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	ans.setDistance(targ.d);
 	ans.setAmpPorogSp(targ.amp, targ.porog);
 	ans.setVelocity(targ.vr);
-	piCout << ans;
+	// piCout << ans;
 	global->sendMessage(ans);
 }
 

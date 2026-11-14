@@ -123,8 +123,6 @@ private:
 	bool overflow_dumped = false;
 
 	PIValueTree main_config;
-	PIThreadNotifier notifier_channels;
-	PIThread process_thread;
 	PIThread u220_recv_thread;
 
 	PIThread cpm_thread;
