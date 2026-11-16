@@ -9,7 +9,9 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <pivector.h>
+#include <thread>
 
 class U220;
 class UserU220;
@@ -31,10 +33,6 @@ public:
 	const PIVector<size_t> & active_boards() const { return active_boards_; }
 	size_t board_count() const { return boards_.size(); }
 
-	// Retained after stop; index = 2 * board_index + local channel.
-	std::array<VectorComplexS, 8> dump_channels;
-	void start_rx_dump();
-	void dump_rx_buffers(size_t board_index, int buffer_idx);
 
 	void setup();
 	void stop_and_drain_rx();
@@ -46,13 +44,28 @@ public:
 	double get_time_drift_ppm() const { return time_synchronizer_.drift_ppm(); }
 	void reset_time_synchronizer() { time_synchronizer_.reset(); }
 
+	void start_rx_dump();
+	bool begin_rx_dump_cycle();
+	void receive_rx_dump();
+	bool rx_dump_complete() const { return rx_dump_offset >= RX_DUMP_SAMPLES; }
+	const complexs * get_dump_channel(size_t channel) const {
+		return channel < dump_channels.size() ? dump_channels[channel].get() : nullptr;
+	}
+
 private:
 	PIVector<U220 *> boards_;
 	PIVector<UserU220 *> fpga_;
 	PIVector<size_t> active_boards_;
 
 	std::atomic_bool rx_dump_requested{false};
-	std::array<size_t, 4> rx_dump_blocks_remaining{};
+	bool rx_dump_active   = false; // Только RX-поток
+	size_t rx_dump_offset = 0;
+	std::atomic_bool rx_dump_busy{false};
+	std::thread rx_dump_writer;
+
+	// Retained after stop; index = 2 * board_index + local channel.
+	static constexpr size_t RX_DUMP_SAMPLES = (10000000 / (SAMPLES_PER_CYCLE + 2)) * (SAMPLES_PER_CYCLE + 2);
+	std::array<std::unique_ptr<complexs[]>, 8> dump_channels;
 
 	const MiniConfig & cfg_;
 	UserRegLogger reg_logger_;
@@ -67,4 +80,6 @@ private:
 	void generate_ad9361_cat_enable();
 	void generate_ad9361_cat_disable();
 	void print_ad9361_ensm_states();
+
+	void save_rx_dump();
 };

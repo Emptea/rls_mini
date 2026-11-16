@@ -540,8 +540,8 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 			   << "cnt:" << *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
 	}
 
-	size_t cur_packet_number = *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1) & 0xFFFF;
-	if ((cur_packet_number - last_packet_number) & 0xFFFF != 20) {
+	size_t cur_packet_number = *(((uint32_t *)rx_buffer_ptrs[active_buffer_idx][0]) + 1);
+	if ((cur_packet_number - last_packet_number) != 20) {
 		piCout << serial << "Pac drop, n_cur_pac: " << PICoutManipulators::Hex << cur_packet_number
 			   << "; n_last_pac: " << last_packet_number;
 	}
@@ -833,4 +833,16 @@ void uhd_recv_diagnostics::print(const PIString & serial) {
 	       (unsigned long long)rx_lag_count);
 
 	reset();
+}
+
+size_t U220::receive_dump(complexs * ch0, complexs * ch1, size_t samples) {
+	rx_dump_ptrs[0]       = ch0;
+	rx_dump_ptrs[1]       = ch1;
+	const size_t received = rx_stream->recv(rx_dump_ptrs, samples, rx_metadata, rx_timeout);
+	rx_timeout            = rx_burst_pkt_time;
+	if (rx_metadata.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
+		rx_errors_worker(rx_metadata.error_code);
+		return 0;
+	}
+	return received;
 }

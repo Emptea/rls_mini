@@ -269,7 +269,7 @@ void GlobalData::stop() {
 	for (size_t i: u220_group.active_boards()) {
 		u220_group.fpga(i)->set_play_stop_tx();
 	}
-	write_dump_hex("rx_dump.hex");
+	// write_dump_hex("rx_dump.hex");
 	const auto cycles_completed =
 		u220_group.active_boards().isEmpty() ? 0 : u220_group.board(u220_group.active_boards()[0])->get_stats().cycles_completed;
 
@@ -294,39 +294,6 @@ void GlobalData::stop() {
 	if (cfg.dma_enabled) {
 		dma.cleanup();
 	}
-}
-
-void GlobalData::write_dump_hex(const char * filename) const {
-	const auto & dump_channels = u220_group.dump_channels;
-	std::ofstream file(filename, std::ios::binary | std::ios::trunc);
-	if (!file) {
-		piCout << "Cannot open RX dump:" << filename;
-		return;
-	}
-	size_t count = 0;
-	for (const auto & channel: dump_channels)
-		count = std::max(count, static_cast<size_t>(channel.size()));
-	constexpr char hex[] = "0123456789abcdef";
-	std::array<char, 65> line{};
-	line[64] = '\n';
-	for (size_t sample = 0; sample < count; ++sample) {
-		size_t pos = 0;
-		for (int channel = 7; channel >= 0; --channel) {
-			uint16_t parts[2]{};
-			if (sample < static_cast<size_t>(dump_channels[channel].size())) {
-				// sc16 buffer layout is real int16 followed by imaginary int16.
-				static_assert(sizeof(complexs) == sizeof(parts), "Expected packed sc16 samples");
-				std::memcpy(parts, &dump_channels[channel][sample], sizeof(parts));
-			}
-			for (int part: {1, 0}) {
-				for (int shift = 12; shift >= 0; shift -= 4)
-					line[pos++] = hex[(parts[part] >> shift) & 0xF];
-			}
-		}
-		file.write(line.data(), line.size());
-	}
-	file.close();
-	if (!file) piCout << "Failed writing RX dump:" << filename;
 }
 
 void GlobalData::dump_time_sync_traces() {
@@ -365,8 +332,12 @@ void GlobalData::dump_time_sync_traces() {
 }
 
 void GlobalData::u220_recv_software() {
-	using Clock             = std::chrono::steady_clock;
+	if (u220_group.begin_rx_dump_cycle()) {
+		u220_group.receive_rx_dump();
+		return;
+	}
 
+	using Clock             = std::chrono::steady_clock;
 
 	static bool tid_printed = false;
 
@@ -400,7 +371,6 @@ void GlobalData::u220_recv_software() {
 		const auto start = Clock::now();
 		const auto error = board->receive(buffer_idx);
 		const auto end   = Clock::now();
-		u220_group.dump_rx_buffers(board_index, buffer_idx);
 
 		if (error == uhd::rx_metadata_t::ERROR_CODE_NONE) {
 			std::lock_guard<std::mutex> lock(pending_tk_mutex);
@@ -475,7 +445,6 @@ void GlobalData::u220_recv_dma() {
 		pending_buffer = true;
 		for (const auto board_index: u220_group.active_boards()) {
 			const auto error = u220_group.board(board_index)->receive(u220_buffer_idx);
-			u220_group.dump_rx_buffers(board_index, u220_buffer_idx);
 			pending_buffer &= (error == uhd::rx_metadata_t::ERROR_CODE_NONE);
 		}
 		u220_cycles = u220_group.board(first_board)->get_stats().cycles_completed;
@@ -934,7 +903,9 @@ void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
 	cpm_rr.set_izl(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	// TODO: убрать из фин версиии
-	// u220_group.start_rx_dump();
+	if (!cfg.dma_enabled) {
+		u220_group.start_rx_dump();
+	}
 	global->sendMessage(ans);
 }
 

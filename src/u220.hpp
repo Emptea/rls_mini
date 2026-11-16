@@ -161,6 +161,7 @@ private:
 	bool shutdown_done                       = false;
 	UhdTimeSynchronizer * time_synchronizer_ = nullptr;
 	size_t last_packet_number                = 0;
+	std::vector<void *> rx_dump_ptrs{nullptr, nullptr};
 
 	void fill_buffer_with_wavetable(VectorComplexS & buffer);
 	void initialize_usrp();
@@ -212,6 +213,7 @@ public:
 
 	void start_reception(double settling_time);
 	uhd::rx_metadata_t::error_code_t receive(const int active_buffer_idx);
+	size_t receive_dump(complexs * ch0, complexs * ch1, size_t samples);
 	void stop_and_drain_rx();
 	void stop_reception();
 

@@ -6,46 +6,29 @@
 #include "user_reg_logger.h"
 #include "user_u220.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <fstream>
 #include <piliterals_time.h>
+#include <string>
 
-U220Group::U220Group(const MiniConfig & cfg): cfg_(cfg) {}
+U220Group::U220Group(const MiniConfig & cfg): cfg_(cfg) {
+	for (auto & channel: dump_channels) {
+		channel = std::make_unique<complexs[]>(RX_DUMP_SAMPLES);
+	}
+}
 
 U220Group::~U220Group() {
+	if (rx_dump_writer.joinable()) {
+		rx_dump_writer.join();
+	}
 	for (auto * u: fpga_) {
 		delete u;
 	}
 
 	for (auto * u: boards_) {
 		delete u;
-	}
-}
-
-void U220Group::start_rx_dump() {
-	rx_dump_requested.store(true);
-}
-
-void U220Group::dump_rx_buffers(size_t board_index, int buffer_idx) {
-	if (board_index >= rx_dump_blocks_remaining.size()) return;
-	const size_t samples = board(board_index)->get_rx_samples();
-	if (samples == 0) return;
-	constexpr double revolution_time = 2.0;
-	constexpr double block_time      = 20 * 46.4e-6;
-	constexpr size_t dump_stride     = 15;
-	const size_t dump_blocks         = static_cast<size_t>(std::ceil(revolution_time / block_time));
-
-	if (rx_dump_requested.exchange(false)) {
-		for (auto & channel: dump_channels)
-			channel.clear();
-		rx_dump_blocks_remaining.fill(dump_blocks);
-	}
-	auto & remaining = rx_dump_blocks_remaining[board_index];
-	if (remaining == 0) return;
-	--remaining;
-	if ((dump_blocks - remaining) % dump_stride != 0 || samples != 4680) return;
-	for (int channel: {0, 1}) {
-		const auto * buffer = board(board_index)->get_rx_buffer(buffer_idx, channel);
-		dump_channels[2 * board_index + channel].append(VectorComplexS(buffer, samples));
 	}
 }
 
@@ -263,4 +246,116 @@ void U220Group::activate_board(size_t i) {
 		boards_[i]->set_time_synchronizer(&time_synchronizer_);
 	}
 	active_boards_.push_back(i);
+}
+
+void U220Group::receive_rx_dump() {
+	const size_t remaining = RX_DUMP_SAMPLES - rx_dump_offset;
+
+	if (remaining == 0) return;
+
+	size_t received = 0;
+	bool first      = true;
+
+	for (const auto board_index: active_boards_) {
+		auto * b             = board(board_index);
+
+		const size_t samples = std::min(remaining, b->get_board_config().rx_spb);
+
+		const size_t n       = b->receive_dump(dump_channels[2 * board_index].get() + rx_dump_offset,
+                                         dump_channels[2 * board_index + 1].get() + rx_dump_offset,
+                                         samples);
+
+		if (n == 0 || (!first && n != received)) {
+			rx_dump_active = false;
+			rx_dump_busy.store(false);
+			piCout << "RX dump aborted: receive error or sample count mismatch";
+			return;
+		}
+
+		received = n;
+		first    = false;
+	}
+
+	rx_dump_offset += received;
+
+	if (rx_dump_offset >= RX_DUMP_SAMPLES) {
+		rx_dump_active = false;
+
+		piCout << "RX dump complete, saving";
+
+		rx_dump_writer = std::thread([this]() { save_rx_dump(); });
+	}
+}
+
+void U220Group::start_rx_dump() {
+	if (rx_dump_busy.exchange(true)) {
+		piCout << "RX dump already active or saving";
+		return;
+	}
+
+	rx_dump_requested.store(true);
+}
+
+bool U220Group::begin_rx_dump_cycle() {
+	if (rx_dump_active) return true;
+
+	if (!rx_dump_requested.exchange(false)) return false;
+
+	if (rx_dump_writer.joinable()) {
+		rx_dump_writer.join();
+	}
+
+	rx_dump_offset = 0;
+	rx_dump_active = true;
+	return true;
+}
+
+void U220Group::save_rx_dump() {
+	const char * filename = "rx_dump.hex";
+
+	std::ofstream file(filename, std::ios::binary | std::ios::trunc);
+
+	if (!file) {
+		piCout << "Cannot open RX dump:" << filename;
+		rx_dump_busy.store(false);
+		return;
+	}
+
+	constexpr char hex[] = "0123456789abcdef";
+
+	std::array<char, 65> line{};
+	line[64] = '\n';
+
+	static_assert(sizeof(complexs) == 4, "Expected packed sc16 samples");
+
+	for (size_t sample = 0; sample < RX_DUMP_SAMPLES; ++sample) {
+		size_t pos = 0;
+
+		for (int channel = 7; channel >= 0; --channel) {
+			uint16_t parts[2]{};
+
+			std::memcpy(parts, &dump_channels[channel][sample], sizeof(parts));
+
+			for (int part: {1, 0}) {
+				for (int shift = 12; shift >= 0; shift -= 4) {
+					line[pos++] = hex[(parts[part] >> shift) & 0xF];
+				}
+			}
+		}
+
+		file.write(line.data(), line.size());
+
+		if (!file) {
+			piCout << "Failed writing RX dump:" << filename;
+			break;
+		}
+	}
+
+	file.close();
+
+	if (file) {
+		piCout << "RX dump saved:" << filename;
+	}
+
+	rx_dump_busy.store(false);
 }
