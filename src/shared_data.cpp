@@ -198,12 +198,12 @@ void GlobalData::start() {
 		if (cfg.dma_enabled) {
 			while (rx_processing_running.load()) {
 				process_rx_buffers_dma();
-				std::this_thread::sleep_for(std::chrono::microseconds(1000));
+				std::this_thread::sleep_for(std::chrono::microseconds(100));
 			}
 		} else {
 			while (rx_processing_running.load()) {
 				process_rx_buffers_software();
-				std::this_thread::sleep_for(std::chrono::microseconds(1000));
+				std::this_thread::sleep_for(std::chrono::microseconds(100));
 			}
 		}
 	});
@@ -540,69 +540,59 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 
 	const auto * pac = reinterpret_cast<const rls::work_packet *>(buffer);
 	cpm_poi.set_zona_val(pac->nf);
-	auto nes = pac->posthdr.n_formulars;
-	if (nes == 0) {
-		return;
-	}
-	size_t packet_number  = pac->hdr.packet_number & 0xFFFF;
+	auto nes              = pac->posthdr.n_formulars;
+	size_t packet_number  = pac->hdr.packet_number;
 	auto * board          = u220_group.board(u220_group.active_boards()[0]);
 	const double uhd_time = board->rx_buffer_time_info.get_time(packet_number);
 	const auto host_time  = u220_group.to_host_time(uhd_time);
-
 	auto targ_az          = cpm_rr.get_compensated_az(host_time);
-	// auto targ_az = cpm_rr.get_compensated_az();
+	if (nes != 0) {
+		// auto targ_az = cpm_rr.get_compensated_az();
 
-	for (size_t i = 0; i < nes; i++) {
-		const auto & f = pac->formulars[i];
-		struct target targ {};
-		targ.n         = cpm_poi.nes.count;
-		targ.time      = cpm_rr.get_compensated_time();
-		targ.az        = targ_az;
+		for (size_t i = 0; i < nes; i++) {
+			const auto & f = pac->formulars[i];
+			struct target targ {};
+			targ.n      = cpm_poi.target_idx++;
+			targ.time   = cpm_rr.get_compensated_time();
+			targ.az     = targ_az;
 
-		auto um_idx    = f.main_diagram_number;
-		// targ.um        = (double)111packet.main_amplitude / (double)packet.neighbor_amplitude;
-		targ.um        = rls::UM_VALUES[um_idx];
+			auto um_idx = f.main_diagram_number;
+			// targ.um        = (double)111packet.main_amplitude / (double)packet.neighbor_amplitude;
+			targ.um     = rls::UM_VALUES[um_idx];
+			targ.d      = rls::range_index_to_meters(f.range) + cpm_rr.get_dd_poi();
+			targ.porog  = f.rank_out * cpm_poi.get_apu_k1();
+			targ.amp    = (double)f.main_amplitude;
+			targ.vr     = rls::freq_index_to_velocity(f.frequency_channel);
+			send_KTA_VO(targ);
 
-		auto range_idx = f.range;
-		size_t tx_sig_len;
-		if (range_idx < rls::RX_LEN_NEAR) {
-			tx_sig_len = rls::TX_LEN_NEAR;
-		} else {
-			tx_sig_len = rls::TX_LEN_FAR;
-			range_idx -= rls::RX_LEN_NEAR;
+			// printf("Target #%zu: "
+			//        "range=%u, "
+			//        "main_amplitude=%u, "
+			//        "neighbor_amplitude=%u, "
+			//        "main_diagram_number=%u, "
+			//        "neighbor_diagram_side=%u, "
+			//        "frequency_channel=%u, "
+			//        "rank_out=%u\n",
+			//        i + 1,
+			//        static_cast<unsigned>(f.range),
+			//        f.main_amplitude,
+			//        f.neighbor_amplitude,
+			//        static_cast<unsigned>(f.main_diagram_number),
+			//        static_cast<unsigned>(f.neighbor_diagram_side),
+			//        static_cast<unsigned>(f.frequency_channel),
+			//        f.rank_out);
 		}
-
-		double range = (range_idx + tx_sig_len / 2.0) / rls::SAMPLE_RATE * rls::LIGHT_SPEED / 2.0;
-		range += cpm_rr.get_dd_poi();
-		cpm_poi.nes.push(static_cast<uint16_t>(range));
-		targ.d                  = range;
-
-		targ.porog              = f.rank_out * cpm_poi.get_apu_k1();
-
-		targ.amp                = (double)f.main_amplitude;
-
-		const uint32_t freq_idx = f.frequency_channel;
-		const int doppler_bin   = freq_idx < rls::FFT_HALF_SIZE ? -static_cast<int>(freq_idx) : rls::FFT_SIZE - static_cast<int>(freq_idx);
-		targ.vr                 = doppler_bin * rls::VELOCITY_STEP;
-
-		send_KTA_VO(targ);
-
-		// printf("Target #%zu: "
-		//        "range=%u, "
-		//        "main_amplitude=%u, "
-		//        "neighbor_amplitude=%u, "
-		//        "main_diagram_number=%u, "
-		//        "neighbor_diagram_side=%u, "
-		//        "frequency_channel=%u, "
-		//        "rank_out=%u\n",
-		//        i + 1,
-		//        static_cast<unsigned>(f.range),
-		//        f.main_amplitude,
-		//        f.neighbor_amplitude,
-		//        static_cast<unsigned>(f.main_diagram_number),
-		//        static_cast<unsigned>(f.neighbor_diagram_side),
-		//        static_cast<unsigned>(f.frequency_channel),
-		//        f.rank_out);
+		// piCout << packet_number;
+		// rls::print_work(&pac->posthdr);
+	}
+	static size_t cnt = 0;
+	if ((cnt++ & 0x7) == 0x7) {
+		const auto & range_pac = *get_range_packet(pac);
+		send_PI(range_pac, targ_az);
+		if (range_pac.n_ranges != 0) {
+			// piCout << packet_number;
+			// rls::print_ranges(&range_pac);
+		}
 	}
 }
 
@@ -637,8 +627,6 @@ void GlobalData::cpm_loop() {
 
 	while (!cpm_thread.isStopping()) {
 		// PI — 100 Гц
-		send_PI();
-
 		// Проверка RR — 10 Гц
 		if (++tick >= 10) {
 			tick = 0;
@@ -955,10 +943,30 @@ void GlobalData::send_KTA_VO(struct target targ) {
 }
 
 
-void GlobalData::send_PI() {
-	Protocol_RLS_Mini::PI pi = set_PI();
-	PIByteArray data         = piSerialize(pi);
-	data.append(cpm_poi.nes.data.data(), pi.nes * sizeof(uint16_t));
+void GlobalData::send_PI(const rls::range_packet & range_pac, float targ_az) {
+	Protocol_RLS_Mini::PI pi;
+
+	pi.setDegreesAzTek(targ_az);
+	pi.setSeconds(cpm_rr.get_compensated_time());
+	pi.setDegreesAz(targ_az);
+
+	pi.setZona(cpm_poi.get_zona_val());
+	pi.nes = range_pac.n_ranges;
+
+	if (cpm_rr.take_rotation_completed()) {
+		cpm_poi.target_idx = 0;
+	}
+	PIByteArray data    = piSerialize(pi);
+
+	const size_t offset = data.size();
+	data.resize(offset + pi.nes * sizeof(uint16_t));
+	auto * ranges = reinterpret_cast<uint16_t *>(data.data() + offset);
+	for (size_t i = 0; i < pi.nes; ++i) {
+		double range = rls::range_index_to_meters(range_pac.ranges[i]);
+		range += cpm_rr.get_dd_poi();
+		ranges[i] = static_cast<uint16_t>(range);
+	}
+
 	global->sendMessage(data, Protocol_RLS_Mini::PI::Port);
 }
 
@@ -973,7 +981,7 @@ Protocol_RLS_Mini::PI GlobalData::set_PI() {
 	pi.nes = cpm_poi.nes.count;
 
 	if (cpm_rr.take_rotation_completed()) {
-		cpm_poi.nes.clear();
+		cpm_poi.target_idx = 0;
 	}
 
 	return pi;

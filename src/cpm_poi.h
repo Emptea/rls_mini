@@ -18,13 +18,13 @@ public:
 	static constexpr double LAMBDA       = 299792458.0 / FREQ;
 
 	static constexpr auto VR_ARRAY       = [] {
-		std::array<double, N> v{};
-		constexpr double step = -LAMBDA / (2.0 * PULSE_PERIOD * N);
+        std::array<double, N> v{};
+        constexpr double step = -LAMBDA / (2.0 * PULSE_PERIOD * N);
 
-		for (std::size_t i = 0; i < N; ++i)
-			v[i] = (i < N / 2 ? int(i) : int(i) - int(N)) * step;
+        for (std::size_t i = 0; i < N; ++i)
+            v[i] = (i < N / 2 ? int(i) : int(i) - int(N)) * step;
 
-		return v;
+        return v;
 	}();
 
 	// POI_TK_Kvit payload: firmware versions, board counters, then the latest DMA header and DMA packet drop counter.
@@ -53,7 +53,10 @@ public:
 		status.timestamp     = hdr.timestamp;
 	}
 
-	void increment_dma_packet_drops() { status.dma_packet_drops++; }
+	void increment_dma_packet_drops() {
+		std::lock_guard<std::mutex> lock(status_mutex);
+		status.dma_packet_drops++;
+	}
 
 	Status get_status() const {
 		std::lock_guard<std::mutex> lock(status_mutex);
@@ -83,6 +86,8 @@ public:
 	};
 
 	Nes nes;
+
+	uint16_t target_idx = 0;
 
 	explicit CpmPoi(bool dma_enabled): dma_enabled(dma_enabled) {}
 

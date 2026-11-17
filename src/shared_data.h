@@ -19,6 +19,9 @@
 
 #include <array>
 #include <pivaluetree.h>
+#include <atomic>
+#include <thread>
+#include <mutex>
 
 #define GLOBAL (GlobalData::instance())
 
@@ -168,7 +171,7 @@ private:
 	std::mutex pending_tk_mutex;
 
 	void send_KTA_VO(struct target targ);
-	void send_PI();
+	void send_PI(const rls::range_packet & range_pac, float targ_az);
 
 	template<typename T>
 	void log_cpm_msg(const char * name, const T & msg) const {
