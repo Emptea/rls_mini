@@ -586,7 +586,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		// rls::print_work(&pac->posthdr);
 	}
 	static size_t cnt = 0;
-	if ((cnt++ & 0x7) == 0x7) {
+	if ((cnt++ & 0x1) == 0x1) {
 		const auto & range_pac = *get_range_packet(pac);
 		send_PI(range_pac, targ_az);
 		if (range_pac.n_ranges != 0) {
@@ -938,7 +938,7 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	ans.setDistance(targ.d);
 	ans.setAmpPorogSp(targ.amp, targ.porog);
 	ans.setVelocity(targ.vr);
-	// piCout << ans;
+	piCout << ans;
 	global->sendMessage(ans);
 }
 
@@ -946,7 +946,7 @@ void GlobalData::send_KTA_VO(struct target targ) {
 void GlobalData::send_PI(const rls::range_packet & range_pac, float targ_az) {
 	Protocol_RLS_Mini::PI pi;
 
-	pi.setDegreesAzTek(targ_az);
+	pi.setDegreesAzTek(cpm_rr.get_current_az());
 	pi.setSeconds(cpm_rr.get_compensated_time());
 	pi.setDegreesAz(targ_az);
 
