@@ -114,6 +114,7 @@ public:
 		dsa_is_on = onoff;
 		dsa_vr_n  = vr_n;
 		dsa_vr_k  = vr_k;
+		if (!dma_enabled) return;
 
 		std::array<uint32_t, N / 32> mask;
 		mask.fill(~uint32_t{0});

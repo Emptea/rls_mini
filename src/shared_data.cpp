@@ -81,8 +81,7 @@ void GlobalData::init() {
 		}
 	}
 	cpm_poi.set_dma_enabled(cfg.dma_enabled);
-	cpm_poi.set_dsa(1, 30, 180);
-	cpm_poi.set_kan(0xff);
+
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	void * tx0_buf[TX_BUFFER_COUNT];
 	void * tx1_buf[TX_BUFFER_COUNT];
@@ -125,11 +124,6 @@ void GlobalData::init() {
 	u220_group.setup();
 	const auto u220_ip_version = u220_group.fpga(u220_group.active_boards()[0])->get_fpga_version();
 	csr_ip_ver_t axu_ip_version{};
-	u220_group.sync_ad9361();
-	// нужна задержка чтобы pps сбросился иначе в reset_time не сработает
-	2_s .sleep();
-	u220_group.reset_time(0x05DC);
-
 	if (cfg.dma_enabled) {
 		axi_dsp_init();
 		axi_dsp_configure();
@@ -143,6 +137,14 @@ void GlobalData::init() {
 		axi_dsp_apply();
 	}
 	cpm_poi.set_ip_versions(axu_ip_version, u220_ip_version);
+	cpm_poi.set_dsa(1, 30, 180);
+	cpm_poi.set_kan(0xff);
+
+	u220_group.sync_ad9361();
+	// нужна задержка чтобы pps сбросился иначе в reset_time не сработает
+	2_s .sleep();
+	u220_group.reset_time(0x05DC);
+
 	first_transfer = false;
 }
 
