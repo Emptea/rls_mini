@@ -118,6 +118,10 @@ void UserU220::set_play_trigger_src(uint32_t trigger_src) {
 	write_play_ctrl();
 }
 
+uint32_t UserU220::get_play_gain_on_enable() {
+	return (read_reg(RdReg::PLAY_CTRL, false) >> 2) & 0x1u;
+}
+
 void UserU220::set_play_gain_on_enable(uint32_t gain_on_enable) {
 	play_ctrl_.gain_on_enable = gain_on_enable;
 	write_play_ctrl();

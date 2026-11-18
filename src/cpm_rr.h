@@ -75,6 +75,7 @@ public:
 	void set_izl(bool value) {
 		kuizl = value;
 		u220_group.set_play_gpio_tx_enable(value);
+		u220_group.set_play_gain_on_enable(value);
 	}
 
 	// ANT — состояние антенны
