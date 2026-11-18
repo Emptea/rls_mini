@@ -64,7 +64,9 @@ public:
 	void set_rx_playback_amplitude(size_t radio, const std::array<uint32_t, 4> & values);
 	void set_rx_playback_samples(size_t radio, size_t playback, const std::array<std::complex<int16_t>, 928> & samples);
 	void set_rx_playback_dn(size_t radio, size_t playback, const std::array<int16_t, 4096> & samples);
-	void set_rx_playback_dn_offset(size_t radio, const std::array<uint32_t, 4> & values);
+	void set_rx_playback_dn_offset(size_t radio,
+	                               const std::array<uint32_t, 4> & values,
+	                               const std::array<bool, 4> & dn_enable = {true, true, true, true});
 	void set_rx_playback_dn_counter(uint16_t start, int32_t step);
 	void set_rx_playback_start_delay(uint16_t delay_radio0, uint16_t delay_radio1);
 

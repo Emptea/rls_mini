@@ -17,6 +17,7 @@ public:
 		double distance;
 		int16_t velocity;
 		double attenuation;
+		bool dn_enable = true;
 	};
 
 	// Four targets, both radios.
@@ -25,13 +26,14 @@ public:
 	                const std::array<double, 4> & target_um,
 	                const std::array<double, 4> & target_dist,
 	                const std::array<int16_t, 4> & target_vel,
-	                const std::array<double, 4> & target_osl);
+	                const std::array<double, 4> & target_osl,
+	                const std::array<bool, 4> & dn_enable = {true, true, true, true});
 
 	void set_params(const std::array<TargetParams, 4> & targets);
 
 	void set_distance(const std::array<double, 4> & target_dist);
 	void set_velocity(const std::array<int16_t, 4> & target_vel);
-	void set_az(const std::array<double, 4> & target_az);
+	void set_az(const std::array<double, 4> & target_az, const std::array<bool, 4> & dn_enable);
 
 	void set_amplitude(const std::array<double, 4> & target_um,
 	                   const std::array<double, 4> & target_dist,

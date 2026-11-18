@@ -368,7 +368,7 @@ void UserU220::set_rx_playback_dn(size_t radio, size_t playback, const std::arra
 		write_rx_playback_reg(radio, reg, static_cast<uint16_t>(sample), false);
 }
 
-void UserU220::set_rx_playback_dn_offset(size_t radio, const std::array<uint32_t, 4> & values) {
+void UserU220::set_rx_playback_dn_offset(size_t radio, const std::array<uint32_t, 4> & values, const std::array<bool, 4> & dn_enable) {
 	for (uint32_t value: values) {
 		if (value > 0xFFF) throw std::out_of_range("DN offset must be 12 bits");
 	}
@@ -376,7 +376,12 @@ void UserU220::set_rx_playback_dn_offset(size_t radio, const std::array<uint32_t
 	for (size_t k = 0; k < values.size(); ++k) {
 		const auto reg = static_cast<RxPlaybackReg>(static_cast<uint32_t>(RxPlaybackReg::AMPLITUDE2_OFFSET) + k);
 
-		write_rx_playback_reg(radio, reg, values[k]);
+		uint32_t value = values[k];
+
+		// bit 31 = 1: amplitude2 отключена
+		if (!dn_enable[k]) value |= (1u << 31);
+
+		write_rx_playback_reg(radio, reg, value);
 	}
 }
 

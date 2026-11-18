@@ -34,12 +34,12 @@ std::complex<int16_t> ImitatorU220::calc_amplitude(double distance_m, size_t cha
 	const std::complex<double> gain = magnitude * std::exp(std::complex<double>(0.0, phase));
 
 	const auto to_q14               = [](double component) -> int16_t {
-		const double scaled = component * 16384.0;
+        const double scaled = component * 16384.0;
 
-		if (scaled <= -32768.0) return -32768;
-		if (scaled >= 32767.0) return 32767;
+        if (scaled <= -32768.0) return -32768;
+        if (scaled >= 32767.0) return 32767;
 
-		return static_cast<int16_t>(std::lround(scaled));
+        return static_cast<int16_t>(std::lround(scaled));
 	};
 
 	return {to_q14(gain.real()), to_q14(gain.imag())};
@@ -76,7 +76,7 @@ void ImitatorU220::set_velocity(const std::array<int16_t, 4> & target_vel) {
 	}
 }
 
-void ImitatorU220::set_az(const std::array<double, 4> & target_az) {
+void ImitatorU220::set_az(const std::array<double, 4> & target_az, const std::array<bool, 4> & dn_enable) {
 	std::array<uint32_t, 4> offsets{};
 
 	for (size_t k = 0; k < 4; ++k) {
@@ -88,8 +88,9 @@ void ImitatorU220::set_az(const std::array<double, 4> & target_az) {
 	for (const auto board_index: group_.active_boards()) {
 		auto * fpga = group_.fpga(board_index);
 
-		for (size_t radio = 0; radio < 2; ++radio)
-			fpga->set_rx_playback_dn_offset(radio, offsets);
+		for (size_t radio = 0; radio < 2; ++radio) {
+			fpga->set_rx_playback_dn_offset(radio, offsets, dn_enable);
+		}
 	}
 }
 
@@ -167,7 +168,8 @@ void ImitatorU220::set_params(const std::array<double, 4> & target_az,
                               const std::array<double, 4> & target_um,
                               const std::array<double, 4> & target_dist,
                               const std::array<int16_t, 4> & target_vel,
-                              const std::array<double, 4> & target_osl) {
+                              const std::array<double, 4> & target_osl,
+                              const std::array<bool, 4> & dn_enable) {
 	for (size_t k = 0; k < 4; ++k) {
 		const double dist = target_dist[k];
 		const double rcs  = std::pow(10.0, -target_osl[k] / 10.0);
@@ -175,13 +177,7 @@ void ImitatorU220::set_params(const std::array<double, 4> & target_az,
 		if (!std::isfinite(target_az[k]) || !std::isfinite(target_um[k]) || !std::isfinite(target_osl[k]) || !std::isfinite(rcs) ||
 		    !std::isfinite(dist) || dist < 0.5 || dist >= 65535.5) {
 			piCout << "Error: invalid imitator target parameters, target=" << k << " az=" << target_az[k] << " um=" << target_um[k]
-			       << " osl=" << target_osl[k] << " rcs=" << rcs << " dist=" << dist;
-
-			if (!std::isfinite(target_az[k])) piCout << "Invalid az";
-			if (!std::isfinite(target_um[k])) piCout << "Invalid um";
-			if (!std::isfinite(target_osl[k])) piCout << "Invalid osl";
-			if (!std::isfinite(rcs)) piCout << "Invalid rcs";
-			if (!std::isfinite(dist) || dist < 0.5 || dist >= 65535.5) piCout << "Invalid distance";
+				   << " osl=" << target_osl[k] << " rcs=" << rcs << " dist=" << dist;
 
 			return;
 		}
@@ -189,7 +185,7 @@ void ImitatorU220::set_params(const std::array<double, 4> & target_az,
 
 	set_distance(target_dist);
 	set_velocity(target_vel);
-	set_az(target_az);
+	set_az(target_az, dn_enable);
 	set_amplitude(target_um, target_dist, target_osl);
 }
 
@@ -199,6 +195,7 @@ void ImitatorU220::set_params(const std::array<TargetParams, 4> & targets) {
 	std::array<double, 4> distances{};
 	std::array<int16_t, 4> velocities{};
 	std::array<double, 4> attenuations{};
+	std::array<bool, 4> dn_enable{};
 
 	for (size_t k = 0; k < targets.size(); ++k) {
 		az[k]           = targets[k].az;
@@ -206,9 +203,10 @@ void ImitatorU220::set_params(const std::array<TargetParams, 4> & targets) {
 		distances[k]    = targets[k].distance;
 		velocities[k]   = targets[k].velocity;
 		attenuations[k] = targets[k].attenuation;
+		dn_enable[k]    = targets[k].dn_enable;
 	}
 
-	set_params(az, um, distances, velocities, attenuations);
+	set_params(az, um, distances, velocities, attenuations, dn_enable);
 }
 
 void ImitatorU220::apply(double delay_seconds) {

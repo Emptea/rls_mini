@@ -1009,8 +1009,8 @@ Protocol_RLS_Mini::CIT_Kvit GlobalData::set_CIT_Kvit() {
 	for (size_t i = 0; i < 2; ++i) {
 		const auto & src = targets[i];
 
-		dst[i]->reg      = static_cast<uint8_t>(src.reg);
 		dst[i]->on       = src.on;
+		dst[i]->reg      = static_cast<uint8_t>(src.dn_enable);
 		dst[i]->setDegreesAz(src.az);
 		dst[i]->setMeters(src.distance);
 		dst[i]->setDegreesUm(src.um);
@@ -1101,15 +1101,15 @@ void GlobalData::received_CIT_KU(const Protocol_RLS_Mini::CIT_KU & msg) {
 			return;
 		}
 
-		auto & dst   = targets[i];
+		auto & dst    = targets[i];
 
-		dst.reg      = static_cast<CpmCit::Register>(src[i]->reg);
-		dst.on       = src[i]->on != 0;
-		dst.az       = src[i]->getDegreesAz();
-		dst.distance = src[i]->getMeters();
-		dst.um       = src[i]->getDegreesUm();
-		dst.vr       = src[i]->getVelocity();
-		dst.osl      = src[i]->getAttenuation();
+		dst.on        = src[i]->on != 0;
+		dst.dn_enable = src[i]->reg == 1;
+		dst.az        = src[i]->getDegreesAz();
+		dst.distance  = src[i]->getMeters();
+		dst.um        = src[i]->getDegreesUm();
+		dst.vr        = src[i]->getVelocity();
+		dst.osl       = src[i]->getAttenuation();
 	}
 
 	cpm_cit.set_targets(targets, 2);

@@ -11,19 +11,14 @@
 
 class CpmCit {
 public:
-	enum class Register : uint8_t {
-		POA = 0,
-		PBA = 1
-	};
-
 	struct Target {
-		Register reg   = Register::POA; // Регистр: POA или PBA
-		bool on        = false;         // Цель включена/выключена
-		float az       = 0.0f;          // Азимут, градусы
-		float distance = 0.0f;          // Дальность, м
-		float um       = 0.0f;          // Угол места, градусы
-		float vr       = 0.0f;          // Радиальная скорость, м/с
-		float osl      = 0.0f;          // Ослабление, дБ
+		bool on        = false; // Цель включена/выключена
+		bool dn_enable = true;  // PBA: dn_enable = true; РОА: dn_enable = false
+		float az       = 0.0f;  // Азимут, градусы
+		float distance = 0.0f;  // Дальность, м
+		float um       = 0.0f;  // Угол места, градусы
+		float vr       = 0.0f;  // Радиальная скорость, м/с
+		float osl      = 0.0f;  // Ослабление, дБ
 	};
 
 	struct Detection {
@@ -85,9 +80,14 @@ public:
 		}
 
 		for (size_t i = 0; i < 4; ++i) {
-			const auto & t = targets[i];
-			const auto osl = t.on ? t.osl : 200;
-			params[i] = {t.az, t.um, t.distance, static_cast<int16_t>(std::lround(t.vr)), osl};
+			const auto & t        = targets[i];
+			const auto osl        = t.on ? t.osl : 200;
+			params[i].az          = t.az;
+			params[i].um          = t.um;
+			params[i].distance    = t.distance;
+			params[i].velocity    = static_cast<int16_t>(std::lround(t.vr));
+			params[i].attenuation = osl;
+			params[i].dn_enable   = t.dn_enable;
 
 			// if (t.on) enable_mask |= static_cast<uint8_t>(1U << i);
 		}
@@ -105,13 +105,13 @@ public:
 		Targets defaults{};
 
 		for (size_t i = 0; i < defaults.size(); ++i) {
-			defaults[i].reg      = Register::POA;
-			defaults[i].on       = cfg.imitator_target_en[i];
-			defaults[i].az       = static_cast<float>(cfg.target_az[i]);
-			defaults[i].distance = static_cast<float>(cfg.target_dist[i]);
-			defaults[i].um       = static_cast<float>(cfg.target_um[i]);
-			defaults[i].vr       = static_cast<float>(cfg.target_vel[i]);
-			defaults[i].osl      = static_cast<float>(cfg.target_osl[i]);
+			defaults[i].on        = cfg.imitator_target_en[i];
+			defaults[i].dn_enable = cfg.imitator_target_dn_en[i];
+			defaults[i].az        = static_cast<float>(cfg.target_az[i]);
+			defaults[i].distance  = static_cast<float>(cfg.target_dist[i]);
+			defaults[i].um        = static_cast<float>(cfg.target_um[i]);
+			defaults[i].vr        = static_cast<float>(cfg.target_vel[i]);
+			defaults[i].osl       = static_cast<float>(cfg.target_osl[i]);
 		}
 
 		imitator.set_targets_enabled(0xF);
