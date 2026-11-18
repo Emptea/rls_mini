@@ -38,6 +38,8 @@ public:
 	void stop_and_drain_rx();
 	bool get_play_gpio_tx_enable() const;
 	void set_play_gpio_tx_enable(bool enable);
+	bool get_play_gain_on_enable() const;
+	void set_play_gain_on_enable(bool enable);
 	void reset_time(uint32_t value);
 	void sync_ad9361();
 	std::chrono::steady_clock::time_point to_host_time(double usrp_sec) const { return time_synchronizer_.to_host(usrp_sec); }

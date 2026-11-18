@@ -25,6 +25,7 @@ public:
 
 	void set_play_enable(uint32_t enable);
 	void set_play_trigger_src(uint32_t trigger_src);
+	uint32_t get_play_gain_on_enable();
 	void set_play_gain_on_enable(uint32_t gain_on_enable);
 	void set_play_rx_enable(uint32_t rx_enable);
 
