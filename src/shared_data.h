@@ -18,10 +18,10 @@
 #include "user_u220.h"
 
 #include <array>
-#include <pivaluetree.h>
 #include <atomic>
-#include <thread>
 #include <mutex>
+#include <pivaluetree.h>
+#include <thread>
 
 #define GLOBAL (GlobalData::instance())
 
@@ -61,6 +61,7 @@ public:
 	};
 
 	static GlobalData * instance();
+	std::atomic<bool> skip_uhd_buffers{false};
 
 	void init();
 	bool sync();
@@ -88,6 +89,12 @@ public:
 	void received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg);
 	void received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg);
 	void received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg);
+
+	Protocol_RLS_Mini::FAP_PR_KVIT set_FAP_PR_KVIT();
+	void received_FAP_PR_ZAPROS(const Protocol_RLS_Mini::FAP_PR_ZAPROS & msg);
+	void received_FAP_PR_KU(const Protocol_RLS_Mini::FAP_PR_KU & msg);
+	void received_FAP_PR_TEST(const Protocol_RLS_Mini::FAP_PR_TEST & msg);
+	void received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg);
 
 	Protocol_RLS_Mini::PI set_PI();
 

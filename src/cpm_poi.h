@@ -4,6 +4,7 @@
 #include "axi_dsp.h"
 
 #include <array>
+#include <complex>
 #include <cstdint>
 #include <mutex>
 
@@ -128,6 +129,7 @@ public:
 		for (uint32_t reg_index = 0; reg_index < 16; ++reg_index) {
 			axi_dsp_set_frequency_selection(mask[reg_index], reg_index);
 		}
+		axi_dsp_apply();
 	}
 
 	// APU — пороги обнаружения
@@ -222,10 +224,50 @@ public:
 
 	void set_dma_enabled(bool value) { dma_enabled = value; }
 
-private:
-	mutable std::mutex status_mutex;
-	Status status;
+	void start_fap_pr() {
+		if (!dma_enabled) return;
+		std::lock_guard<std::mutex> lock(fap_pr_mutex);
+		fap_pr_pending = true;
+	}
 
+	bool is_fap_pr_pending() const {
+		std::lock_guard<std::mutex> lock(fap_pr_mutex);
+		return fap_pr_pending;
+	}
+
+	std::array<std::complex<float>, 8> get_fap_pr_coeffs() const {
+		std::lock_guard<std::mutex> lock(fap_pr_mutex);
+		return fap_pr_coeffs;
+	}
+
+	bool set_fap_pr_coeffs(const rls::compens_formular & cf) {
+		std::lock_guard<std::mutex> lock(fap_pr_mutex);
+
+		if (!fap_pr_pending) return false;
+
+		for (size_t i = 0; i < fap_pr_coeffs.size(); ++i) {
+			fap_pr_coeffs[i] = {static_cast<float>(cf.channels[i].re) / 16384.0f, static_cast<float>(cf.channels[i].im) / 16384.0f};
+		}
+
+		fap_pr_pending = false;
+		return true;
+	}
+
+	void set_fap_pr_coeffs(const std::array<std::complex<float>, 8> & coeffs) {
+		std::lock_guard<std::mutex> lock(fap_pr_mutex);
+		fap_pr_coeffs  = coeffs;
+		fap_pr_pending = false;
+		if (!dma_enabled) return;
+
+		for (size_t i = 0; i < coeffs.size(); ++i) {
+			cmplx_f64 c = {.real = coeffs[i].real(), .imag = coeffs[i].imag()};
+			axi_dsp_set_manual_compensation(c, i);
+		}
+
+		axi_dsp_apply();
+	}
+
+private:
 	bool dma_enabled         = false;
 
 	bool sdc                 = false;
@@ -244,4 +286,15 @@ private:
 	ZoneCalcStage zona_stage = ZoneCalcStage::BeforeLou;
 	uint16_t zona_ch_num     = 0;
 	uint32_t zona_val_sq     = 1;
+
+	mutable std::mutex status_mutex;
+	Status status;
+
+	bool fap_pr_pending = false;
+	mutable std::mutex fap_pr_mutex;
+	std::array<std::complex<float>, 8> fap_pr_coeffs = [] {
+		std::array<std::complex<float>, 8> coeffs;
+		coeffs.fill({1.0f, 0.0f});
+		return coeffs;
+	}();
 };

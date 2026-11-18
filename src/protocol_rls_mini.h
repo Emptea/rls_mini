@@ -205,9 +205,9 @@ public:
 
 	struct POI_Kvit: public Header PIMETA(dest=soi, port=5100, no-stream) {
 		static constexpr bool Broadcast = true;
-		static constexpr int16_t Port = 5100;
-		static constexpr int16_t Type = 2;
-		static constexpr int16_t Code = 0;
+		static constexpr int16_t Port   = 5100;
+		static constexpr int16_t Type   = 2;
+		static constexpr int16_t Code   = 0;
 		POI_Kvit(): Header(Type, Code) {}
 		union {
 			uint16_t bits = 0;
@@ -249,9 +249,9 @@ public:
 
 	struct POI_TK_Kvit: public Header PIMETA(dest=soi, port=5100, no-stream) {
 		static constexpr bool Broadcast = true;
-		static constexpr int16_t Port = 5100;
-		static constexpr int16_t Type = 3;
-		static constexpr int16_t Code = 0;
+		static constexpr int16_t Port   = 5100;
+		static constexpr int16_t Type   = 3;
+		static constexpr int16_t Code   = 0;
 		POI_TK_Kvit(): Header(Type, Code) {} // 0 - состояние системы ПОИ, 1 - контрольная точка
 		uint16_t nw = 0;                     // Количество слов данных
 		PIVector<uint16_t> words;
@@ -283,6 +283,56 @@ public:
 		}
 	};
 
+	// FAP PR
+
+	struct FAP_PR_ZAPROS: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 0;
+		FAP_PR_ZAPROS(): Header(Type, Code) {}
+	};
+
+	struct FAP_PR_KU: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 1;
+		FAP_PR_KU(): Header(Type, Code) {}
+	};
+
+	struct FAP_PR_TEST: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 2;
+		FAP_PR_TEST(uint8_t code = Code): Header(Type, code) {} // 2 - начать проверку, 3 - завершить проверку
+	};
+
+	struct FAP_PR_Correction PIMETA(no-stream) {
+		int16_t f = 0; // Поправка фазы, 0.01 град
+		int16_t a = 0; // Поправка амплитуды, 0.01 дБ
+		void setDegrees(double v) { f = static_cast<int16_t>(std::lround(v / 0.01)); }
+		double getDegrees() const { return f * 0.01; }
+		void setDb(double v) { a = static_cast<int16_t>(std::lround(v / 0.01)); }
+		double getDb() const { return a * 0.01; }
+	};
+
+	struct FAP_PR_POPR: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 4;
+		FAP_PR_POPR(): Header(Type, Code) {}
+		uint16_t save = 0; // 0 - не сохранять, 1 - сохранять
+		FAP_PR_Correction channels[8];
+	};
+
+	struct FAP_PR_KVIT: public Header PIMETA(dest=soi, port=5100, no-stream) {
+		static constexpr bool Broadcast = true;
+		static constexpr int16_t Port   = 5100;
+		static constexpr int16_t Type   = 13;
+		static constexpr int16_t Code   = 0;
+		FAP_PR_KVIT(): Header(Type, Code) {}
+		uint16_t test = 0; // 0 - текущие поправки, 1 - проверочные значения
+		FAP_PR_Correction channels[8];
+	};
 
 	// CIT
 
@@ -327,9 +377,9 @@ public:
 
 	struct CIT_Kvit: public Header PIMETA(dest=soi, port=5400, no-stream) {
 		static constexpr bool Broadcast = true;
-		static constexpr int16_t Port = 5400;
-		static constexpr int16_t Type = 9;
-		static constexpr int16_t Code = 0;
+		static constexpr int16_t Port   = 5400;
+		static constexpr int16_t Type   = 9;
+		static constexpr int16_t Code   = 0;
 		CIT_Kvit(): Header(Type, Code) {}
 		ImitatorTarget it1;
 		ImitatorTarget it2;
@@ -999,6 +1049,36 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::SOST_REG & v) {
 	return out << "disk_size:" << v.disk_size << "disk_free:" << v.disk_free << "mon:" << int(v.mon) << "year:" << int(v.year)
 	           << "free_perc:" << int(v.free_perc) << "day:" << int(v.day) << "min:" << int(v.min) << "hour:" << int(v.hour)
 	           << "dhour:" << int(v.dhour) << "sec:" << int(v.sec) << "dsec:" << int(v.dsec) << "dmin:" << int(v.dmin);
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_ZAPROS & v) {
+	return out;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_KU & v) {
+	return out;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_TEST & v) {
+	return out << "code:" << int(v.msg_code);
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_Correction & v) {
+	return out << "f:" << v.getDegrees() << "a:" << v.getDb();
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_POPR & v) {
+	out << "save:" << v.save;
+	for (const auto & channel: v.channels)
+		out << "{" << channel << "}";
+	return out;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_KVIT & v) {
+	out << "test:" << v.test;
+	for (const auto & channel: v.channels)
+		out << "{" << channel << "}";
+	return out;
 }
 
 #endif // protocol_rls_mini_H
