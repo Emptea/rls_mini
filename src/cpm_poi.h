@@ -194,6 +194,7 @@ public:
 		kan = value & ispr_kan;
 		if (!dma_enabled) return;
 		axi_dsp_set_channel_mask(uint32_t(value));
+		axi_dsp_apply();
 	}
 
 	// Штатные настройки ПОИ
