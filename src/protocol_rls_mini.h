@@ -204,6 +204,7 @@ public:
 
 
 	struct POI_Kvit: public Header PIMETA(dest=soi, port=5100, no-stream) {
+		static constexpr bool Broadcast = true;
 		static constexpr int16_t Port = 5100;
 		static constexpr int16_t Type = 2;
 		static constexpr int16_t Code = 0;
@@ -247,6 +248,7 @@ public:
 
 
 	struct POI_TK_Kvit: public Header PIMETA(dest=soi, port=5100, no-stream) {
+		static constexpr bool Broadcast = true;
 		static constexpr int16_t Port = 5100;
 		static constexpr int16_t Type = 3;
 		static constexpr int16_t Code = 0;
@@ -324,6 +326,7 @@ public:
 
 
 	struct CIT_Kvit: public Header PIMETA(dest=soi, port=5400, no-stream) {
+		static constexpr bool Broadcast = true;
 		static constexpr int16_t Port = 5400;
 		static constexpr int16_t Type = 9;
 		static constexpr int16_t Code = 0;

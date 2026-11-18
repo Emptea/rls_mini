@@ -785,7 +785,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		pending_tk.active =
 			msg.reg_takt == 1 && msg.kt != rls::TP_WORK && pending_tk.words > 0 && pending_tk.words <= BUFFER_SIZE / sizeof(uint32_t);
 
-		axi_dsp_set_output_source(msg.kt, msg.nkan, msg.rg);
+		axi_dsp_set_output_source(pending_tk.kt, pending_tk.nkan, pending_tk.rg);
 		axi_dsp_apply();
 	} else {
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);
@@ -794,53 +794,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		pending_tk.nkan   = msg.nkan;
 		pending_tk.words  = (232 + 2 * cfg.rx_insert_count) * 3;
 		pending_tk.active = msg.kt == rls::TP_SDR && msg.reg_takt == 1 && msg.nkan < 8 && (cpm_poi.get_ispr_kan() & (1u << msg.nkan));
-	}
-	// const auto test_point = msg.kt;
-	// req_test_channel      = msg.kt;
-	// req_test_point        = true;
-
-	// Protocol_RLS_Mini::POI_TK_Kvit ans;
-	// int data_cnt = 0;
-	// if (msg.kt != rls::CTRL && msg.reg_takt == 1) {
-	// 	data_cnt = rls::get_rx_words_per_buf(test_point, cfg.rx_insert_count);
-	// } else {
-	// 	// TODO get all dsp regs state and pack them into one packet
-	// }
-
-	// const auto set_data = [&](const auto & data, size_t count) {
-	// 	if (data.isEmpty()) {
-	// 		ans.setData(zero_vector);
-	// 		return;
-	// 	}
-	// 	ans.setData(data, std::min(data.size(), count));
-	// };
-
-	// if (cfg.dma_enabled) {
-	// 	PIVector<uint32_t> data;
-	// 	{
-	// 		auto ref = dma_channel_buf.getRef();
-	// 		data     = *ref;
-	// 	}
-	// 	set_data(data, data_cnt);
-	// } else if (test_point == rls::TP_SDR) {
-	// 	const size_t board_index = msg.nkan / 2;
-	// 	const size_t channel     = msg.nkan % 2;
-	// 	if (msg.nkan >= 8 || !(cpm_poi.get_ispr_kan() & (1u << msg.nkan))) {
-	// 		return;
-	// 	}
-	// 	auto * board = u220_group.board(board_index);
-
-	// 	if (board) {
-	// 		VectorComplexS data = board->take_rx_queue_and_clear(channel);
-	// 		data_cnt            = (232 + 2 * cfg.rx_insert_count) * 3;
-	// 		set_data(data, data_cnt);
-	// 	} else {
-	// 		ans.setData(zero_vector);
-	// 	}
-	// }
-
-	// ans.nw = static_cast<uint16_t>(data_cnt);
-	// global->sendMessage(ans);
+	}	
 }
 
 Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
