@@ -434,6 +434,28 @@ void GlobalData::u220_recv_dma() {
 		t_start = PISystemTime::current();
 	}
 
+	static size_t counter                  = 0;
+	static uint64_t sum_processing_backlog = 0;
+	static size_t max_processing_backlog   = 0;
+	static size_t max_total_backlog        = 0;
+
+	const size_t processed                 = dma.get_rx_processed();
+	const size_t processing_backlog        = dma.get_completed() - processed;
+	const size_t total_backlog             = dma.get_submitted() - processed;
+
+	sum_processing_backlog += processing_backlog;
+	max_processing_backlog = std::max(max_processing_backlog, processing_backlog);
+	max_total_backlog      = std::max(max_total_backlog, total_backlog);
+
+	if (++counter % 1000 == 0) {
+		fprintf(stderr,
+		        "RX backlog avg=%.2f max=%zu total_max=%zu headroom=%zu\n",
+		        static_cast<double>(sum_processing_backlog) / counter,
+		        max_processing_backlog,
+		        max_total_backlog,
+		        max_total_backlog < RX_BUFFER_COUNT ? RX_BUFFER_COUNT - max_total_backlog : 0);
+	}
+
 	if (dma.can_send()) {
 		if (pending_buffer) {
 			int ret         = dma.send();
@@ -456,40 +478,6 @@ void GlobalData::u220_recv_dma() {
 		fprintf(stderr, "RX ERROR transaction=%zu ret=%d\n", dma.get_completed(), ret);
 		u220_recv_thread.stop();
 	}
-
-	// const auto * buffer = static_cast<const uint32_t *>(dma.get_rx_buffer());
-	// if (buffer) {
-	// 	const auto * hdr = reinterpret_cast<const rls::header *>(buffer);
-
-	// 	if (hdr->tp != rls::TP_WORK) {
-	// 		const size_t words = rls::get_rx_words_per_buf(hdr->tp, cfg.rx_insert_count);
-
-	// 		if (words > 0 && words <= BUFFER_SIZE / sizeof(uint32_t)) {
-	// 			auto ref = dma_channel_buf.getRef();
-	// 			*ref     = PIVector<uint32_t>(buffer, words);
-	// 		}
-	// 	} else {
-	// 		process_work_pac(buffer);
-	// 	}
-
-	// 	if (u220_group.active_boards().isEmpty()) return;
-
-	// if (packet_cnt > 0 && packet_cnt % ((SAMPLES_PER_CYCLE + 2) * 20 * 5000) == 0) {
-	// 	for (const auto board_index: u220_group.active_boards()) {
-	// 		auto * board = u220_group.board(board_index);
-	// 		auto ref1    = current_channels.getRef();
-	// 		auto ref2    = adc_channels.getRef();
-
-	// 		for (int channel: {0, 1}) {
-	// 			const int global_channel = 2 * board_index + channel;
-	// 			(*ref1)[global_channel] = (*ref2)[global_channel] = board->take_rx_queue_and_clear(channel);
-	// 		}
-	// 	}
-	// }
-	// if (u220_cycles > 0) {
-	// 	notifier_channels.notify();
-	// }
-	// }
 }
 
 void GlobalData::process_rx_buffers_software() {
@@ -530,6 +518,7 @@ void GlobalData::process_rx_buffers_dma() {
 		} else {
 			process_kt_pac(buffer);
 		}
+		dma.mark_rx_processed();
 	}
 }
 
