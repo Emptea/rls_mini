@@ -198,12 +198,12 @@ void GlobalData::start() {
 		if (cfg.dma_enabled) {
 			while (rx_processing_running.load()) {
 				process_rx_buffers_dma();
-				std::this_thread::sleep_for(std::chrono::microseconds(100));
+				std::this_thread::sleep_for(std::chrono::microseconds(500));
 			}
 		} else {
 			while (rx_processing_running.load()) {
 				process_rx_buffers_software();
-				std::this_thread::sleep_for(std::chrono::microseconds(100));
+				std::this_thread::sleep_for(std::chrono::microseconds(500));
 			}
 		}
 	});
@@ -516,8 +516,8 @@ void GlobalData::process_rx_buffers_dma() {
 		const auto * buffer              = info.buffer;
 		const auto * hdr                 = reinterpret_cast<const rls::header *>(buffer);
 		static size_t last_packet_number = 0;
-		size_t cur_packet_number         = hdr->packet_number & 0xFFFF;
-		if (((cur_packet_number - last_packet_number) & 0xFFFF) != 20) {
+		size_t cur_packet_number         = hdr->packet_number;
+		if (((cur_packet_number - last_packet_number)) != 20) {
 			piCout << "Pac drop, n_cur_pac: " << PICoutManipulators::Hex << cur_packet_number << "; n_last_pac: " << last_packet_number;
 			cpm_poi.increment_dma_packet_drops();
 		}
