@@ -104,7 +104,7 @@ public:
 	void set_sdc(bool value) {
 		if (!dma_enabled) return;
 
-		axi_dsp_set_motion_selector(1, value);
+		axi_dsp_set_motion_selector(0xFF, 0xFF, value);
 		sdc = value;
 	}
 
@@ -197,7 +197,7 @@ public:
 	void set_kan(uint8_t value) {
 		kan = value & ispr_kan;
 		if (!dma_enabled) return;
-		axi_dsp_set_channel_mask(uint32_t(value));
+		axi_dsp_set_channel_mask(value, ispr_kan);
 		axi_dsp_apply();
 	}
 
@@ -221,7 +221,7 @@ public:
 
 		axi_dsp_set_compensation_mode(0);
 		axi_dsp_set_compensation_ref(uint32_t(1575));
-		axi_dsp_set_motion_selector(1, sdc);
+		axi_dsp_set_motion_selector(0xFF, 0xFF, sdc);
 		axi_dsp_set_median_detector_coef(apu_k1);
 		axi_dsp_set_cfar_level(apu_k2);
 		axi_dsp_apply();

@@ -133,7 +133,7 @@ void GlobalData::init() {
 		axi_dsp_set_output_source(0, 0, 0);
 		auto v = axi_dsp_get_output_source();
 		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE;
-		axi_dsp_set_channel_mask(ispr_kan);
+		axi_dsp_set_channel_mask(0xFF, ispr_kan);
 		axi_dsp_apply();
 	}
 	cpm_poi.set_ip_versions(axu_ip_version, u220_ip_version);
