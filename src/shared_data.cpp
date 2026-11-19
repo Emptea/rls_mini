@@ -466,7 +466,7 @@ void GlobalData::u220_recv_dma() {
 				fprintf(stderr, "TX ERROR transaction=%zu ret=%d\n", dma.get_submitted() - 1, ret);
 			}
 		}
-		pending_buffer = !skip_uhd_buffers.load();
+		pending_buffer = !cpm_poi.skip_dma_transaction.load();
 		for (const auto board_index: u220_group.active_boards()) {
 			const auto error = u220_group.board(board_index)->receive(u220_buffer_idx);
 			pending_buffer &= (error == uhd::rx_metadata_t::ERROR_CODE_NONE);
@@ -1062,9 +1062,7 @@ void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 
 void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 	log_cpm_msg(__func__, msg);
-	skip_uhd_buffers.store(true);
 	cpm_poi.set_dsa(msg.par == 1, msg.vr_n, msg.vr_k);
-	skip_uhd_buffers.store(false);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }

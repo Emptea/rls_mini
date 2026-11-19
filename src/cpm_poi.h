@@ -4,6 +4,7 @@
 #include "axi_dsp.h"
 
 #include <array>
+#include <atomic>
 #include <complex>
 #include <cstdint>
 #include <mutex>
@@ -89,6 +90,7 @@ public:
 	Nes nes;
 
 	uint16_t target_idx = 0;
+	std::atomic<bool> skip_dma_transaction{false};
 
 	explicit CpmPoi(bool dma_enabled): dma_enabled(dma_enabled) {}
 
@@ -116,6 +118,7 @@ public:
 		dsa_vr_n  = vr_n;
 		dsa_vr_k  = vr_k;
 		if (!dma_enabled) return;
+		skip_dma_transaction.store(true);
 
 		std::array<uint32_t, N / 32> mask;
 		mask.fill(~uint32_t{0});
@@ -130,6 +133,7 @@ public:
 			axi_dsp_set_frequency_selection(mask[reg_index], reg_index);
 		}
 		axi_dsp_apply();
+		skip_dma_transaction.store(false);
 	}
 
 	// APU — пороги обнаружения

@@ -61,7 +61,6 @@ public:
 	};
 
 	static GlobalData * instance();
-	std::atomic<bool> skip_uhd_buffers{false};
 
 	void init();
 	bool sync();
