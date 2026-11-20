@@ -92,12 +92,9 @@ void U220::initialize_usrp() {
 	device_args.append(",serial=");
 	device_args.append(serial);
 	device_args.append(",master_clock_rate=20e6");
-	std::cout << std::endl;
-	std::cout << boost::format("Creating the usrp device with: %s...") % device_args << std::endl;
+	// std::cout << boost::format("Creating the usrp device with: %s...") % device_args << std::endl;
 
 	usrp = uhd::usrp::multi_usrp::make(PIString2StdString(device_args));
-	// usrp->set_master_clock_rate(20e6);
-
 	if (!user_config.ref.isEmpty()) {
 		usrp->set_clock_source(PIString2StdString(user_config.ref));
 	}
@@ -168,7 +165,7 @@ void U220::setup_tx_streamer() {
 	tx_buffer_ptrs = {&tx_buffer.front(), &tx_buffer.front()};
 
 	// Pre-fill buffer with waveform
-	fill_buffer_with_wavetable(tx_buffer);
+	// fill_buffer_with_wavetable(tx_buffer);
 }
 
 void U220::setup_rx_streamer(void ** tx0_buf, void ** tx1_buf) {

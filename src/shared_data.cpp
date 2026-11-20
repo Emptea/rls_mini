@@ -78,6 +78,8 @@ void GlobalData::init() {
 		if (dma.init(cfg.rx_insert_count) != 0) {
 			fprintf(stderr, "Failed to initialize FPGA DMA\n");
 			cfg.dma_enabled = false;
+		} else {
+			piCout << "DMA: init";
 		}
 	}
 	cpm_poi.set_dma_enabled(cfg.dma_enabled);
@@ -130,10 +132,10 @@ void GlobalData::init() {
 		axu_ip_version = axi_dsp_get_ip_ver();
 		axi_dsp_set_compensation_mode(1);
 		axi_dsp_set_expect_u220_del(cfg.rx_insert_count);
-		axi_dsp_set_output_source(0, 0, 0);
+		axi_dsp_set_output_source(0, 0, 0, 0);
 		auto v = axi_dsp_get_output_source();
 		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE;
-		axi_dsp_set_channel_mask(0xFF, ispr_kan);
+		axi_dsp_set_channel_mask(0xFF, ~ispr_kan);
 		axi_dsp_apply();
 	}
 	cpm_poi.set_ip_versions(axu_ip_version, u220_ip_version);
@@ -514,7 +516,7 @@ void GlobalData::process_rx_buffers_dma() {
 		last_packet_number = cur_packet_number;
 
 		cpm_poi.set_rx_header(*hdr);
-
+		static size_t cnt = 0;
 		if (hdr->tp == rls::TP_WORK) {
 			process_work_pac(buffer);
 		} else {
@@ -605,8 +607,6 @@ void GlobalData::process_kt_pac(const uint32_t * buffer) {
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	ans.setData(buffer, words);
 	global->sendMessage(ans);
-	axi_dsp_set_output_source(0, 0, 0);
-	axi_dsp_apply();
 }
 
 void GlobalData::cpm_loop() {
@@ -788,7 +788,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		pending_tk.active =
 			msg.reg_takt == 1 && msg.kt != rls::TP_WORK && pending_tk.words > 0 && pending_tk.words <= BUFFER_SIZE / sizeof(uint32_t);
 
-		axi_dsp_set_output_source(pending_tk.kt, pending_tk.nkan, pending_tk.rg);
+		axi_dsp_set_output_source(pending_tk.kt, 0, pending_tk.nkan, pending_tk.rg);
 		axi_dsp_apply();
 	} else {
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);

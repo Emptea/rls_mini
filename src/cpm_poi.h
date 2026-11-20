@@ -197,7 +197,7 @@ public:
 	void set_kan(uint8_t value) {
 		kan = value & ispr_kan;
 		if (!dma_enabled) return;
-		axi_dsp_set_channel_mask(value, ispr_kan);
+		axi_dsp_set_channel_mask(value, ~ispr_kan);
 		axi_dsp_apply();
 	}
 
