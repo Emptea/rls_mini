@@ -2,6 +2,49 @@ cmake_minimum_required(VERSION 3.16)
 
 project(rls_mini LANGUAGES C CXX)
 
+find_package(Git QUIET)
+
+set(GIT_TAG "untagged")
+set(GIT_HASH "unknown")
+
+if(GIT_FOUND)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE GIT_TAG_RESULT
+    )
+
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse --short=7 HEAD
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE GIT_HASH_RESULT
+    )
+
+    if(NOT GIT_TAG_RESULT EQUAL 0)
+        set(GIT_TAG "untagged")
+    endif()
+
+    if(NOT GIT_HASH_RESULT EQUAL 0)
+        set(GIT_HASH "unknown")
+    endif()
+endif()
+
+set(APP_GIT_VERSION "${GIT_TAG}-${GIT_HASH}")
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/git_version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/git_version.h"
+    @ONLY
+)
+
+message(STATUS "Git version: ${APP_GIT_VERSION}")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -30,7 +73,7 @@ set_version(${PROJECT_NAME}
 
 set_deploy_property(${PROJECT_NAME}
     LABEL "${PROJECT_NAME}"
-    FULLNAME "rat"
+    FULLNAME "rls_mini"
     COMPANY "SM5"
     INFO ""
 )

@@ -212,6 +212,7 @@ void MiniConfig::load_settings() {
 		use_ext_file_sg[ch] = values[ch] == 1;
 	}
 	log_cpm_msg = get_uint("log", "cpm_msg") == 1;
+	log_axu_hdr = get_uint("log", "axu_hdr") == 1;
 }
 
 void MiniConfig::load_signal(const std::string & filename, ChannelSignals & signals) {

@@ -10,6 +10,7 @@
 #include "mini_config.hpp"
 #include "rls.hpp"
 #include "rx_cycle_trace.hpp"
+#include "axu_header_logger.hpp"
 #include "shared_data_eth.h"
 #include "techlaser.h"
 #include "u220.hpp"
@@ -175,6 +176,8 @@ private:
 
 	pending_tk_request pending_tk;
 	std::mutex pending_tk_mutex;
+
+	AxuHeaderLogger axu_header_logger;
 
 	void send_KTA_VO(struct target targ);
 	void send_PI(const rls::range_packet & range_pac, float targ_az);

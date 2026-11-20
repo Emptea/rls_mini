@@ -6,6 +6,7 @@
 #include "protocol_rls_mini.h"
 #include "rls_const.hpp"
 #include "rx_cycle_trace.hpp"
+#include "axu_header_logger.hpp"
 #include "user_u220.h"
 
 #include <algorithm>
@@ -152,6 +153,9 @@ void GlobalData::init() {
 
 void GlobalData::start() {
 	startEth();
+	if (cfg.log_axu_hdr && cfg.dma_enabled) {
+		axu_header_logger.start();
+	}
 	cpm_thread.start([this]() { cpm_loop(); });
 
 	if (u220_group.active_boards().isEmpty()) {
@@ -298,6 +302,7 @@ void GlobalData::stop() {
 	if (cfg.dma_enabled) {
 		dma.cleanup();
 	}
+	axu_header_logger.stop();
 }
 
 void GlobalData::dump_time_sync_traces() {
@@ -503,10 +508,13 @@ void GlobalData::process_rx_buffers_software() {
 
 void GlobalData::process_rx_buffers_dma() {
 	while (dma.get_rx_ready_count() > 0) {
-		auto info                        = dma.get_rx_buffer();
+		auto info           = dma.get_rx_buffer();
 
-		const auto * buffer              = info.buffer;
-		const auto * hdr                 = reinterpret_cast<const rls::header *>(buffer);
+		const auto * buffer = info.buffer;
+		const auto * hdr    = reinterpret_cast<const rls::header *>(buffer);
+		if (cfg.log_axu_hdr) {
+			axu_header_logger.write(*hdr);
+		}
 		static size_t last_packet_number = 0;
 		size_t cur_packet_number         = hdr->packet_number;
 		if (((cur_packet_number - last_packet_number)) != 20) {
@@ -788,7 +796,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		pending_tk.active =
 			msg.reg_takt == 1 && msg.kt != rls::TP_WORK && pending_tk.words > 0 && pending_tk.words <= BUFFER_SIZE / sizeof(uint32_t);
 
-		axi_dsp_set_output_source(pending_tk.kt, 0, pending_tk.nkan, pending_tk.rg);
+		axi_dsp_set_output_source(pending_tk.kt, 1, pending_tk.nkan, pending_tk.rg);
 		axi_dsp_apply();
 	} else {
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);

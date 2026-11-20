@@ -56,6 +56,7 @@ public:
 	ChannelComplexSignals tx_dac_sg{};
 
 	bool log_cpm_msg = false;
+	bool log_axu_hdr = false;
 
 private:
 	using Section    = std::map<std::string, std::string>;
