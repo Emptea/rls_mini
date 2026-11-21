@@ -150,7 +150,13 @@ public:
 		static constexpr int16_t Type = 2;
 		static constexpr int16_t Code = 1;
 		POI_SDC(): Header(Type, Code) {}
-		uint16_t par = 0; // 0 - выключить СДЦ, 1 - включить СДЦ
+		union {
+			uint16_t bits = 0;
+			struct {
+				uint16_t bz: 8; // Маска включения СДЦ в ближней зоне
+				uint16_t dz: 8; // Маска включения СДЦ в далььней зоне
+			};
+		};
 	};
 
 
@@ -849,7 +855,7 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Ant & v) {
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_TTek & v) {
-	return out << "time:" << PICoutManipulators::Hex << v.time_msw << PICoutManipulators::Hex << v.time_lsw;
+	return out << "time:" << PICoutManipulators::Hex << v.time_msw << v.time_lsw;
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_AzPopr & v) {
@@ -867,8 +873,8 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_AzPopr_POI & v)
 // RR_Kvit
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Kvit & v) {
 	return out << "ant:" << int(v.ant) << "izl:" << int(v.izl) << "kuizl:" << int(v.kuizl) << "vr:" << int(v.vr) << "kuvr:" << int(v.kuvr)
-	           << "ispr_kan:" << PICoutManipulators::Bin << v.ispr_kan << "daz:" << v.daz << "dd_poi:" << v.dd_poi
-	           << "daz_poi:" << v.daz_poi;
+	           << "ispr_kan:" << PICoutManipulators::Bin << v.ispr_kan << PICoutManipulators::Dec << "daz:" << v.daz
+	           << "dd_poi:" << v.dd_poi << "daz_poi:" << v.daz_poi;
 }
 
 // POI_Zapros
@@ -883,7 +889,7 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Shtat & v) {
 
 // POI_SDC
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_SDC & v) {
-	return out << "par:" << v.par;
+	return out << "bz:" << PICoutManipulators::Bin << v.bz << "dz:" << PICoutManipulators::Bin << v.dz;
 }
 
 // POI_DSA

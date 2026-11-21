@@ -138,7 +138,7 @@ void GlobalData::init() {
 		axi_dsp_apply();
 	}
 	cpm_poi.set_target_velocity_range(cfg.target_velocity_min, cfg.target_velocity_max);
-	
+
 	cpm_poi.set_ip_versions(axu_ip_version, u220_ip_version);
 	cpm_poi.set_kan(0xff);
 
@@ -1004,7 +1004,7 @@ Protocol_RLS_Mini::PI GlobalData::set_PI() {
 Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 	Protocol_RLS_Mini::POI_Kvit kvit;
 
-	kvit.sdc      = cpm_poi.get_sdc();
+	kvit.sdc      = cpm_poi.get_sdc().bz & 0x01;
 	kvit.dsa      = cpm_poi.get_dsa();
 	kvit.kan      = cpm_poi.get_kan();
 
@@ -1061,7 +1061,8 @@ void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
 
 void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 	log_cpm_msg(__func__, msg);
-	cpm_poi.set_sdc(msg.par == 1);
+	CpmPoi::Sdc sdc{.val = msg.bits};
+	cpm_poi.set_sdc(sdc);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }

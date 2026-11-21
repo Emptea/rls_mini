@@ -71,6 +71,14 @@ public:
 		uint16_t vr_k;
 	};
 
+	union Sdc {
+		uint16_t val;
+		struct {
+			uint16_t bz: 8;
+			uint16_t dz: 8;
+		};
+	};
+
 	enum class ZoneCalcStage : uint16_t {
 		BeforeLou = 0,
 		AfterLou  = 1,
@@ -95,17 +103,16 @@ public:
 	explicit CpmPoi(bool dma_enabled): dma_enabled(dma_enabled) {}
 
 	// SDC — селекция движущихся целей
-	bool get_sdc() const {
-		if (!dma_enabled) return sdc;
-		return sdc;
-		// return axi_dsp_get_motion_selector().ONOFF;
+	Sdc get_sdc() const {
+		// if (!dma_enabled) return sdc;
+		return poi_sdc;
 	}
 
-	void set_sdc(bool value) {
+	void set_sdc(Sdc sdc) {
+		poi_sdc = sdc;
 		if (!dma_enabled) return;
-
-		axi_dsp_set_motion_selector(0xFF, 0xFF, value);
-		sdc = value;
+		axi_dsp_set_motion_selector(poi_sdc.bz, poi_sdc.dz, 1);
+		axi_dsp_apply();
 	}
 
 	// DSA — диапазон скоростей автокомпенсации
@@ -204,8 +211,8 @@ public:
 
 	// Штатные настройки ПОИ
 	void set_shtat() {
-		sdc       = true;
-		dsa_is_on = false;
+		poi_sdc.val = 0;
+		dsa_is_on   = false;
 
 		set_kan(0xFF);
 
@@ -222,7 +229,7 @@ public:
 
 		axi_dsp_set_compensation_mode(0);
 		axi_dsp_set_compensation_ref(uint32_t(1575));
-		axi_dsp_set_motion_selector(0xFF, 0xFF, sdc);
+		axi_dsp_set_motion_selector(poi_sdc.bz, poi_sdc.dz, 1);
 		axi_dsp_set_median_detector_coef(apu_k1);
 		axi_dsp_set_cfar_level(apu_k2);
 		axi_dsp_apply();
@@ -274,9 +281,10 @@ public:
 	}
 
 private:
-	bool dma_enabled           = false;
+	bool dma_enabled = false;
 
-	bool sdc                   = false;
+	union Sdc poi_sdc {};
+
 	bool dsa_is_on             = false;
 
 	uint8_t ispr_kan           = 0xff; // Исправность приёмных каналов
