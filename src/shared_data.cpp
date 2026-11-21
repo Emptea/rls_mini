@@ -117,7 +117,6 @@ void GlobalData::init() {
 		if (cfg.dma_enabled) {
 			dma.get_all_tx_buffers(2 * board_index, tx0_buf);
 			dma.get_all_tx_buffers(2 * board_index + 1, tx1_buf);
-
 			u220_group.board(board_index)->setup(tx0_buf, tx1_buf);
 		} else {
 			u220_group.board(board_index)->setup();
@@ -130,10 +129,9 @@ void GlobalData::init() {
 	if (cfg.dma_enabled) {
 		axi_dsp_init();
 		axi_dsp_configure();
-		axu_ip_version = axi_dsp_get_ip_ver();
-		axi_dsp_set_compensation_mode(1);
 		axi_dsp_set_expect_u220_del(cfg.rx_insert_count);
-		axi_dsp_set_output_source(0, 0, 0, 0);
+		axu_ip_version = axi_dsp_get_ip_ver();
+		
 		axi_dsp_set_channel_mask(0xFF, ~ispr_kan);
 		axi_dsp_apply();
 	}
@@ -273,9 +271,6 @@ void GlobalData::stop() {
 		u220_group.fpga(i)->set_play_stop_tx();
 	}
 
-	for (size_t i: u220_group.active_boards()) {
-		u220_group.fpga(i)->set_play_stop_tx();
-	}
 	// write_dump_hex("rx_dump.hex");
 	const auto cycles_completed =
 		u220_group.active_boards().isEmpty() ? 0 : u220_group.board(u220_group.active_boards()[0])->get_stats().cycles_completed;
@@ -490,16 +485,12 @@ void GlobalData::u220_recv_dma() {
 
 void GlobalData::process_rx_buffers_software() {
 	sdr_buffer_info info;
-
 	{
 		std::lock_guard<std::mutex> lock(sdr_rx.mutex);
-
 		if (!sdr_rx.ready) return;
-
 		info         = sdr_rx.buffer;
 		sdr_rx.ready = false;
 	}
-
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	ans.setData(info.buffer, static_cast<int>(info.samples));
 	global->sendMessage(ans);
@@ -507,8 +498,7 @@ void GlobalData::process_rx_buffers_software() {
 
 void GlobalData::process_rx_buffers_dma() {
 	while (dma.get_rx_ready_count() > 0) {
-		auto info           = dma.get_rx_buffer();
-
+		const auto info     = dma.get_rx_buffer();
 		const auto * buffer = info.buffer;
 		const auto * hdr    = reinterpret_cast<const rls::header *>(buffer);
 		if (cfg.log_axu_hdr) {
@@ -567,26 +557,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 			targ.amp    = (double)f.main_amplitude;
 			targ.vr     = rls::freq_index_to_velocity(f.frequency_channel);
 			send_KTA_VO(targ);
-
-			// printf("Target #%zu: "
-			//        "range=%u, "
-			//        "main_amplitude=%u, "
-			//        "neighbor_amplitude=%u, "
-			//        "main_diagram_number=%u, "
-			//        "neighbor_diagram_side=%u, "
-			//        "frequency_channel=%u, "
-			//        "rank_out=%u\n",
-			//        i + 1,
-			//        static_cast<unsigned>(f.range),
-			//        f.main_amplitude,
-			//        f.neighbor_amplitude,
-			//        static_cast<unsigned>(f.main_diagram_number),
-			//        static_cast<unsigned>(f.neighbor_diagram_side),
-			//        static_cast<unsigned>(f.frequency_channel),
-			//        f.rank_out);
 		}
-		// piCout << packet_number;
-		// rls::print_work(&pac->posthdr);
 	}
 	static size_t cnt = 0;
 	if ((cnt++ & 0x1) == 0x1) {
@@ -604,7 +575,6 @@ void GlobalData::process_kt_pac(const uint32_t * buffer) {
 	size_t words     = 0;
 	{
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);
-
 		if (!pending_tk.active || hdr->tp != pending_tk.kt || hdr->range != pending_tk.rg || hdr->channel != pending_tk.nkan) {
 			return;
 		}
@@ -708,63 +678,6 @@ void GlobalData::dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_ent
 	write_rx_trace_csv(std::move(all_entries), rx_filename.string());
 }
 
-// static constexpr rls::tp map_kt_to_dsp(uint16_t control_point) {
-// 	switch (control_point) {
-// 	case Protocol_RLS_Mini::CTRL: return rls::TP_WORK;
-// 	case Protocol_RLS_Mini::PHD: return rls::TP_BYPASS;
-// 	case Protocol_RLS_Mini::FAP: return rls::TP_FAPCH;
-// 	case Protocol_RLS_Mini::LOU: return rls::TP_LOU;
-// 	case Protocol_RLS_Mini::SF: return rls::TP_SF;
-// 	case Protocol_RLS_Mini::KN: return rls::TP_MAX;
-// 	case Protocol_RLS_Mini::AD: return rls::TP_FFT;
-// 	case Protocol_RLS_Mini::APU: return rls::TP_APU;
-// 	case Protocol_RLS_Mini::CUT: return rls::TP_CUT;
-// 	case Protocol_RLS_Mini::DDR: return rls::TP_DDR;
-// 	case Protocol_RLS_Mini::FIND: return rls::TP_FIND;
-// 	case Protocol_RLS_Mini::RANK: return rls::TP_RANK;
-// 	case Protocol_RLS_Mini::FAP_COEFFS: return rls::TP_FAPCH_COEFFS;
-// 	case Protocol_RLS_Mini::WEIGHT_OUT: return rls::TP_WEIGHT_OUT;
-// 	case Protocol_RLS_Mini::MTI: return rls::TP_MTI;
-// 	default: return rls::TP_WORK;
-// 	}
-// }
-
-namespace {
-
-constexpr bool kt_uses_rg(rls::tp tp) {
-	switch (tp) {
-	case rls::TP_DDR:
-	case rls::TP_FFT:
-	case rls::TP_MAX: {
-		return true;
-	}
-	default: {
-		return false;
-	}
-	}
-}
-
-constexpr bool kt_uses_channel(rls::tp tp) {
-	switch (tp) {
-	case rls::TP_BYPASS:
-	case rls::TP_CUT:
-	case rls::TP_FAPCH:
-	case rls::TP_LOU:
-	case rls::TP_SF:
-	case rls::TP_MTI:
-	case rls::TP_DDR:
-	case rls::TP_FFT: {
-		return true;
-	}
-	default: {
-		return false;
-	}
-	}
-}
-
-} // namespace
-
-
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	log_cpm_msg(__func__, msg);
 	if (msg.reg_takt == 0 || msg.kt == 0) {
@@ -788,8 +701,8 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		const auto tp = static_cast<rls::tp>(msg.kt);
 		if (tp == rls::TP_SDR) return;
 		pending_tk.kt       = msg.kt;
-		pending_tk.rg       = kt_uses_rg(tp) ? msg.rg : 0;
-		pending_tk.nkan     = kt_uses_channel(tp) ? msg.nkan : 0;
+		pending_tk.rg       = rls::kt_uses_rg(tp) ? msg.rg : 0;
+		pending_tk.nkan     = rls::kt_uses_channel(tp) ? msg.nkan : 0;
 		pending_tk.reg_takt = msg.reg_takt;
 		pending_tk.words    = rls::get_rx_words_per_buf(msg.kt, cfg.rx_insert_count);
 		pending_tk.active =
@@ -809,22 +722,15 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 
 Protocol_RLS_Mini::RR_Kvit GlobalData::set_RR_Kvit() {
 	Protocol_RLS_Mini::RR_Kvit kvit;
-
 	kvit.kuvr     = static_cast<uint8_t>(cpm_rr.get_kuvr());
 	kvit.vr       = static_cast<uint8_t>(cpm_rr.get_vr());
-
 	kvit.kuizl    = cpm_rr.get_kuizl();
 	kvit.izl      = cpm_rr.get_izl();
 	kvit.ant      = cpm_rr.get_ant();
-
 	kvit.ispr_kan = cpm_poi.get_ispr_kan();
-
 	kvit.setDegreesDaz(cpm_rr.get_daz());
 	kvit.dd_poi = static_cast<int16_t>(cpm_rr.get_dd_poi());
 	kvit.setDegreesDazPOI(cpm_rr.get_daz_poi());
-
-	// piCout << kvit;
-
 	return kvit;
 }
 
@@ -846,9 +752,9 @@ void GlobalData::received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg) {
 	cpm_rr.set_izl(msg.par == 1);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	// TODO: убрать из фин версиии
-	if (!cfg.dma_enabled) {
-		u220_group.start_rx_dump();
-	}
+	// if (!cfg.dma_enabled) {
+	// 	u220_group.start_rx_dump();
+	// }
 	global->sendMessage(ans);
 }
 
@@ -865,18 +771,21 @@ void GlobalData::received_RR_TTek(const Protocol_RLS_Mini::RR_TTek & msg) {
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
+
 void GlobalData::received_RR_AzPopr(const Protocol_RLS_Mini::RR_AzPopr & msg) {
 	log_cpm_msg(__func__, msg);
 	cpm_rr.set_daz(msg.getDegrees());
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
+
 void GlobalData::received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg) {
 	log_cpm_msg(__func__, msg);
 	cpm_rr.set_dd_poi(msg.dd);
 	Protocol_RLS_Mini::RR_Kvit ans = set_RR_Kvit();
 	global->sendMessage(ans);
 }
+
 void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg) {
 	log_cpm_msg(__func__, msg);
 	cpm_rr.set_daz_poi(msg.getDegrees());
@@ -886,34 +795,27 @@ void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI &
 
 Protocol_RLS_Mini::FAP_PR_KVIT GlobalData::set_FAP_PR_KVIT() {
 	Protocol_RLS_Mini::FAP_PR_KVIT kvit;
-
 	const auto & coeffs         = cpm_poi.get_fap_pr_coeffs();
 	constexpr double rad_to_deg = 180.0 / 3.14159265358979323846;
-
 	for (size_t i = 0; i < coeffs.size(); ++i) {
 		kvit.channels[i].setDegrees(std::arg(coeffs[i]) * rad_to_deg);
 		kvit.channels[i].setDb(20.0 * std::log10(std::abs(coeffs[i])));
 	}
-
 	return kvit;
 }
-
 
 void GlobalData::received_FAP_PR_ZAPROS(const Protocol_RLS_Mini::FAP_PR_ZAPROS & msg) {
 	log_cpm_msg(__func__, msg);
 	global->sendMessage(set_FAP_PR_KVIT());
 }
 
-
 void GlobalData::received_FAP_PR_KU(const Protocol_RLS_Mini::FAP_PR_KU & msg) {
 	log_cpm_msg(__func__, msg);
 	cpm_poi.start_fap_pr();
 }
 
-
 void GlobalData::received_FAP_PR_TEST(const Protocol_RLS_Mini::FAP_PR_TEST & msg) {
 	log_cpm_msg(__func__, msg);
-
 	if (msg.msg_code != 2 && msg.msg_code != 3) return;
 
 	// TODO: включить или выключить режим проверки фазирования ПР.
@@ -923,21 +825,15 @@ void GlobalData::received_FAP_PR_TEST(const Protocol_RLS_Mini::FAP_PR_TEST & msg
 	// и отправить FAP_PR_KVIT с TEST=0.
 }
 
-
 void GlobalData::received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg) {
 	log_cpm_msg(__func__, msg);
-
-	if (msg.save > 1) return;
-
 	std::array<std::complex<float>, 8> coeffs;
 	constexpr float deg_to_rad = 3.14159265358979323846f / 180.0f;
-
 	for (size_t i = 0; i < coeffs.size(); ++i) {
 		const float phase     = msg.channels[i].getDegrees() * deg_to_rad;
 		const float amplitude = std::pow(10.0f, msg.channels[i].getDb() / 20.0f);
 		coeffs[i]             = std::polar(amplitude, phase);
 	}
-
 	cpm_poi.set_fap_pr_coeffs(coeffs);
 	global->sendMessage(set_FAP_PR_KVIT());
 }
@@ -955,19 +851,14 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	global->sendMessage(ans);
 }
 
-
 void GlobalData::send_PI(const rls::range_packet & range_pac, float targ_az) {
 	Protocol_RLS_Mini::PI pi;
-
 	pi.setDegreesAzTek(cpm_rr.get_current_az());
 	pi.setSeconds(cpm_rr.get_compensated_time());
 	pi.setDegreesAz(targ_az);
-
 	pi.setZona(cpm_poi.get_zona_val());
-	pi.nes = range_pac.n_ranges;
-
+	pi.nes              = range_pac.n_ranges;
 	PIByteArray data    = piSerialize(pi);
-
 	const size_t offset = data.size();
 	data.resize(offset + pi.nes * sizeof(uint16_t));
 	auto * ranges = reinterpret_cast<uint16_t *>(data.data() + offset);
@@ -976,58 +867,39 @@ void GlobalData::send_PI(const rls::range_packet & range_pac, float targ_az) {
 		range += cpm_rr.get_dd_poi();
 		ranges[i] = static_cast<uint16_t>(range);
 	}
-
 	global->sendMessage(data, Protocol_RLS_Mini::PI::Port);
 }
 
 Protocol_RLS_Mini::PI GlobalData::set_PI() {
 	Protocol_RLS_Mini::PI pi;
-
 	pi.setDegreesAzTek(cpm_rr.get_current_az());
 	pi.setSeconds(cpm_rr.get_compensated_time());
 	pi.setDegreesAz(cpm_rr.get_compensated_az());
-
 	pi.setZona(cpm_poi.get_zona_val());
 	pi.nes = cpm_poi.nes.count;
-
-	if (cpm_rr.take_rotation_completed()) {
-		cpm_poi.target_idx = 0;
-	}
-
 	return pi;
 }
 
-
 Protocol_RLS_Mini::POI_Kvit GlobalData::set_POI_Kvit() {
 	Protocol_RLS_Mini::POI_Kvit kvit;
-
 	kvit.sdc      = cpm_poi.get_sdc().bz & 0x01;
 	kvit.dsa      = cpm_poi.get_dsa();
 	kvit.kan      = cpm_poi.get_kan();
-
 	kvit.dsa_vr_n = cpm_poi.get_dsa_vr_n();
 	kvit.dsa_vr_k = cpm_poi.get_dsa_vr_k();
-
 	kvit.setLevelApuk1(cpm_poi.get_apu_k1());
 	kvit.setLevelApuk2(cpm_poi.get_apu_k2());
-
 	kvit.zona_k1 = static_cast<uint8_t>(cpm_poi.get_zona_stage());
 	kvit.zona_k2 = cpm_poi.get_zona_ch_num();
-
 	return kvit;
 }
 
-
 Protocol_RLS_Mini::CIT_Kvit GlobalData::set_CIT_Kvit() {
+	const auto targets = cpm_cit.get_targets();
 	Protocol_RLS_Mini::CIT_Kvit kvit;
-
-	const auto targets                        = cpm_cit.get_targets();
-
 	Protocol_RLS_Mini::ImitatorTarget * dst[] = {&kvit.it1, &kvit.it2};
-
 	for (size_t i = 0; i < 2; ++i) {
 		const auto & src = targets[i];
-
 		dst[i]->on       = src.on;
 		dst[i]->reg      = static_cast<uint8_t>(src.dn_enable);
 		dst[i]->setDegreesAz(src.az);
@@ -1036,10 +908,8 @@ Protocol_RLS_Mini::CIT_Kvit GlobalData::set_CIT_Kvit() {
 		dst[i]->setVelocity(src.vr);
 		dst[i]->setAttenuation(src.osl);
 	}
-
 	return kvit;
 }
-
 
 void GlobalData::received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg) {
 	log_cpm_msg(__func__, msg);
@@ -1047,14 +917,12 @@ void GlobalData::received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg) 
 	global->sendMessage(ans);
 }
 
-
 void GlobalData::received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg) {
 	log_cpm_msg(__func__, msg);
 	cpm_poi.set_shtat();
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
-
 
 void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 	log_cpm_msg(__func__, msg);
@@ -1064,14 +932,12 @@ void GlobalData::received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg) {
 	global->sendMessage(ans);
 }
 
-
 void GlobalData::received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg) {
 	log_cpm_msg(__func__, msg);
 	cpm_poi.set_dsa(msg.par == 1, msg.vr_n, msg.vr_k);
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
-
 
 void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 	log_cpm_msg(__func__, msg);
@@ -1080,7 +946,6 @@ void GlobalData::received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg) {
 	Protocol_RLS_Mini::POI_Kvit ans = set_POI_Kvit();
 	global->sendMessage(ans);
 }
-
 
 void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 	log_cpm_msg(__func__, msg);
@@ -1093,7 +958,6 @@ void GlobalData::received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg) {
 	global->sendMessage(ans);
 }
 
-
 void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
 	log_cpm_msg(__func__, msg);
 	cpm_poi.set_kan(msg.kan);
@@ -1101,28 +965,18 @@ void GlobalData::received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg) {
 	global->sendMessage(ans);
 }
 
-
 void GlobalData::received_CIT_Zapros(const Protocol_RLS_Mini::CIT_Zapros & msg) {
 	log_cpm_msg(__func__, msg);
 	Protocol_RLS_Mini::CIT_Kvit ans = set_CIT_Kvit();
 	global->sendMessage(ans);
 }
 
-
 void GlobalData::received_CIT_KU(const Protocol_RLS_Mini::CIT_KU & msg) {
 	log_cpm_msg(__func__, msg);
-
 	const Protocol_RLS_Mini::ImitatorTarget * src[] = {&msg.it1, &msg.it2};
-
 	CpmCit::Targets targets{};
-
 	for (size_t i = 0; i < 2; ++i) {
-		if (src[i]->reg > 1) {
-			return;
-		}
-
 		auto & dst    = targets[i];
-
 		dst.on        = src[i]->on != 0;
 		dst.dn_enable = src[i]->reg == 1;
 		dst.az        = src[i]->getDegreesAz();
@@ -1131,8 +985,6 @@ void GlobalData::received_CIT_KU(const Protocol_RLS_Mini::CIT_KU & msg) {
 		dst.vr        = src[i]->getVelocity();
 		dst.osl       = src[i]->getAttenuation();
 	}
-
 	cpm_cit.set_targets(targets, 2);
-
 	global->sendMessage(set_CIT_Kvit());
 }
