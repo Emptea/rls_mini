@@ -966,9 +966,6 @@ void GlobalData::send_PI(const rls::range_packet & range_pac, float targ_az) {
 	pi.setZona(cpm_poi.get_zona_val());
 	pi.nes = range_pac.n_ranges;
 
-	if (cpm_rr.take_rotation_completed()) {
-		cpm_poi.target_idx = 0;
-	}
 	PIByteArray data    = piSerialize(pi);
 
 	const size_t offset = data.size();
