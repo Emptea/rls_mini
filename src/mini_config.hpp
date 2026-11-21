@@ -55,8 +55,11 @@ public:
 	ChannelSignals rx_en_sg{};
 	ChannelComplexSignals tx_dac_sg{};
 
-	bool log_cpm_msg = false;
-	bool log_axu_hdr = false;
+	bool log_cpm_msg           = false;
+	bool log_axu_hdr           = false;
+
+	double target_velocity_min = 2.05;
+	double target_velocity_max = 51.27;
 
 private:
 	using Section    = std::map<std::string, std::string>;
@@ -73,6 +76,7 @@ private:
 	uint32_t get_uint(const std::string & section, const std::string & key) const;
 	int32_t get_int(const std::string & section, const std::string & key) const;
 	std::array<uint32_t, CHANNEL_COUNT> get_uint_array(const std::string & section, const std::string & key) const;
+	double get_double(const std::string & section, const std::string & key) const;
 
 	static void trim(std::string & s);
 };

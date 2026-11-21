@@ -1,12 +1,12 @@
 #include "shared_data.h"
 
 #include "../rls_fpga/dma-proxy.h"
+#include "axu_header_logger.hpp"
 #include "imitator_u220.h"
 #include "mini_config.hpp"
 #include "protocol_rls_mini.h"
 #include "rls_const.hpp"
 #include "rx_cycle_trace.hpp"
-#include "axu_header_logger.hpp"
 #include "user_u220.h"
 
 #include <algorithm>
@@ -134,13 +134,12 @@ void GlobalData::init() {
 		axi_dsp_set_compensation_mode(1);
 		axi_dsp_set_expect_u220_del(cfg.rx_insert_count);
 		axi_dsp_set_output_source(0, 0, 0, 0);
-		auto v = axi_dsp_get_output_source();
-		piCout << "SOURCE: " << v.SOURCE << ", SOURCE_CHANNEL: " << v.SOURCE_CHANNEL << ", RANGE_GATE: " << v.RANGE_GATE;
 		axi_dsp_set_channel_mask(0xFF, ~ispr_kan);
 		axi_dsp_apply();
 	}
+	cpm_poi.set_target_velocity_range(cfg.target_velocity_min, cfg.target_velocity_max);
+	
 	cpm_poi.set_ip_versions(axu_ip_version, u220_ip_version);
-	cpm_poi.set_dsa(1, 30, 180);
 	cpm_poi.set_kan(0xff);
 
 	u220_group.sync_ad9361();

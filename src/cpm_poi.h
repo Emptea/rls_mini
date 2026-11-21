@@ -109,31 +109,32 @@ public:
 	}
 
 	// DSA — диапазон скоростей автокомпенсации
+
+	void set_target_velocity_range(double min, double max) {
+		if (min < 0 || max < min) return;
+		target_velocity_min = min;
+		target_velocity_max = max;
+		config_frequency_mask.fill(0);
+
+		for (std::size_t i = 0; i < N; ++i) {
+			const double speed = std::abs(VR_ARRAY[i]);
+			if (speed >= min && speed <= max) {
+				config_frequency_mask[i / 32] |= uint32_t{1} << (i % 32);
+			}
+		}
+		apply_frequency_selection();
+	}
+
 	bool get_dsa() const { return dsa_is_on; }
 	uint16_t get_dsa_vr_n() const { return dsa_vr_n; }
 	uint16_t get_dsa_vr_k() const { return dsa_vr_k; }
 
 	void set_dsa(bool onoff, uint16_t vr_n, uint16_t vr_k) {
+		if (onoff && vr_n > vr_k) return;
 		dsa_is_on = onoff;
 		dsa_vr_n  = vr_n;
 		dsa_vr_k  = vr_k;
-		if (!dma_enabled) return;
-		skip_dma_transaction.store(true);
-
-		std::array<uint32_t, N / 32> mask;
-		mask.fill(~uint32_t{0});
-
-		for (std::size_t i = 0; i < N; ++i) {
-			const double speed = VR_ARRAY[i] < 0 ? -VR_ARRAY[i] : VR_ARRAY[i];
-
-			if (speed >= dsa_vr_n && speed <= dsa_vr_k) mask[i / 32] &= ~(uint32_t{1} << (i % 32));
-		}
-
-		for (uint32_t reg_index = 0; reg_index < 16; ++reg_index) {
-			axi_dsp_set_frequency_selection(mask[reg_index], reg_index);
-		}
-		axi_dsp_apply();
-		skip_dma_transaction.store(false);
+		apply_frequency_selection();
 	}
 
 	// APU — пороги обнаружения
@@ -273,13 +274,17 @@ public:
 	}
 
 private:
-	bool dma_enabled         = false;
+	bool dma_enabled           = false;
 
-	bool sdc                 = false;
-	bool dsa_is_on           = false;
+	bool sdc                   = false;
+	bool dsa_is_on             = false;
 
-	uint8_t ispr_kan         = 0xff; // Исправность приёмных каналов
-	uint8_t kan              = 0xff;
+	uint8_t ispr_kan           = 0xff; // Исправность приёмных каналов
+	uint8_t kan                = 0xff;
+
+	double target_velocity_min = 2.05;
+	double target_velocity_max = 51.27;
+	std::array<uint32_t, N / 32> config_frequency_mask{};
 
 	uint16_t dsa_vr_n        = 0;
 	uint16_t dsa_vr_k        = 0;
@@ -302,4 +307,27 @@ private:
 		coeffs.fill({1.0f, 0.0f});
 		return coeffs;
 	}();
+
+	void apply_frequency_selection() {
+		if (!dma_enabled) return;
+
+		auto mask = config_frequency_mask;
+
+		if (dsa_is_on) {
+			for (std::size_t i = 0; i < N; ++i) {
+				const double speed = std::abs(VR_ARRAY[i]);
+
+				if (speed >= dsa_vr_n && speed <= dsa_vr_k) {
+					mask[i / 32] &= ~(uint32_t{1} << (i % 32));
+				}
+			}
+		}
+
+		skip_dma_transaction.store(true);
+		for (uint32_t i = 0; i < 16; ++i) {
+			axi_dsp_set_frequency_selection(mask[i], i);
+		}
+		axi_dsp_apply();
+		skip_dma_transaction.store(false);
+	}
 };

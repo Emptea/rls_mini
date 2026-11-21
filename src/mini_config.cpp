@@ -143,6 +143,37 @@ int32_t MiniConfig::get_int(const std::string & section, const std::string & key
 	return static_cast<int32_t>(result);
 }
 
+double MiniConfig::get_double(const std::string & section, const std::string & key) const {
+	const auto section_it = data_.find(section);
+
+	if (section_it == data_.end()) {
+		throw std::runtime_error("Missing config section: [" + section + "]");
+	}
+
+	const auto key_it = section_it->second.find(key);
+
+	if (key_it == section_it->second.end()) {
+		throw std::runtime_error("Missing config key: " + section + "." + key);
+	}
+
+	const auto & value = key_it->second;
+
+	size_t pos         = 0;
+	double result      = 0;
+
+	try {
+		result = std::stod(value, &pos);
+	} catch (const std::exception &) {
+		throw std::runtime_error("Invalid config value: " + section + "." + key);
+	}
+
+	if (pos != value.size() || !std::isfinite(result)) {
+		throw std::runtime_error("Invalid config value: " + section + "." + key);
+	}
+
+	return result;
+}
+
 std::array<uint32_t, MiniConfig::CHANNEL_COUNT> MiniConfig::get_uint_array(const std::string & section, const std::string & key) const {
 	std::array<uint32_t, CHANNEL_COUNT> result{};
 
@@ -213,6 +244,18 @@ void MiniConfig::load_settings() {
 	}
 	log_cpm_msg = get_uint("log", "cpm_msg") == 1;
 	log_axu_hdr = get_uint("log", "axu_hdr") == 1;
+
+	auto tv_min = get_double("dsp", "target_velocity_min");
+	auto tv_max = get_double("dsp", "target_velocity_max");
+
+	if (target_velocity_min < 0 || target_velocity_max < target_velocity_min) {
+		throw std::runtime_error("Invalid DSP target velocity range");
+		target_velocity_min = 2.05;
+		target_velocity_min = 51.27;
+	} else {
+		target_velocity_min = tv_min;
+		target_velocity_max = tv_max;
+	}
 }
 
 void MiniConfig::load_signal(const std::string & filename, ChannelSignals & signals) {
