@@ -83,12 +83,10 @@ void GlobalData::init() {
 			piCout << "DMA: init";
 		}
 	}
-	cpm_poi.set_dma_enabled(cfg.dma_enabled);
 
 	device_addrs_filtered_t devices = uhd_utils.uhd_get_devices();
 	void * tx0_buf[TX_BUFFER_COUNT];
 	void * tx1_buf[TX_BUFFER_COUNT];
-
 
 	uint8_t ispr_kan = 0;
 
@@ -105,7 +103,6 @@ void GlobalData::init() {
 		ispr_kan |= static_cast<uint8_t>((1u << (2 * i)) | (1u << (2 * i + 1)));
 	}
 
-	cpm_poi.set_ispr_kan(ispr_kan);
 
 	if (u220_group.active_boards().isEmpty()) {
 		piCout << "No active U220 boards";
@@ -125,20 +122,7 @@ void GlobalData::init() {
 
 	u220_group.setup();
 	const auto u220_ip_version = u220_group.fpga(u220_group.active_boards()[0])->get_fpga_version();
-	csr_ip_ver_t axu_ip_version{};
-	if (cfg.dma_enabled) {
-		axi_dsp_init();
-		axi_dsp_configure();
-		axi_dsp_set_expect_u220_del(cfg.rx_insert_count);
-		axu_ip_version = axi_dsp_get_ip_ver();
-		
-		axi_dsp_set_channel_mask(0xFF, ~ispr_kan);
-		axi_dsp_apply();
-	}
-	cpm_poi.set_target_velocity_range(cfg.target_velocity_min, cfg.target_velocity_max);
-
-	cpm_poi.set_ip_versions(axu_ip_version, u220_ip_version);
-	cpm_poi.set_kan(0xff);
+	cpm_poi.init(cfg.dma_enabled, ispr_kan, cfg.target_velocity_min, cfg.target_velocity_max, u220_ip_version, cfg.rx_insert_count);
 
 	u220_group.sync_ad9361();
 	// нужна задержка чтобы pps сбросился иначе в reset_time не сработает

@@ -5,11 +5,10 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <complex>
 #include <cstdint>
 #include <mutex>
-
-// TODO: нужно ли axi_dsp_apply();
 
 class CpmPoi {
 public:
@@ -129,7 +128,6 @@ public:
 				config_frequency_mask[i / 32] |= uint32_t{1} << (i % 32);
 			}
 		}
-		apply_frequency_selection();
 	}
 
 	bool get_dsa() const { return dsa_is_on; }
@@ -141,7 +139,11 @@ public:
 		dsa_is_on = onoff;
 		dsa_vr_n  = vr_n;
 		dsa_vr_k  = vr_k;
+		if (!dma_enabled) return;
+		skip_dma_transaction.store(true);
 		apply_frequency_selection();
+		axi_dsp_apply();
+		skip_dma_transaction.store(false);
 	}
 
 	// APU — пороги обнаружения
@@ -197,7 +199,6 @@ public:
 
 	// KAN — маска подключённых каналов
 	uint8_t get_kan() const {
-		if (dma_enabled) return kan & ispr_kan;
 		return kan & ispr_kan;
 		// return axi_dsp_get_channel_mask();
 	}
@@ -214,8 +215,6 @@ public:
 		poi_sdc.val = 0;
 		dsa_is_on   = false;
 
-		set_kan(0xFF);
-
 		dsa_vr_n    = 0;
 		dsa_vr_k    = 0;
 
@@ -225,14 +224,21 @@ public:
 		zona_stage  = ZoneCalcStage::BeforeLou;
 		zona_ch_num = 0;
 
+		kan         = 0xFF & ispr_kan;
+
 		if (!dma_enabled) return;
 
-		axi_dsp_set_compensation_mode(0);
+		skip_dma_transaction.store(true);
+		axi_dsp_set_compensation_mode(1);
+		axi_dsp_set_channel_mask(kan, ~ispr_kan);
+		axi_dsp_set_output_source(0, 0, 0, 0);
 		axi_dsp_set_compensation_ref(uint32_t(1575));
 		axi_dsp_set_motion_selector(poi_sdc.bz, poi_sdc.dz, 1);
 		axi_dsp_set_median_detector_coef(apu_k1);
 		axi_dsp_set_cfar_level(apu_k2);
+		apply_frequency_selection();
 		axi_dsp_apply();
+		skip_dma_transaction.store(false);
 	}
 
 	void set_dma_enabled(bool value) { dma_enabled = value; }
@@ -280,10 +286,29 @@ public:
 		axi_dsp_apply();
 	}
 
+	void init(bool dma, uint8_t ispr, double velocity_min, double velocity_max, uint32_t u220_ip_version, uint32_t rx_insert_count) {
+		dma_enabled = dma;
+		ispr_kan    = ispr;
+
+		csr_ip_ver_t axu_ip_version{};
+
+		if (dma_enabled) {
+			axi_dsp_init();
+			axi_dsp_configure();
+			axi_dsp_set_expect_u220_del(rx_insert_count);
+			axu_ip_version = axi_dsp_get_ip_ver();
+			axi_dsp_apply();
+		}
+
+		set_ip_versions(axu_ip_version, u220_ip_version);
+		set_target_velocity_range(velocity_min, velocity_max);
+		set_shtat();
+	}
+
 private:
 	bool dma_enabled = false;
 
-	union Sdc poi_sdc {};
+	Sdc poi_sdc{};
 
 	bool dsa_is_on             = false;
 
@@ -331,11 +356,8 @@ private:
 			}
 		}
 
-		skip_dma_transaction.store(true);
 		for (uint32_t i = 0; i < 16; ++i) {
 			axi_dsp_set_frequency_selection(mask[i], i);
 		}
-		axi_dsp_apply();
-		skip_dma_transaction.store(false);
 	}
 };
