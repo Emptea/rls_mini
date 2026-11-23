@@ -33,14 +33,11 @@
 bool set_rx_realtime_priority() {
 	sched_param param{};
 	param.sched_priority = 30;
-
 	const int err        = pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
-
 	if (err != 0) {
 		piCout << "RX SCHED_FIFO error:" << strerror(err);
 		return false;
 	}
-
 	piCout << "RX SCHED_FIFO priority = 30";
 	return true;
 }
@@ -54,7 +51,6 @@ GlobalData::GlobalData()
 	, cpm_poi(cfg.dma_enabled)
 	, cpm_cit(imitator_u220) {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
-
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
 	for (int i = 0; i < serial_list.size(); i++) {
 		U220 * u = new U220(serial_list[i], u220_args, 0, u220_config);
@@ -64,7 +60,6 @@ GlobalData::GlobalData()
 
 
 GlobalData::~GlobalData() {}
-
 
 GlobalData * GlobalData::instance() {
 	static GlobalData ret;
@@ -89,7 +84,6 @@ void GlobalData::init() {
 	void * tx1_buf[TX_BUFFER_COUNT];
 
 	uint8_t ispr_kan = 0;
-
 	for (size_t i = 0; i < u220_group.board_count(); ++i) {
 		auto * board = u220_group.board(i);
 		if (!board) continue;
@@ -102,7 +96,6 @@ void GlobalData::init() {
 		u220_group.activate_board(i);
 		ispr_kan |= static_cast<uint8_t>((1u << (2 * i)) | (1u << (2 * i + 1)));
 	}
-
 
 	if (u220_group.active_boards().isEmpty()) {
 		piCout << "No active U220 boards";
@@ -208,9 +201,9 @@ void GlobalData::start() {
 	auto poi_kvit = set_POI_Kvit();
 	auto cit_kvit = set_CIT_Kvit();
 	auto rr_kvit  = set_RR_Kvit();
-	piCout << poi_kvit;
-	piCout << cit_kvit;
-	piCout << rr_kvit;
+	// piCout << poi_kvit;
+	// piCout << cit_kvit;
+	// piCout << rr_kvit;
 	global->sendMessage(poi_kvit);
 	global->sendMessage(cit_kvit);
 	global->sendMessage(rr_kvit);
@@ -542,6 +535,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 			targ.porog  = f.rank_out * cpm_poi.get_apu_k1();
 			targ.amp    = (double)f.main_amplitude;
 			targ.vr     = rls::freq_index_to_velocity(f.frequency_channel);
+			// rls::print_work(&pac->posthdr);
 			send_KTA_VO(targ);
 		}
 	}
@@ -611,10 +605,10 @@ void GlobalData::cpm_loop() {
 					// fpga->log_rx_playback_enable(radio);
 					// fpga->log_rx_playback_correction(radio);
 					// fpga->log_rx_playback_delay(radio);
-					fpga->log_rx_playback_amplitude(radio);
+					// fpga->log_rx_playback_amplitude(radio);
 					// fpga->log_rx_playback_dn_offset(radio);
 				}
-				fpga->log_play_ctrl();
+				// fpga->log_play_ctrl();
 				fpga->log_tx_fap_val();
 				// fpga->log_rx_playback_start_delay();
 			}
@@ -697,7 +691,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 			msg.reg_takt == 1 && msg.kt != rls::TP_WORK && pending_tk.words > 0 && pending_tk.words <= BUFFER_SIZE / sizeof(uint32_t);
 
 		axi_dsp_set_output_source(pending_tk.kt, 0, pending_tk.nkan, pending_tk.rg);
-		// axi_dsp_apply();
+		axi_dsp_apply();
 	} else {
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);
 
@@ -835,7 +829,7 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	ans.setDistance(targ.d);
 	ans.setAmpPorogSp(targ.amp, targ.porog);
 	ans.setVelocity(targ.vr);
-	piCout << ans;
+	// piCout << ans;
 	global->sendMessage(ans);
 }
 
