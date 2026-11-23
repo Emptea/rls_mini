@@ -54,7 +54,7 @@ public:
 	void set_tx_gainon_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples);
 	void set_rx_en_sg(size_t channel, const std::array<uint8_t, 232 * 4> & samples);
 	void set_tx_complex_gain(size_t channel, const std::complex<short> gain);
-
+	void set_tx_mode(uint32_t mode); // 0 - tx, 1 - playbacks rx mem, 2 - playbacks mixed streams
 
 	void apply_rx_playback();
 	void pulse_rx_playback_apply();
@@ -82,6 +82,7 @@ public:
 	void log_rx_playback_dn_offset(size_t radio);
 	void log_rx_playback_dn_counter();
 	void log_rx_playback_start_delay();
+	void log_tx_mode();
 
 	// Чтение состояния
 	uint16_t get_rx_playback_dn_counter_start();
@@ -126,6 +127,7 @@ private:
 		RX_PLAYBACK_APPLY       = 18,
 		RX_PLAYBACK_APPLY_PULSE = 19,
 		RX_PLAYBACK_START_DELAY = 20,
+		TX_MODE                 = 21,
 
 		RX0_PLAYBACK_BASE       = 32,
 		RX1_PLAYBACK_BASE       = 64,
@@ -155,6 +157,8 @@ private:
 
 		RX_PLAYBACK_START         = 22,
 		RX_PLAYBACK_START_DELAY   = 26,
+		RX_DECIMATION_GRID        = 27,
+		TX_MODE                   = 28,
 		RX0_PLAYBACK_BASE         = 32,
 		RX1_PLAYBACK_BASE         = 64,
 	};

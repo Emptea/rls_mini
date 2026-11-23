@@ -28,6 +28,7 @@ public:
 	std::array<uint32_t, CHANNEL_COUNT> rx_en_delay{};
 	std::array<bool, CHANNEL_COUNT> use_ext_file_sg{};
 	uint32_t tx_gpio_enable   = 0;
+	uint32_t tx_mode          = 0;
 	uint32_t rx_gpio_enable   = 0;
 	uint32_t rx_insert_count  = 0;
 

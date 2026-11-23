@@ -252,6 +252,7 @@ void GlobalData::stop() {
 	}
 
 	for (size_t i: u220_group.active_boards()) {
+		u220_group.fpga(i)->set_tx_mode(0);
 		u220_group.fpga(i)->set_play_stop_tx();
 	}
 
@@ -260,6 +261,7 @@ void GlobalData::stop() {
 		u220_group.active_boards().isEmpty() ? 0 : u220_group.board(u220_group.active_boards()[0])->get_stats().cycles_completed;
 
 	if (cfg.dma_enabled) {
+		piCout << "DDR slow reg value:" << axi_dsp_get_status().DDR_STORAGE_SLOW;
 		axi_dsp_deinit();
 	}
 
@@ -564,6 +566,7 @@ void GlobalData::process_kt_pac(const uint32_t * buffer) {
 		}
 		words             = pending_tk.words;
 		pending_tk.active = false;
+		axi_dsp_set_output_source(0, 0, 0, 0);
 	}
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	ans.setData(buffer, words);
@@ -692,7 +695,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		pending_tk.active =
 			msg.reg_takt == 1 && msg.kt != rls::TP_WORK && pending_tk.words > 0 && pending_tk.words <= BUFFER_SIZE / sizeof(uint32_t);
 
-		axi_dsp_set_output_source(pending_tk.kt, 1, pending_tk.nkan, pending_tk.rg);
+		axi_dsp_set_output_source(pending_tk.kt, 0, pending_tk.nkan, pending_tk.rg);
 		axi_dsp_apply();
 	} else {
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);
@@ -831,7 +834,7 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	ans.setDistance(targ.d);
 	ans.setAmpPorogSp(targ.amp, targ.porog);
 	ans.setVelocity(targ.vr);
-	piCout << ans;
+	// piCout << ans;
 	global->sendMessage(ans);
 }
 

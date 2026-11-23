@@ -232,6 +232,7 @@ void MiniConfig::load_settings() {
 	rx_adc_delay      = get_uint_array("rx", "adc_delay");
 	rx_en_delay       = get_uint_array("rx", "en_delay");
 	tx_gpio_enable    = get_uint("tx", "gpio_enable");
+	tx_mode           = get_uint("tx", "mode");
 	rx_gpio_enable    = get_uint("rx", "gpio_enable");
 	rx_insert_count   = get_uint("rx", "insert_count");
 	pps_dead_zone_ms  = get_uint("sync", "pps_dead_zone_ms");

@@ -293,6 +293,12 @@ void UserU220::set_tx_complex_gain(size_t channel, const std::complex<short> gai
 	write_reg(wr_reg, value);
 }
 
+void UserU220::set_tx_mode(uint32_t mode) {
+	const WrReg wr_reg   = WrReg::TX_MODE;
+	const uint32_t value = mode;
+	write_reg(wr_reg, value);
+}
+
 void UserU220::apply_rx_playback() {
 	write_reg(WrReg::RX_PLAYBACK_APPLY, 1);
 }
@@ -484,4 +490,8 @@ void UserU220::log_rx_playback_dn_counter() {
 
 void UserU220::log_rx_playback_start_delay() {
 	read_reg(RdReg::RX_PLAYBACK_START_DELAY);
+}
+
+void UserU220::log_tx_mode() {
+	read_reg(RdReg::TX_MODE);
 }

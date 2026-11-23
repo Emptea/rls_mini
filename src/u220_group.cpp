@@ -93,6 +93,7 @@ void U220Group::setup_one_board(size_t i) {
 	u->set_rx_en_delay(cfg_.rx_en_delay[ch0], cfg_.rx_en_delay[ch1]);
 
 	u->set_play_gpio_tx_enable(cfg_.tx_gpio_enable);
+	u->set_tx_mode(cfg_.tx_mode);
 	u->set_play_gpio_rx_enable(cfg_.rx_gpio_enable);
 	u->set_play_rx_insert_count(cfg_.rx_insert_count);
 
