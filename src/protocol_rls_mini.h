@@ -420,6 +420,12 @@ public:
 			int32_t val = 3000 - std::lround(50 * 10.0 * std::log10(zona_val_sq));
 			zona        = val < 0 ? 0 : static_cast<uint16_t>(val);
 		}
+		double getDegreesAzTek() const { return aztek * degLSB; }
+		double getDegreesAz() const { return az * degLSB; }
+		double getSeconds() const {
+			uint32_t t = (uint32_t(time_msw) << 16) | time_lsw;
+			return t * timeLSB;
+		}
 	};
 
 
@@ -468,6 +474,13 @@ public:
 			porog = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v_porog)));
 			sp    = amp - porog;
 		}
+		double getT() const {
+			uint32_t t = (uint32_t(t_msw) << 16) | t_lsw;
+			return t * timeLSB;
+		}
+		double getAmpDb() const { return amp * dbLSB; }
+		double getPorogDb() const { return porog * dbLSB; }
+		double getSpDb() const { return sp * dbLSB; }
 	};
 
 
@@ -855,7 +868,7 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Ant & v) {
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_TTek & v) {
-	return out << "time:" << PICoutManipulators::Hex << v.time_msw << v.time_lsw;
+	return out << "time:" << v.getSeconds();
 }
 
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_AzPopr & v) {
@@ -954,15 +967,15 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CIT_Kvit & v) {
 
 // PI
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::PI & v) {
-	return out << "aztek:" << v.aztek << "time:" << PICoutManipulators::Hex << v.time_msw << PICoutManipulators::Hex << v.time_lsw
-	           << "az:" << v.az << "zona:" << v.zona << "nes:" << v.nes;
+	return out << "aztek:" << v.getDegreesAzTek() << "time:" << v.getSeconds() << "az:" << v.getDegreesAz() << "zona:" << v.zona
+	           << "nes:" << v.nes;
 }
 
 // KTA_VO
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::KTA_VO & v) {
-	return out << "N:" << v.n << "T:" << PICoutManipulators::Hex << v.t_msw << v.t_lsw << PICoutManipulators::Dec << "az:" << v.az
-	           << "um:" << v.um << "D:" << v.d << "porog:" << v.porog << "sp:" << v.sp << "amp:" << v.amp << "vr:" << v.vr
-	           << "tn:" << int(v.tn0) << "dum:" << int(v.dum0) << "tn:" << int(v.tn1) << "dum:" << int(v.dum1);
+	return out << "N:" << v.n << "T:" << v.getT() << "az:" << v.getDegreesAz() << "um:" << v.getDegreesUm() << "D:" << v.getDistance()
+	           << "porog:" << v.getPorogDb() << "sp:" << v.getSpDb() << "amp:" << v.getAmpDb() << "vr:" << v.getVelocity()
+	           << "tn0:" << int(v.tn0) << "dum0:" << int(v.dum0) << "tn1:" << int(v.tn1) << "dum1:" << int(v.dum1);
 }
 
 // TRVO

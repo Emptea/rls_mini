@@ -293,9 +293,15 @@ void UserU220::set_tx_complex_gain(size_t channel, const std::complex<short> gai
 	write_reg(wr_reg, value);
 }
 
-void UserU220::set_tx_mode(uint32_t mode) {
+void UserU220::set_tx_mode(uint32_t tx_mode_ch0, uint32_t tx_mode_ch1) {
 	const WrReg wr_reg   = WrReg::TX_MODE;
-	const uint32_t value = mode;
+	const uint32_t value = (tx_mode_ch0 & 0xF) | ((tx_mode_ch1 & 0xF) << 4);
+	write_reg(wr_reg, value);
+}
+
+void UserU220::set_tx_fap_val(size_t channel, const std::complex<short> fap_val) {
+	const WrReg wr_reg   = channel == 0 ? WrReg::TX0_FAP_VAL : WrReg::TX1_FAP_VAL;
+	const uint32_t value = static_cast<uint16_t>(fap_val.real()) | (static_cast<uint32_t>(static_cast<uint16_t>(fap_val.imag())) << 16);
 	write_reg(wr_reg, value);
 }
 
@@ -494,4 +500,8 @@ void UserU220::log_rx_playback_start_delay() {
 
 void UserU220::log_tx_mode() {
 	read_reg(RdReg::TX_MODE);
+}
+
+void UserU220::log_tx_fap_val() {
+	read_reg(RdReg::TX_FAP_VAL);
 }

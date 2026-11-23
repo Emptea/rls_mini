@@ -252,7 +252,7 @@ void GlobalData::stop() {
 	}
 
 	for (size_t i: u220_group.active_boards()) {
-		u220_group.fpga(i)->set_tx_mode(0);
+		u220_group.fpga(i)->set_tx_mode(0, 0);
 		u220_group.fpga(i)->set_play_stop_tx();
 	}
 
@@ -436,14 +436,14 @@ void GlobalData::u220_recv_dma() {
 	max_processing_backlog = std::max(max_processing_backlog, processing_backlog);
 	max_total_backlog      = std::max(max_total_backlog, total_backlog);
 
-	if (++counter % 1000 == 0) {
-		fprintf(stderr,
-		        "RX backlog avg=%.2f max=%zu total_max=%zu headroom=%zu\n",
-		        static_cast<double>(sum_processing_backlog) / counter,
-		        max_processing_backlog,
-		        max_total_backlog,
-		        max_total_backlog < RX_BUFFER_COUNT ? RX_BUFFER_COUNT - max_total_backlog : 0);
-	}
+	// if (++counter % 1000 == 0) {
+	// 	fprintf(stderr,
+	// 	        "RX backlog avg=%.2f max=%zu total_max=%zu headroom=%zu\n",
+	// 	        static_cast<double>(sum_processing_backlog) / counter,
+	// 	        max_processing_backlog,
+	// 	        max_total_backlog,
+	// 	        max_total_backlog < RX_BUFFER_COUNT ? RX_BUFFER_COUNT - max_total_backlog : 0);
+	// }
 
 	if (dma.can_send()) {
 		if (pending_buffer) {
@@ -566,7 +566,7 @@ void GlobalData::process_kt_pac(const uint32_t * buffer) {
 		}
 		words             = pending_tk.words;
 		pending_tk.active = false;
-		axi_dsp_set_output_source(0, 0, 0, 0);
+		// axi_dsp_set_output_source(0, 0, 0, 0);
 	}
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	ans.setData(buffer, words);
@@ -615,6 +615,7 @@ void GlobalData::cpm_loop() {
 					// fpga->log_rx_playback_dn_offset(radio);
 				}
 				fpga->log_play_ctrl();
+				fpga->log_tx_fap_val();
 				// fpga->log_rx_playback_start_delay();
 			}
 		}
@@ -696,7 +697,7 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 			msg.reg_takt == 1 && msg.kt != rls::TP_WORK && pending_tk.words > 0 && pending_tk.words <= BUFFER_SIZE / sizeof(uint32_t);
 
 		axi_dsp_set_output_source(pending_tk.kt, 0, pending_tk.nkan, pending_tk.rg);
-		axi_dsp_apply();
+		// axi_dsp_apply();
 	} else {
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);
 
@@ -834,7 +835,7 @@ void GlobalData::send_KTA_VO(struct target targ) {
 	ans.setDistance(targ.d);
 	ans.setAmpPorogSp(targ.amp, targ.porog);
 	ans.setVelocity(targ.vr);
-	// piCout << ans;
+	piCout << ans;
 	global->sendMessage(ans);
 }
 
@@ -854,6 +855,11 @@ void GlobalData::send_PI(const rls::range_packet & range_pac, float targ_az) {
 		range += cpm_rr.get_dd_poi();
 		ranges[i] = static_cast<uint16_t>(range);
 	}
+	static size_t cnt = 0;
+	if ((cnt++ & 0xFF) == 0xFF) {
+		piCout << pi;
+	}
+
 	global->sendMessage(data, Protocol_RLS_Mini::PI::Port);
 }
 

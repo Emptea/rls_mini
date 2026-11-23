@@ -93,7 +93,7 @@ void U220Group::setup_one_board(size_t i) {
 	u->set_rx_en_delay(cfg_.rx_en_delay[ch0], cfg_.rx_en_delay[ch1]);
 
 	u->set_play_gpio_tx_enable(cfg_.tx_gpio_enable);
-	u->set_tx_mode(cfg_.tx_mode);
+	u->set_tx_mode(cfg_.tx_mode[ch0], cfg_.tx_mode[ch1]);
 	u->set_play_gpio_rx_enable(cfg_.rx_gpio_enable);
 	u->set_play_rx_insert_count(cfg_.rx_insert_count);
 
@@ -105,24 +105,19 @@ void U220Group::setup_one_board(size_t i) {
 
 	for (size_t channel = 0; channel < 2; ++channel) {
 		const size_t ch = i * 2 + channel;
-
 		u->set_tx_gainon_sg(channel, cfg_.tx_gainon_sg[ch]);
-
 		if (cfg_.use_ext_file_sg[ch]) {
 			u->set_tx_dac_sg(channel, cfg_.tx_dac_sg[ch]);
 		}
-
 		u->set_tx_complex_gain(channel, cfg_.complex_gains[ch]);
-
-		// Калибровка имитатора
+		u->set_tx_fap_val(channel, {1535, 0});
 		u->set_rx_playback_correction(channel, cfg_.complex_corrections[ch]);
-
-		// Включение целей для данного радиоканала
 		const uint8_t mask = cfg_.imitator_channels_en[ch] ? enable_mask : uint8_t{0};
-
 		u->set_rx_playback_enable(channel, mask);
 	}
-	u->set_rx_playback_start_delay(cfg_.imitator_start_delay[ch0], cfg_.imitator_start_delay[ch1]);
+	auto imitator_start_delay_ch0 = cfg_.tx_mode[ch0] == 0 ? cfg_.imitator_start_delay[ch0] : cfg_.imitator_start_delay_tx_mode[ch0];
+	auto imitator_start_delay_ch1 = cfg_.tx_mode[ch1] == 0 ? cfg_.imitator_start_delay[ch1] : cfg_.imitator_start_delay_tx_mode[ch1];
+	u->set_rx_playback_start_delay(imitator_start_delay_ch0, imitator_start_delay_ch1);
 }
 
 void U220Group::reset_time(uint32_t value) {

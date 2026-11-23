@@ -231,8 +231,8 @@ void MiniConfig::load_settings() {
 	tx_gpio_delay     = get_uint_array("tx", "gpio_delay");
 	rx_adc_delay      = get_uint_array("rx", "adc_delay");
 	rx_en_delay       = get_uint_array("rx", "en_delay");
+	tx_mode           = get_uint_array("tx", "mode");
 	tx_gpio_enable    = get_uint("tx", "gpio_enable");
-	tx_mode           = get_uint("tx", "mode");
 	rx_gpio_enable    = get_uint("rx", "gpio_enable");
 	rx_insert_count   = get_uint("rx", "insert_count");
 	pps_dead_zone_ms  = get_uint("sync", "pps_dead_zone_ms");
@@ -472,5 +472,6 @@ void MiniConfig::load_imitator() {
 		if (channels[channel] > 1) throw std::runtime_error("Invalid imitator.channels_enable");
 		imitator_channels_en[channel] = channels[channel] == 1;
 	}
-	imitator_start_delay = get_uint_array("imitator", "start_delay");
+	imitator_start_delay         = get_uint_array("imitator", "start_delay");
+	imitator_start_delay_tx_mode = get_uint_array("imitator", "start_delay_tx_mode");
 }

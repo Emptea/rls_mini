@@ -27,8 +27,8 @@ public:
 	std::array<uint32_t, CHANNEL_COUNT> rx_adc_delay{};
 	std::array<uint32_t, CHANNEL_COUNT> rx_en_delay{};
 	std::array<bool, CHANNEL_COUNT> use_ext_file_sg{};
+	std::array<uint32_t, CHANNEL_COUNT> tx_mode{};
 	uint32_t tx_gpio_enable   = 0;
-	uint32_t tx_mode          = 0;
 	uint32_t rx_gpio_enable   = 0;
 	uint32_t rx_insert_count  = 0;
 
@@ -47,6 +47,7 @@ public:
 	std::array<bool, TARGET_COUNT> imitator_target_dn_en{};
 	std::array<bool, CHANNEL_COUNT> imitator_channels_en{};
 	std::array<uint32_t, CHANNEL_COUNT> imitator_start_delay{};
+	std::array<uint32_t, CHANNEL_COUNT> imitator_start_delay_tx_mode{};
 
 	using Signal                = std::array<uint8_t, SAMPLE_COUNT>;
 	using ComplexSignal         = std::array<std::complex<int16_t>, SAMPLE_COUNT>;
