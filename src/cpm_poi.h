@@ -297,6 +297,10 @@ public:
 			axi_dsp_configure();
 			axi_dsp_set_expect_u220_del(rx_insert_count);
 			axu_ip_version = axi_dsp_get_ip_ver();
+			for (uint32_t i = 0; i < 8; ++i) {
+				axi_dsp_set_band_stop_edges(i, {0, 39, 40, 140});
+				// axi_dsp_set_band_stop_edges(i, {0, 0, 0, 0});
+			}
 			axi_dsp_apply();
 		}
 

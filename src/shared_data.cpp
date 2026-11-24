@@ -560,7 +560,10 @@ void GlobalData::process_kt_pac(const uint32_t * buffer) {
 		}
 		words             = pending_tk.words;
 		pending_tk.active = false;
-		// axi_dsp_set_output_source(0, 0, 0, 0);
+		// cpm_poi.skip_dma_transaction.store(true);
+		axi_dsp_set_output_source(0, 0, 0, 0);
+		axi_dsp_apply();		
+		// cpm_poi.skip_dma_transaction.store(false);
 	}
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
 	ans.setData(buffer, words);
@@ -690,8 +693,10 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		pending_tk.active =
 			msg.reg_takt == 1 && msg.kt != rls::TP_WORK && pending_tk.words > 0 && pending_tk.words <= BUFFER_SIZE / sizeof(uint32_t);
 
+		// cpm_poi.skip_dma_transaction.store(true);
 		axi_dsp_set_output_source(pending_tk.kt, 0, pending_tk.nkan, pending_tk.rg);
 		axi_dsp_apply();
+		// cpm_poi.skip_dma_transaction.store(false);
 	} else {
 		std::lock_guard<std::mutex> lock(pending_tk_mutex);
 
