@@ -258,9 +258,9 @@ void MiniConfig::load_settings() {
 		target_velocity_min = tv_min;
 		target_velocity_max = tv_max;
 	}
-	adc_noise_level = get_uint("log", "adc_noise_level");
-	fap_ref_level   = get_uint("log", "fap_ref_level");
-	fap_tx_level    = get_uint("log", "fap_tx_level");
+	adc_noise_level = get_uint("dsp", "adc_noise_level");
+	fap_ref_level   = get_uint("dsp", "fap_ref_level");
+	fap_tx_level    = get_uint("dsp", "fap_tx_level");
 }
 
 void MiniConfig::load_signal(const std::string & filename, ChannelSignals & signals) {
