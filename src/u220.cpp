@@ -381,16 +381,20 @@ uhd::rx_metadata_t::error_code_t U220::receive(const int active_buffer_idx) {
 	entry.pre_recv_ns                = elapsed_ns(function_start, uhd_start);
 
 	const size_t samples_per_channel = rx_stream->recv(rx_buffer_ptrs[active_buffer_idx], board_config.rx_spb, rx_metadata, rx_timeout);
-	rx_samples                       = samples_per_channel;
+	if (rx_metadata.error_code == uhd::rx_metadata_t::ERROR_CODE_ALIGNMENT) {
+		piCout << "RX ALIGNMENT ERROR:" << serial;
+	}
 
-	const auto recv_end              = Clock::now();
+	rx_samples             = samples_per_channel;
 
-	entry.uhd_recv_ns                = elapsed_ns(uhd_start, recv_end);
+	const auto recv_end    = Clock::now();
 
-	const uint64_t recv_us           = std::chrono::duration_cast<std::chrono::microseconds>(recv_end - recv_start).count();
+	entry.uhd_recv_ns      = elapsed_ns(uhd_start, recv_end);
 
-	previous_recv_end                = recv_end;
-	have_previous_recv               = true;
+	const uint64_t recv_us = std::chrono::duration_cast<std::chrono::microseconds>(recv_end - recv_start).count();
+
+	previous_recv_end      = recv_end;
+	have_previous_recv     = true;
 
 	// ------------------------------------------------------------
 	// 3. Время последнего принятого отсчёта
