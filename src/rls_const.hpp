@@ -18,10 +18,10 @@ inline constexpr size_t FFT_SIZE                = 512;
 inline constexpr size_t FFT_HALF_SIZE           = FFT_SIZE / 2;
 
 // Параметры сигнала
-inline constexpr size_t TX_LEN_NEAR             = 40;
-inline constexpr size_t TX_LEN_FAR              = 6;
-inline constexpr size_t RX_LEN_NEAR             = 101;
-inline constexpr size_t RX_LEN_FAR              = 40;
+inline constexpr size_t TX_LEN_FAR              = 40;
+inline constexpr size_t TX_LEN_NEAR             = 6;
+inline constexpr size_t RX_LEN_FAR              = 101;
+inline constexpr size_t RX_LEN_NEAR             = 40;
 
 // Углы места для диаграмм
 inline constexpr std::array<float, 8> UM_VALUES = {
@@ -40,9 +40,9 @@ inline constexpr double WAVELENGTH    = LIGHT_SPEED / CARRIER_FREQUENCY;
 inline constexpr double VELOCITY_STEP = WAVELENGTH / PULSE_PERIOD / FFT_SIZE / 2.0;
 
 inline constexpr double range_index_to_meters(size_t index) {
-	const bool near        = index < RX_LEN_NEAR;
-	const size_t range_idx = near ? index : index - RX_LEN_NEAR;
-	const size_t tx_len    = near ? TX_LEN_NEAR : TX_LEN_FAR;
+	const bool far        = index < RX_LEN_FAR;
+	const size_t range_idx = far ? index : index - RX_LEN_FAR;
+	const size_t tx_len    = far ? TX_LEN_FAR : TX_LEN_NEAR;
 	return (range_idx + tx_len / 2.0) * LIGHT_SPEED / (2.0 * SAMPLE_RATE);
 }
 
