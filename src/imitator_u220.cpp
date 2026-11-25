@@ -29,7 +29,8 @@ std::complex<int16_t> ImitatorU220::calc_amplitude(double distance_m, size_t cha
 	const double um        = um_deg * deg2rad;
 	const double rcs       = attenuation_to_rcs(attenuation_db);
 	distance_m             = 1e3;
-	const double magnitude = ENERGY_CONST * std::sqrt(rcs) * std::cos(um) / (distance_m * distance_m);
+	// const double magnitude = ENERGY_CONST * std::sqrt(rcs) * std::cos(um) / (distance_m * distance_m);
+	const double magnitude = std::pow(10.0, -attenuation_db / 20.0);
 	const double phase     = (2.0 * M_PI / LAMBDA) * (-(N_CHANNELS - 1) / 2.0 + static_cast<double>(channel)) * ANT_DIST * std::sin(um);
 	const std::complex<double> gain = magnitude * std::exp(std::complex<double>(0.0, phase));
 
@@ -42,7 +43,16 @@ std::complex<int16_t> ImitatorU220::calc_amplitude(double distance_m, size_t cha
         return static_cast<int16_t>(std::lround(scaled));
 	};
 
-	return {to_q14(gain.real()), to_q14(gain.imag())};
+	const auto to_q11               = [](double component) -> int16_t {
+        const double scaled = component * 2048;
+
+        if (scaled <= -2048.0) return -2048;
+        if (scaled >= 2047.0) return 2047;
+
+        return static_cast<int16_t>(std::lround(scaled));
+	};
+
+	return {to_q11(gain.real()), to_q11(gain.imag())};
 }
 
 void ImitatorU220::set_distance(const std::array<double, 4> & target_dist) {

@@ -110,7 +110,7 @@ void U220Group::setup_one_board(size_t i) {
 			u->set_tx_dac_sg(channel, cfg_.tx_dac_sg[ch]);
 		}
 		u->set_tx_complex_gain(channel, cfg_.complex_gains[ch]);
-		u->set_tx_fap_val(channel, {1535, 0});
+		u->set_tx_fap_val(channel, {1575 << 3, 0});
 		u->set_rx_playback_correction(channel, cfg_.complex_corrections[ch]);
 		const uint8_t mask = cfg_.imitator_channels_en[ch] ? enable_mask : uint8_t{0};
 		u->set_rx_playback_enable(channel, mask);
