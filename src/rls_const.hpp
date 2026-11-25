@@ -40,10 +40,10 @@ inline constexpr double WAVELENGTH    = LIGHT_SPEED / CARRIER_FREQUENCY;
 inline constexpr double VELOCITY_STEP = WAVELENGTH / PULSE_PERIOD / FFT_SIZE / 2.0;
 
 inline constexpr double range_index_to_meters(size_t index) {
-	const bool far        = index < RX_LEN_FAR;
+	const bool far         = index < RX_LEN_FAR;
 	const size_t range_idx = far ? index : index - RX_LEN_FAR;
 	const size_t tx_len    = far ? TX_LEN_FAR : TX_LEN_NEAR;
-	return (range_idx + tx_len / 2.0) * LIGHT_SPEED / (2.0 * SAMPLE_RATE);
+	return (range_idx + 1 + tx_len / 2.0) * LIGHT_SPEED / (2.0 * SAMPLE_RATE);
 }
 
 inline constexpr double freq_index_to_velocity(size_t index) {

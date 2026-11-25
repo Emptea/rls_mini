@@ -523,6 +523,11 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 
 		for (size_t i = 0; i < nes; i++) {
 			const auto & f = pac->formulars[i];
+			auto range_idx = f.range;
+			if (range_idx < 13 && range_idx > 130) {
+				continue;
+			}
+
 			struct target targ {};
 			targ.n      = cpm_poi.target_idx++;
 			targ.time   = cpm_rr.get_compensated_time();
@@ -531,7 +536,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 			auto um_idx = f.main_diagram_number;
 			// targ.um        = (double)111packet.main_amplitude / (double)packet.neighbor_amplitude;
 			targ.um     = rls::UM_VALUES[um_idx];
-			targ.d      = rls::range_index_to_meters(f.range) + cpm_rr.get_dd_poi();
+			targ.d      = rls::range_index_to_meters(range_idx) + cpm_rr.get_dd_poi();
 			targ.porog  = f.rank_out * cpm_poi.get_apu_k1();
 			targ.amp    = (double)f.main_amplitude;
 			targ.vr     = rls::freq_index_to_velocity(f.frequency_channel);
@@ -562,7 +567,7 @@ void GlobalData::process_kt_pac(const uint32_t * buffer) {
 		pending_tk.active = false;
 		// cpm_poi.skip_dma_transaction.store(true);
 		axi_dsp_set_output_source(0, 0, 0, 0);
-		axi_dsp_apply();		
+		axi_dsp_apply();
 		// cpm_poi.skip_dma_transaction.store(false);
 	}
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
