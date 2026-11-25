@@ -62,6 +62,9 @@ public:
 
 	double target_velocity_min = 2.05;
 	double target_velocity_max = 51.27;
+	uint32_t adc_noise_level   = 10;
+	uint32_t fap_ref_level     = 1575;
+	uint32_t fap_tx_level      = 12600;
 
 private:
 	using Section    = std::map<std::string, std::string>;

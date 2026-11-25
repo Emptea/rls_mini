@@ -48,7 +48,7 @@ GlobalData::GlobalData()
 	, u220_group(cfg)
 	, imitator_u220(u220_group)
 	, cpm_rr(techlaser, imitator_u220, u220_group)
-	, cpm_poi(cfg.dma_enabled)
+	, cpm_poi(cfg.dma_enabled, cfg.fap_ref_level, cfg.adc_noise_level)
 	, cpm_cit(imitator_u220) {
 	main_config                    = PIValueTreeConversions::fromTextFile("rls_mini.conf");
 	PIVector<PIString> serial_list = uhd_utils.get_serials_list();
@@ -845,10 +845,10 @@ void GlobalData::send_KTA_VO(struct target targ) {
 
 void GlobalData::send_PI(const rls::range_packet & range_pac, float targ_az) {
 	Protocol_RLS_Mini::PI pi;
-	pi.setDegreesAzTek(cpm_rr.get_current_az());
+	pi.setDegreesAzTek(targ_az);
 	pi.setSeconds(cpm_rr.get_compensated_time());
 	pi.setDegreesAz(targ_az);
-	pi.setZona(cpm_poi.get_zona_val());
+	pi.zona             = cpm_poi.get_zona_val_db();
 	pi.nes              = range_pac.n_ranges;
 	PIByteArray data    = piSerialize(pi);
 	const size_t offset = data.size();
@@ -872,8 +872,8 @@ Protocol_RLS_Mini::PI GlobalData::set_PI() {
 	pi.setDegreesAzTek(cpm_rr.get_current_az());
 	pi.setSeconds(cpm_rr.get_compensated_time());
 	pi.setDegreesAz(cpm_rr.get_compensated_az());
-	pi.setZona(cpm_poi.get_zona_val());
-	pi.nes = cpm_poi.nes.count;
+	pi.zona = cpm_poi.get_zona_val_db();
+	pi.nes  = cpm_poi.nes.count;
 	return pi;
 }
 

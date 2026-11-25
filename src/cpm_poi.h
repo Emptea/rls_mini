@@ -3,6 +3,7 @@
 #include "../rls_fpga/rls.hpp"
 #include "axi_dsp.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
@@ -99,7 +100,15 @@ public:
 	uint16_t target_idx = 0;
 	std::atomic<bool> skip_dma_transaction{false};
 
-	explicit CpmPoi(bool dma_enabled): dma_enabled(dma_enabled) {}
+	explicit CpmPoi(bool dma_enabled, uint32_t fap_ref_level, uint32_t adc_noise_level)
+		: dma_enabled(dma_enabled)
+		, fap_ref_level(fap_ref_level) {
+		if (adc_noise_level == 0) {
+			adc_noise_level = 10;
+		}
+
+		zona_max_val_db = 3000.0 + 50.0 * 20.0 * std::log10(adc_noise_level);
+	}
 
 	// SDC — селекция движущихся целей
 	Sdc get_sdc() const {
@@ -165,7 +174,7 @@ public:
 		apu_k2 = k2;
 		if (!dma_enabled) return;
 		axi_dsp_set_median_detector_coef(apu_k1);
-		axi_dsp_set_cfar_level(apu_k2);
+		axi_dsp_set_cfar_level(0);
 		axi_dsp_apply();
 	}
 
@@ -190,7 +199,12 @@ public:
 		} break;
 		}
 	}
-	uint32_t get_zona_val() const { return zona_val_sq; }
+
+	uint16_t get_zona_val_db() const {
+		if (zona_val_sq == 0) return 65535;
+		const auto z = std::lround(zona_max_val_db - 500.0 * std::log10(zona_val_sq));
+		return static_cast<uint16_t>(std::clamp(z, 0L, 65535L));
+	}
 
 	// ISPR_KAN — исправность приёмных каналов
 	// Целое без знака, 0–255
@@ -232,10 +246,10 @@ public:
 		axi_dsp_set_compensation_mode(1);
 		axi_dsp_set_channel_mask(kan, ~ispr_kan);
 		axi_dsp_set_output_source(0, 0, 0, 0);
-		axi_dsp_set_compensation_ref(uint32_t(1575));
+		axi_dsp_set_compensation_ref(fap_ref_level);
 		axi_dsp_set_motion_selector(poi_sdc.bz, poi_sdc.dz, 1);
 		axi_dsp_set_median_detector_coef(apu_k1);
-		axi_dsp_set_cfar_level(apu_k2);
+		axi_dsp_set_cfar_level(0);
 		apply_frequency_selection();
 		axi_dsp_apply();
 		skip_dma_transaction.store(false);
@@ -321,6 +335,7 @@ private:
 
 	double target_velocity_min = 2.05;
 	double target_velocity_max = 51.27;
+	uint32_t fap_ref_level     = 1575;
 	std::array<uint32_t, N / 32> config_frequency_mask{};
 
 	uint16_t dsa_vr_n        = 0;
@@ -333,6 +348,7 @@ private:
 	ZoneCalcStage zona_stage = ZoneCalcStage::BeforeLou;
 	uint16_t zona_ch_num     = 0;
 	uint32_t zona_val_sq     = 1;
+	double zona_max_val_db   = 4000;
 
 	mutable std::mutex status_mutex;
 	Status status;

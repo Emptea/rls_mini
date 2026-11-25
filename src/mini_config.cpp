@@ -249,14 +249,16 @@ void MiniConfig::load_settings() {
 	auto tv_min = get_double("dsp", "target_velocity_min");
 	auto tv_max = get_double("dsp", "target_velocity_max");
 
-	if (target_velocity_min < 0 || target_velocity_max < target_velocity_min) {
-		throw std::runtime_error("Invalid DSP target velocity range");
+	if (tv_min < 0 || tv_max < tv_min) {
 		target_velocity_min = 2.05;
-		target_velocity_min = 51.27;
+		target_velocity_max = 51.27;
 	} else {
 		target_velocity_min = tv_min;
 		target_velocity_max = tv_max;
 	}
+	adc_noise_level = get_uint("log", "adc_noise_level");
+	fap_ref_level   = get_uint("log", "fap_ref_level");
+	fap_tx_level    = get_uint("log", "fap_tx_level");
 }
 
 void MiniConfig::load_signal(const std::string & filename, ChannelSignals & signals) {
