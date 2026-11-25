@@ -268,6 +268,10 @@ public:
 		return fap_pr_pending;
 	}
 
+	uint32_t get_fap_test() const { return fap_test.load(); }
+
+	void set_fap_test(uint32_t test) { fap_test.store(test); }
+
 	std::array<std::complex<float>, 8> get_fap_pr_coeffs() const {
 		std::lock_guard<std::mutex> lock(fap_pr_mutex);
 		return fap_pr_coeffs;
@@ -300,9 +304,16 @@ public:
 		axi_dsp_apply();
 	}
 
-	void init(bool dma, uint8_t ispr, double velocity_min, double velocity_max, uint32_t u220_ip_version, uint32_t rx_insert_count) {
-		dma_enabled = dma;
-		ispr_kan    = ispr;
+	void init(bool dma,
+	          uint8_t ispr,
+	          double velocity_min,
+	          double velocity_max,
+	          uint32_t u220_ip_version,
+	          uint32_t rx_insert_count,
+	          const std::array<std::complex<float>, 8> & fap_coeffs) {
+		dma_enabled   = dma;
+		ispr_kan      = ispr;
+		fap_pr_coeffs = fap_coeffs;
 
 		csr_ip_ver_t axu_ip_version{};
 
@@ -313,6 +324,8 @@ public:
 			axu_ip_version = axi_dsp_get_ip_ver();
 			for (uint32_t i = 0; i < 8; ++i) {
 				axi_dsp_set_band_stop_edges(i, {0, 39, 40, 140});
+				cmplx_f64 c = {.real = fap_coeffs[i].real(), .imag = fap_coeffs[i].imag()};
+				axi_dsp_set_manual_compensation(c, i);
 				// axi_dsp_set_band_stop_edges(i, {0, 0, 0, 0});
 			}
 			axi_dsp_apply();
@@ -354,6 +367,7 @@ private:
 	Status status;
 
 	bool fap_pr_pending = false;
+	std::atomic<uint32_t> fap_test{0};
 	mutable std::mutex fap_pr_mutex;
 	std::array<std::complex<float>, 8> fap_pr_coeffs = [] {
 		std::array<std::complex<float>, 8> coeffs;

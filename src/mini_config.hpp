@@ -15,12 +15,13 @@ public:
 	static constexpr size_t TARGET_COUNT  = 4;
 
 	explicit MiniConfig();
-	void load_coeffs(const std::string & filename);
+	void load_tx_coeffs(const std::string & filename);
+	void load_fap_coeffs(const std::string & filename);
+	void save_fap_coeffs(std::array<float, 8> amplitudes, std::array<float, 8> phases) const;
 
-	std::array<double, CHANNEL_COUNT> amplitudes{};
-	std::array<double, CHANNEL_COUNT> phases{};
-	std::vector<std::complex<int16_t>> complex_gains;
-	std::vector<std::complex<int32_t>> complex_corrections;
+	std::vector<std::complex<int16_t>> complex_tx_gains;
+	std::array<std::complex<float>, 8> complex_fap_gains;
+	std::vector<std::complex<int32_t>> complex_imitator_corrections;
 
 	std::array<uint32_t, CHANNEL_COUNT> tx_dac_delay{};
 	std::array<uint32_t, CHANNEL_COUNT> tx_gpio_delay{};

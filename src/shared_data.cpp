@@ -115,7 +115,13 @@ void GlobalData::init() {
 
 	u220_group.setup();
 	const auto u220_ip_version = u220_group.fpga(u220_group.active_boards()[0])->get_fpga_version();
-	cpm_poi.init(cfg.dma_enabled, ispr_kan, cfg.target_velocity_min, cfg.target_velocity_max, u220_ip_version, cfg.rx_insert_count);
+	cpm_poi.init(cfg.dma_enabled,
+	             ispr_kan,
+	             cfg.target_velocity_min,
+	             cfg.target_velocity_max,
+	             u220_ip_version,
+	             cfg.rx_insert_count,
+	             cfg.complex_fap_gains);
 
 	u220_group.sync_ad9361();
 	// нужна задержка чтобы pps сбросился иначе в reset_time не сработает
@@ -509,8 +515,13 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 
 	const auto * pac = reinterpret_cast<const rls::work_packet *>(buffer);
 	cpm_poi.set_zona_val(pac->nf);
+	auto prev_coeffs = cpm_poi.get_fap_pr_coeffs();
 	if (cpm_poi.set_fap_pr_coeffs(pac->cf)) {
-		global->sendMessage(set_FAP_PR_KVIT());
+		if (cpm_poi.get_fap_test()) {
+			global->sendMessage(set_FAP_PR_KVIT(prev_coeffs));
+		} else {
+			global->sendMessage(set_FAP_PR_KVIT());
+		}
 	}
 	auto nes              = pac->posthdr.n_formulars;
 	size_t packet_number  = pac->hdr.packet_number;
@@ -785,6 +796,23 @@ void GlobalData::received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI &
 	global->sendMessage(ans);
 }
 
+Protocol_RLS_Mini::FAP_PR_KVIT GlobalData::set_FAP_PR_KVIT(const std::array<complexf, 8UL> & prev_coeffs) {
+	Protocol_RLS_Mini::FAP_PR_KVIT kvit;
+	const auto & coeffs         = cpm_poi.get_fap_pr_coeffs();
+	constexpr double rad_to_deg = 180.0 / 3.14159265358979323846;
+	for (size_t i = 0; i < coeffs.size(); ++i) {
+		if (std::abs(prev_coeffs[i]) == 0.0f || std::abs(coeffs[i]) == 0.0f) {
+			continue;
+		}
+		auto ith_coeff = coeffs[i] / prev_coeffs[i];
+		kvit.channels[i].setDegrees(std::arg(ith_coeff) * rad_to_deg);
+		kvit.channels[i].setDb(20.0 * std::log10(std::abs(ith_coeff)));
+	}
+	cpm_poi.set_fap_pr_coeffs(prev_coeffs);
+	kvit.test = 1;
+	return kvit;
+}
+
 Protocol_RLS_Mini::FAP_PR_KVIT GlobalData::set_FAP_PR_KVIT() {
 	Protocol_RLS_Mini::FAP_PR_KVIT kvit;
 	const auto & coeffs         = cpm_poi.get_fap_pr_coeffs();
@@ -793,6 +821,7 @@ Protocol_RLS_Mini::FAP_PR_KVIT GlobalData::set_FAP_PR_KVIT() {
 		kvit.channels[i].setDegrees(std::arg(coeffs[i]) * rad_to_deg);
 		kvit.channels[i].setDb(20.0 * std::log10(std::abs(coeffs[i])));
 	}
+	kvit.test = 0;
 	return kvit;
 }
 
@@ -809,6 +838,12 @@ void GlobalData::received_FAP_PR_KU(const Protocol_RLS_Mini::FAP_PR_KU & msg) {
 void GlobalData::received_FAP_PR_TEST(const Protocol_RLS_Mini::FAP_PR_TEST & msg) {
 	log_cpm_msg(__func__, msg);
 	if (msg.msg_code != 2 && msg.msg_code != 3) return;
+	if (msg.msg_code == 2) {
+		cpm_poi.set_fap_test(1);
+		cpm_poi.start_fap_pr();
+	} else {
+		cpm_poi.set_fap_test(0);
+	}
 
 	// TODO: включить или выключить режим проверки фазирования ПР.
 	// При включении отправить FAP_PR_KVIT с TEST=1
@@ -820,13 +855,18 @@ void GlobalData::received_FAP_PR_TEST(const Protocol_RLS_Mini::FAP_PR_TEST & msg
 void GlobalData::received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg) {
 	log_cpm_msg(__func__, msg);
 	std::array<std::complex<float>, 8> coeffs;
+	std::array<float, 8> phases, amplitudes;
 	constexpr float deg_to_rad = 3.14159265358979323846f / 180.0f;
 	for (size_t i = 0; i < coeffs.size(); ++i) {
-		const float phase     = msg.channels[i].getDegrees() * deg_to_rad;
-		const float amplitude = std::pow(10.0f, msg.channels[i].getDb() / 20.0f);
-		coeffs[i]             = std::polar(amplitude, phase);
+		phases[i]     = msg.channels[i].getDegrees();
+		amplitudes[i] = std::pow(10.0f, msg.channels[i].getDb() / 20.0f);
+		coeffs[i]     = std::polar(amplitudes[i], phases[i]  * deg_to_rad);
 	}
 	cpm_poi.set_fap_pr_coeffs(coeffs);
+	u220_group.set_rx_playback_correction(coeffs);
+	if (msg.save) {
+		cfg.save_fap_coeffs(amplitudes, phases);
+	}
 	global->sendMessage(set_FAP_PR_KVIT());
 }
 

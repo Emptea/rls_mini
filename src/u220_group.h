@@ -40,6 +40,7 @@ public:
 	void set_play_gpio_tx_enable(bool enable);
 	bool get_play_gain_on_enable() const;
 	void set_play_gain_on_enable(bool enable);
+	void set_rx_playback_correction(const std::array<std::complex<float>, 8> & coeffs);
 	void reset_time(uint32_t value);
 	void sync_ad9361();
 	std::chrono::steady_clock::time_point to_host_time(double usrp_sec) const { return time_synchronizer_.to_host(usrp_sec); }

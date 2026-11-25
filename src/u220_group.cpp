@@ -109,9 +109,9 @@ void U220Group::setup_one_board(size_t i) {
 		if (cfg_.use_ext_file_sg[ch]) {
 			u->set_tx_dac_sg(channel, cfg_.tx_dac_sg[ch]);
 		}
-		u->set_tx_complex_gain(channel, cfg_.complex_gains[ch]);
+		u->set_tx_complex_gain(channel, cfg_.complex_tx_gains[ch]);
 		u->set_tx_fap_val(channel, {static_cast<int16_t>(cfg_.fap_tx_level), 0});
-		u->set_rx_playback_correction(channel, cfg_.complex_corrections[ch]);
+		u->set_rx_playback_correction(channel, cfg_.complex_imitator_corrections[ch]);
 		const uint8_t mask = cfg_.imitator_channels_en[ch] ? enable_mask : uint8_t{0};
 		u->set_rx_playback_enable(channel, mask);
 	}
@@ -120,6 +120,18 @@ void U220Group::setup_one_board(size_t i) {
 	u->set_rx_playback_start_delay(imitator_start_delay_ch0, imitator_start_delay_ch1);
 }
 
+void U220Group::set_rx_playback_correction(const std::array<std::complex<float>, 8> & coeffs) {
+	for (size_t i: active_boards_) {
+		for (size_t channel = 0; channel < 2; ++channel) {
+			const size_t ch = i * 2 + channel;
+			const std::complex<float> correction_float = 1.0f / coeffs[ch];
+			const std::complex<int32_t> correction =  {static_cast<int32_t>(std::round((1 << 14) * correction_float.real())),
+		                                static_cast<int32_t>(std::round((1 << 14) * correction_float.imag()))};
+										
+			fpga_[i]->set_rx_playback_correction(channel, correction);
+		}
+	}
+}
 void U220Group::reset_time(uint32_t value) {
 	for (size_t i: active_boards_) {
 		fpga_[i]->reset_time(value);
