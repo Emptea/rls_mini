@@ -524,7 +524,7 @@ void GlobalData::process_work_pac(const uint32_t * buffer) {
 		for (size_t i = 0; i < nes; i++) {
 			const auto & f = pac->formulars[i];
 			auto range_idx = f.range;
-			if (range_idx < 13 && range_idx > 130) {
+			if (range_idx < 13 || range_idx > 130) {
 				continue;
 			}
 
