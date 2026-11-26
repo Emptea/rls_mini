@@ -18,11 +18,16 @@ public:
 	bool start(const std::string & directory = "logs");
 	void stop();
 
-	void write(const rls::header & hdr);
+	void write(const log_entry & entry);
 
 	uint64_t get_dropped() const { return dropped.load(); }
 
 	~AxuHeaderLogger();
+
+	struct log_entry {
+		rls::header hdr;
+		rls::compens_formular cf;
+	};
 
 private:
 	using Record                           = std::array<uint32_t, 6>;

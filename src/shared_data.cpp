@@ -487,7 +487,13 @@ void GlobalData::process_rx_buffers_dma() {
 		const auto * buffer = info.buffer;
 		const auto * hdr    = reinterpret_cast<const rls::header *>(buffer);
 		if (cfg.log_axu_hdr) {
-			axu_header_logger.write(*hdr);
+			AxuHeaderLogger::log_entry entry{};
+			entry.hdr = *hdr;
+			if (hdr->tp == rls::TP_WORK){
+				const auto * pac = reinterpret_cast<const rls::work_packet *>(buffer);
+				entry.cf = pac->cf;
+			}
+			axu_header_logger.write(entry);
 		}
 		static size_t last_packet_number = 0;
 		size_t cur_packet_number         = hdr->packet_number;

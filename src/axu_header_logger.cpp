@@ -53,11 +53,11 @@ bool AxuHeaderLogger::start(const std::string & directory) {
 	return true;
 }
 
-void AxuHeaderLogger::write(const rls::header & hdr) {
-	static_assert(sizeof(rls::header) == 24, "Unexpected RX header size");
+void AxuHeaderLogger::write(const log_entry & entry) {
+	// static_assert(sizeof(log_entry) == 24, "Unexpected RX header size");
 
 	Record record;
-	std::memcpy(record.data(), &hdr, sizeof(hdr));
+	std::memcpy(record.data(), &entry, sizeof(entry));
 
 	{
 		std::lock_guard<std::mutex> lock(mutex);
