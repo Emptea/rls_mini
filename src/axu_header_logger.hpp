@@ -9,12 +9,15 @@
 #include <string>
 #include <thread>
 
-namespace rls {
-struct header;
-}
+#include "../rls_fpga/rls.hpp"
 
 class AxuHeaderLogger {
 public:
+	struct log_entry {
+		rls::header hdr;
+		rls::compens_formular cf;
+	};
+
 	bool start(const std::string & directory = "logs");
 	void stop();
 
@@ -24,13 +27,9 @@ public:
 
 	~AxuHeaderLogger();
 
-	struct log_entry {
-		rls::header hdr;
-		rls::compens_formular cf;
-	};
 
 private:
-	using Record                           = std::array<uint32_t, 6>;
+	using Record                           = std::array<uint32_t, sizeof(log_entry) / sizeof (uint32_t)>;
 
 	static constexpr size_t MAX_QUEUE_SIZE = 16384;
 

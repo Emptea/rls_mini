@@ -126,7 +126,7 @@ void AxuHeaderLogger::worker_loop() {
 void AxuHeaderLogger::write_record(const Record & record) {
 	static constexpr char HEX[] = "0123456789ABCDEF";
 
-	char line[66];
+	char line[std::tuple_size<Record>::value * 11];
 	size_t pos = 0;
 
 	for (const uint32_t word: record) {
@@ -140,5 +140,5 @@ void AxuHeaderLogger::write_record(const Record & record) {
 		line[pos++] = '\n';
 	}
 
-	file.write(line, sizeof(line));
+	file.write(line, pos);
 }
