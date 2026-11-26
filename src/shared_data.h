@@ -94,7 +94,8 @@ public:
 	Protocol_RLS_Mini::FAP_PR_KVIT set_FAP_PR_KVIT(const std::array<complexf, 8UL> & prev_coeffs);
 	void received_FAP_PR_ZAPROS(const Protocol_RLS_Mini::FAP_PR_ZAPROS & msg);
 	void received_FAP_PR_KU(const Protocol_RLS_Mini::FAP_PR_KU & msg);
-	void received_FAP_PR_TEST(const Protocol_RLS_Mini::FAP_PR_TEST & msg);
+	void received_FAP_PR_START_TEST(const Protocol_RLS_Mini::FAP_PR_START_TEST & msg);
+	void received_FAP_PR_STOP_TEST(const Protocol_RLS_Mini::FAP_PR_STOP_TEST & msg);
 	void received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg);
 
 	Protocol_RLS_Mini::PI set_PI();

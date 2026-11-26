@@ -122,7 +122,8 @@ void GlobalDataEth::receivedRLS(PIByteArray data, int port) {
 	RLS_TRY_PARSE(CIT_KU        );
 	RLS_TRY_PARSE(FAP_PR_ZAPROS );
 	RLS_TRY_PARSE(FAP_PR_KU     );
-	RLS_TRY_PARSE(FAP_PR_TEST   );
+	RLS_TRY_PARSE(FAP_PR_START_TEST   );
+	RLS_TRY_PARSE(FAP_PR_STOP_TEST   );
 	RLS_TRY_PARSE(FAP_PR_POPR   );
 	// RLS_TRY_PARSE(TRVO          );
 	// RLS_TRY_PARSE(TRETA         );

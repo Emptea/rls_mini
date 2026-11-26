@@ -835,21 +835,16 @@ void GlobalData::received_FAP_PR_KU(const Protocol_RLS_Mini::FAP_PR_KU & msg) {
 	cpm_poi.start_fap_pr();
 }
 
-void GlobalData::received_FAP_PR_TEST(const Protocol_RLS_Mini::FAP_PR_TEST & msg) {
+void GlobalData::received_FAP_PR_START_TEST(const Protocol_RLS_Mini::FAP_PR_START_TEST & msg) {
 	log_cpm_msg(__func__, msg);
-	if (msg.msg_code != 2 && msg.msg_code != 3) return;
-	if (msg.msg_code == 2) {
-		cpm_poi.set_fap_test(1);
-		cpm_poi.start_fap_pr();
-	} else {
-		cpm_poi.set_fap_test(0);
-	}
+	cpm_poi.set_fap_test(1);
+	cpm_poi.start_fap_pr();
+}
 
-	// TODO: включить или выключить режим проверки фазирования ПР.
-	// При включении отправить FAP_PR_KVIT с TEST=1
-	// и рассчитанными проверочными значениями.
-	// При выключении восстановить текущие поправки
-	// и отправить FAP_PR_KVIT с TEST=0.
+void GlobalData::received_FAP_PR_STOP_TEST(const Protocol_RLS_Mini::FAP_PR_STOP_TEST & msg) {
+	log_cpm_msg(__func__, msg);
+	cpm_poi.set_fap_test(0);
+	global->sendMessage(set_FAP_PR_KVIT());
 }
 
 void GlobalData::received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg) {

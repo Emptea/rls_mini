@@ -305,12 +305,20 @@ public:
 		FAP_PR_KU(): Header(Type, Code) {}
 	};
 
-	struct FAP_PR_TEST: public Header PIMETA(dest=poi, port=5101, no-stream) {
+	struct FAP_PR_START_TEST: public Header PIMETA(dest=poi, port=5101, no-stream) {
 		static constexpr int16_t Port = 5101;
 		static constexpr int16_t Type = 13;
 		static constexpr int16_t Code = 2;
-		FAP_PR_TEST(uint8_t code = Code): Header(Type, code) {} // 2 - начать проверку, 3 - завершить проверку
+		FAP_PR_START_TEST(): Header(Type, Code) {} // 2 - начать проверку, 3 - завершить проверку
 	};
+
+	struct FAP_PR_STOP_TEST: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 3;
+		FAP_PR_STOP_TEST(): Header(Type, Code) {} // 2 - начать проверку, 3 - завершить проверку
+	};
+
 
 	struct FAP_PR_Correction PIMETA(no-stream) {
 		int16_t f = 0; // Поправка фазы, 0.01 град
@@ -1074,7 +1082,11 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_KU & v) {
 	return out;
 }
 
-inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_TEST & v) {
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_START_TEST & v) {
+	return out << "code:" << int(v.msg_code);
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_STOP_TEST & v) {
 	return out << "code:" << int(v.msg_code);
 }
 
