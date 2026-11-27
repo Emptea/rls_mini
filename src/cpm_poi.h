@@ -310,7 +310,8 @@ public:
 	          double velocity_max,
 	          uint32_t u220_ip_version,
 	          uint32_t rx_insert_count,
-	          const std::array<std::complex<float>, 8> & fap_coeffs) {
+	          const std::array<std::complex<float>, 8> & fap_coeffs,
+	          const std::array<const cmplx_f64 *, 8> & lou_coeffs) {
 		dma_enabled   = dma;
 		ispr_kan      = ispr;
 		fap_pr_coeffs = fap_coeffs;
@@ -326,6 +327,14 @@ public:
 				axi_dsp_set_band_stop_edges(i, {0, 39, 40, 140});
 				cmplx_f64 c = {.real = fap_coeffs[i].real(), .imag = fap_coeffs[i].imag()};
 				axi_dsp_set_manual_compensation(c, i);
+				axi_dsp_set_diagram_0(lou_coeffs[0][i], i);
+				axi_dsp_set_diagram_1(lou_coeffs[1][i], i);
+				axi_dsp_set_diagram_2(lou_coeffs[2][i], i);
+				axi_dsp_set_diagram_3(lou_coeffs[3][i], i);
+				axi_dsp_set_diagram_4(lou_coeffs[4][i], i);
+				axi_dsp_set_diagram_5(lou_coeffs[5][i], i);
+				axi_dsp_set_diagram_6(lou_coeffs[6][i], i);
+				axi_dsp_set_diagram_7(lou_coeffs[7][i], i);
 				// axi_dsp_set_band_stop_edges(i, {0, 0, 0, 0});
 			}
 			axi_dsp_apply();

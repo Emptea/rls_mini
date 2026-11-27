@@ -1,5 +1,7 @@
 #pragma once
 
+#include "axi_dsp.h"
+
 #include <array>
 #include <complex>
 #include <cstddef>
@@ -66,6 +68,17 @@ public:
 	uint32_t adc_noise_level   = 10;
 	uint32_t fap_ref_level     = 1575;
 	uint32_t fap_tx_level      = 12600;
+
+	void load_lou_coeffs(const std::string & filename);
+
+	cmplx_f64 diagrams_0[8]{};
+	cmplx_f64 diagrams_1[8]{};
+	cmplx_f64 diagrams_2[8]{};
+	cmplx_f64 diagrams_3[8]{};
+	cmplx_f64 diagrams_4[8]{};
+	cmplx_f64 diagrams_5[8]{};
+	cmplx_f64 diagrams_6[8]{};
+	cmplx_f64 diagrams_7[8]{};
 
 private:
 	using Section    = std::map<std::string, std::string>;

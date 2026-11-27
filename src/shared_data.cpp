@@ -115,13 +115,15 @@ void GlobalData::init() {
 
 	u220_group.setup();
 	const auto u220_ip_version = u220_group.fpga(u220_group.active_boards()[0])->get_fpga_version();
-	cpm_poi.init(cfg.dma_enabled,
-	             ispr_kan,
-	             cfg.target_velocity_min,
-	             cfg.target_velocity_max,
-	             u220_ip_version,
-	             cfg.rx_insert_count,
-	             cfg.complex_fap_gains);
+	cpm_poi.init(
+		cfg.dma_enabled,
+		ispr_kan,
+		cfg.target_velocity_min,
+		cfg.target_velocity_max,
+		u220_ip_version,
+		cfg.rx_insert_count,
+		cfg.complex_fap_gains,
+		{cfg.diagrams_0, cfg.diagrams_1, cfg.diagrams_2, cfg.diagrams_3, cfg.diagrams_4, cfg.diagrams_5, cfg.diagrams_6, cfg.diagrams_7});
 
 	u220_group.sync_ad9361();
 	// нужна задержка чтобы pps сбросился иначе в reset_time не сработает
@@ -489,9 +491,9 @@ void GlobalData::process_rx_buffers_dma() {
 		if (cfg.log_axu_hdr) {
 			AxuHeaderLogger::log_entry entry{};
 			entry.hdr = *hdr;
-			if (hdr->tp == rls::TP_WORK){
+			if (hdr->tp == rls::TP_WORK) {
 				const auto * pac = reinterpret_cast<const rls::work_packet *>(buffer);
-				entry.cf = pac->cf;
+				entry.cf         = pac->cf;
 			}
 			axu_header_logger.write(entry);
 		}
@@ -861,7 +863,7 @@ void GlobalData::received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg
 	for (size_t i = 0; i < coeffs.size(); ++i) {
 		phases[i]     = msg.channels[i].getDegrees();
 		amplitudes[i] = std::pow(10.0f, msg.channels[i].getDb() / 20.0f);
-		coeffs[i]     = std::polar(amplitudes[i], phases[i]  * deg_to_rad);
+		coeffs[i]     = std::polar(amplitudes[i], phases[i] * deg_to_rad);
 	}
 	cpm_poi.set_fap_pr_coeffs(coeffs);
 	u220_group.set_rx_playback_correction(coeffs);

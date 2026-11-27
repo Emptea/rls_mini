@@ -15,6 +15,7 @@ MiniConfig::MiniConfig() {
 	load_imitator();
 	load_fap_coeffs("fap_coeffs.csv");
 	load_tx_coeffs("tx_coeffs.csv");
+	load_lou_coeffs("lou_coeffs_9200.csv");
 	load_signal("tx_gainon.txt", tx_gainon_sg);
 	load_signal("rx_en.txt", rx_en_sg);
 	load_complex_signal("tx_dac.txt", tx_dac_sg);
@@ -481,7 +482,6 @@ void MiniConfig::save_fap_coeffs(std::array<float, 8> amplitudes, std::array<flo
 	if (!file) throw std::runtime_error("Cannot write coefficients file: fap_coeffs.csv");
 }
 
-
 void MiniConfig::load_imitator() {
 	const auto section_it = data_.find("imitator");
 	if (section_it == data_.end()) {
@@ -547,4 +547,85 @@ void MiniConfig::load_imitator() {
 	}
 	imitator_start_delay         = get_uint_array("imitator", "start_delay");
 	imitator_start_delay_tx_mode = get_uint_array("imitator", "start_delay_tx_mode");
+}
+
+void MiniConfig::load_lou_coeffs(const std::string & filename) {
+	std::ifstream file(filename);
+	if (!file) throw std::runtime_error("Cannot open LOU coefficients file: " + filename);
+
+	std::string line;
+	if (!std::getline(file, line)) throw std::runtime_error("Missing LOU header: " + filename);
+	trim(line);
+
+	if (line != "dn_0,dn_1,dn_2,dn_3,dn_4,dn_5,dn_6,dn_7") {
+		throw std::runtime_error("Invalid LOU header: " + filename);
+	}
+
+	cmplx_f64 * diagrams[8] = {
+		diagrams_0,
+		diagrams_1,
+		diagrams_2,
+		diagrams_3,
+		diagrams_4,
+		diagrams_5,
+		diagrams_6,
+		diagrams_7
+	};
+
+	size_t channel = 0;
+
+	while (std::getline(file, line)) {
+		trim(line);
+		if (line.empty()) continue;
+
+		if (channel >= CHANNEL_COUNT) {
+			throw std::runtime_error("Too many LOU coefficient rows: " + filename);
+		}
+
+		std::stringstream ss(line);
+		std::string value;
+
+		for (size_t dn = 0; dn < 8; ++dn) {
+			if (!std::getline(ss, value, ',')) {
+				throw std::runtime_error("Not enough LOU coefficients: " + filename);
+			}
+
+			trim(value);
+
+			size_t re_pos = 0;
+			size_t im_pos = 0;
+			double re, im;
+
+			try {
+				re = std::stod(value, &re_pos);
+
+				if (re_pos >= value.size() ||
+					(value[re_pos] != '+' && value[re_pos] != '-')) {
+					throw std::runtime_error("Invalid complex value");
+				}
+
+				im = std::stod(value.substr(re_pos), &im_pos);
+			} catch (const std::exception &) {
+				throw std::runtime_error("Invalid LOU coefficient: " + value);
+			}
+
+			if (re_pos + im_pos != value.size() - 1 ||
+				value.back() != 'i' ||
+				!std::isfinite(re) || !std::isfinite(im)) {
+				throw std::runtime_error("Invalid LOU coefficient: " + value);
+			}
+
+			diagrams[dn][channel].real = re;
+			diagrams[dn][channel].imag = im;
+		}
+
+		if (std::getline(ss, value, ',') || line.back() == ',') {
+			throw std::runtime_error("Too many LOU coefficients: " + filename);
+		}
+
+		++channel;
+	}
+
+	if (file.bad()) throw std::runtime_error("Cannot read LOU coefficients file: " + filename);
+	if (channel != CHANNEL_COUNT) throw std::runtime_error("Not enough LOU coefficient rows: " + filename);
 }
