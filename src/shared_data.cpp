@@ -900,6 +900,7 @@ void GlobalData::received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg
 Protocol_RLS_Mini::GETERODIN_KVIT GlobalData::set_GETERODIN_KVIT() {
 	Protocol_RLS_Mini::GETERODIN_KVIT kvit;
 	kvit.n_geterodin = cpm_poi.get_geterodin();
+	piCout << kvit;
 	return kvit;
 }
 

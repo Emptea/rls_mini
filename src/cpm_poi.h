@@ -318,6 +318,7 @@ public:
 				axi_dsp_set_diagram_7(lou_coeffs[7][i], i);
 				// axi_dsp_set_band_stop_edges(i, {0, 0, 0, 0});
 			}
+			axi_dsp_apply();
 		}
 		n_geterodin = n_get;
 	}

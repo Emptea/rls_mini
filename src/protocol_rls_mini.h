@@ -971,6 +971,11 @@ inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_TK_Kvit & v) {
 	return out << "nw:" << v.nw << "words:";
 }
 
+// GETERODIN_KVIT
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::GETERODIN_KVIT & v) {
+	return out << "n_geterodin:" << v.n_geterodin;
+}
+
 // CIT_Zapros
 inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CIT_Zapros & v) {
 	return out;
