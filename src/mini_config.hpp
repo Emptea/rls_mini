@@ -69,16 +69,16 @@ public:
 	uint32_t fap_ref_level     = 1575;
 	uint32_t fap_tx_level      = 12600;
 
-	void load_lou_coeffs(const std::string & filename);
+	void load_lou_coeffs(const std::string & filename, uint32_t lou_idx);
 
-	cmplx_f64 diagrams_0[8]{};
-	cmplx_f64 diagrams_1[8]{};
-	cmplx_f64 diagrams_2[8]{};
-	cmplx_f64 diagrams_3[8]{};
-	cmplx_f64 diagrams_4[8]{};
-	cmplx_f64 diagrams_5[8]{};
-	cmplx_f64 diagrams_6[8]{};
-	cmplx_f64 diagrams_7[8]{};
+	cmplx_f64 diagrams_0[8][5]{};
+	cmplx_f64 diagrams_1[8][5]{};
+	cmplx_f64 diagrams_2[8][5]{};
+	cmplx_f64 diagrams_3[8][5]{};
+	cmplx_f64 diagrams_4[8][5]{};
+	cmplx_f64 diagrams_5[8][5]{};
+	cmplx_f64 diagrams_6[8][5]{};
+	cmplx_f64 diagrams_7[8][5]{};
 
 private:
 	using Section    = std::map<std::string, std::string>;

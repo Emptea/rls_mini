@@ -348,6 +348,31 @@ public:
 		FAP_PR_Correction channels[8];
 	};
 
+	// GETERODIN
+
+	struct GETERODIN_ZAPROS: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 14;
+		static constexpr int16_t Code = 0;
+		GETERODIN_ZAPROS(): Header(Type, Code) {}
+	};
+
+	struct GETERODIN_SET: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 14;
+		static constexpr int16_t Code = 1;
+		GETERODIN_SET(): Header(Type, Code) {}
+		uint16_t n_geterodin = 0; // 0-4
+	};
+
+	struct GETERODIN_KVIT: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 14;
+		static constexpr int16_t Code = 0;
+		GETERODIN_KVIT(): Header(Type, Code) {}
+		uint16_t n_geterodin = 0; // 0-4
+	};
+
 	// CIT
 
 	struct CIT_Zapros: public Header PIMETA(dest=it, port=5401, no-stream) {

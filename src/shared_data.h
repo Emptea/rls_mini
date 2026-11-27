@@ -70,8 +70,11 @@ public:
 	void processChannels();
 
 	const PIValueTree & mainConfig() const { return main_config; }
-	Protocol_RLS_Mini::RR_Kvit set_RR_Kvit();
+
+	Protocol_RLS_Mini::POI_TK_Kvit set_POI_TK_Kvit(CpmPoi::Status *status);
 	void received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg);
+
+	Protocol_RLS_Mini::RR_Kvit set_RR_Kvit();
 	void received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg);
 	void received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg);
 	void received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg);
@@ -97,6 +100,10 @@ public:
 	void received_FAP_PR_START_TEST(const Protocol_RLS_Mini::FAP_PR_START_TEST & msg);
 	void received_FAP_PR_STOP_TEST(const Protocol_RLS_Mini::FAP_PR_STOP_TEST & msg);
 	void received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg);
+
+	Protocol_RLS_Mini::GETERODIN_KVIT set_GETERODIN_KVIT();
+	void received_GETERODIN_ZAPROS(const Protocol_RLS_Mini::GETERODIN_ZAPROS & msg);
+	void received_GETERODIN_SET(const Protocol_RLS_Mini::GETERODIN_SET & msg);
 
 	Protocol_RLS_Mini::PI set_PI();
 

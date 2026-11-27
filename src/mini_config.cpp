@@ -15,7 +15,11 @@ MiniConfig::MiniConfig() {
 	load_imitator();
 	load_fap_coeffs("fap_coeffs.csv");
 	load_tx_coeffs("tx_coeffs.csv");
-	load_lou_coeffs("lou_coeffs_9200.csv");
+	load_lou_coeffs("lou_coeffs_0.csv", 0);
+	load_lou_coeffs("lou_coeffs_1.csv", 1);
+	load_lou_coeffs("lou_coeffs_2.csv", 2);
+	load_lou_coeffs("lou_coeffs_3.csv", 3);
+	load_lou_coeffs("lou_coeffs_4.csv", 4);
 	load_signal("tx_gainon.txt", tx_gainon_sg);
 	load_signal("rx_en.txt", rx_en_sg);
 	load_complex_signal("tx_dac.txt", tx_dac_sg);
@@ -549,7 +553,7 @@ void MiniConfig::load_imitator() {
 	imitator_start_delay_tx_mode = get_uint_array("imitator", "start_delay_tx_mode");
 }
 
-void MiniConfig::load_lou_coeffs(const std::string & filename) {
+void MiniConfig::load_lou_coeffs(const std::string & filename, uint32_t lou_idx) {
 	std::ifstream file(filename);
 	if (!file) throw std::runtime_error("Cannot open LOU coefficients file: " + filename);
 
@@ -562,14 +566,14 @@ void MiniConfig::load_lou_coeffs(const std::string & filename) {
 	}
 
 	cmplx_f64 * diagrams[8] = {
-		diagrams_0,
-		diagrams_1,
-		diagrams_2,
-		diagrams_3,
-		diagrams_4,
-		diagrams_5,
-		diagrams_6,
-		diagrams_7
+		diagrams_0[lou_idx],
+		diagrams_1[lou_idx],
+		diagrams_2[lou_idx],
+		diagrams_3[lou_idx],
+		diagrams_4[lou_idx],
+		diagrams_5[lou_idx],
+		diagrams_6[lou_idx],
+		diagrams_7[lou_idx]
 	};
 
 	size_t channel = 0;

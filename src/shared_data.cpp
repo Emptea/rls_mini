@@ -115,15 +115,21 @@ void GlobalData::init() {
 
 	u220_group.setup();
 	const auto u220_ip_version = u220_group.fpga(u220_group.active_boards()[0])->get_fpga_version();
-	cpm_poi.init(
-		cfg.dma_enabled,
-		ispr_kan,
-		cfg.target_velocity_min,
-		cfg.target_velocity_max,
-		u220_ip_version,
-		cfg.rx_insert_count,
-		cfg.complex_fap_gains,
-		{cfg.diagrams_0, cfg.diagrams_1, cfg.diagrams_2, cfg.diagrams_3, cfg.diagrams_4, cfg.diagrams_5, cfg.diagrams_6, cfg.diagrams_7});
+	cpm_poi.init(cfg.dma_enabled,
+	             ispr_kan,
+	             cfg.target_velocity_min,
+	             cfg.target_velocity_max,
+	             u220_ip_version,
+	             cfg.rx_insert_count,
+	             cfg.complex_fap_gains,
+	             {cfg.diagrams_0[0],
+	              cfg.diagrams_1[0],
+	              cfg.diagrams_2[0],
+	              cfg.diagrams_3[0],
+	              cfg.diagrams_4[0],
+	              cfg.diagrams_5[0],
+	              cfg.diagrams_6[0],
+	              cfg.diagrams_7[0]});
 
 	u220_group.sync_ad9361();
 	// нужна задержка чтобы pps сбросился иначе в reset_time не сработает
@@ -889,6 +895,32 @@ void GlobalData::received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg
 		cfg.save_fap_coeffs(amplitudes, phases);
 	}
 	global->sendMessage(set_FAP_PR_KVIT());
+}
+
+Protocol_RLS_Mini::GETERODIN_KVIT GlobalData::set_GETERODIN_KVIT() {
+	Protocol_RLS_Mini::GETERODIN_KVIT kvit;
+	kvit.n_geterodin = cpm_poi.get_geterodin();
+	return kvit;
+}
+
+void GlobalData::received_GETERODIN_ZAPROS(const Protocol_RLS_Mini::GETERODIN_ZAPROS & msg) {
+	log_cpm_msg(__func__, msg);
+	global->sendMessage(set_GETERODIN_KVIT());
+}
+
+void GlobalData::received_GETERODIN_SET(const Protocol_RLS_Mini::GETERODIN_SET & msg) {
+	log_cpm_msg(__func__, msg);
+	auto n_geterodin = msg.n_geterodin;
+	cpm_poi.set_geterodin({cfg.diagrams_0[n_geterodin],
+	                       cfg.diagrams_1[n_geterodin],
+	                       cfg.diagrams_2[n_geterodin],
+	                       cfg.diagrams_3[n_geterodin],
+	                       cfg.diagrams_4[n_geterodin],
+	                       cfg.diagrams_5[n_geterodin],
+	                       cfg.diagrams_6[n_geterodin],
+	                       cfg.diagrams_7[n_geterodin]},
+	                      n_geterodin);
+	global->sendMessage(set_GETERODIN_KVIT());
 }
 
 void GlobalData::send_KTA_VO(struct target targ) {

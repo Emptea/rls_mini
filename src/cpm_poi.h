@@ -305,6 +305,25 @@ public:
 		axi_dsp_apply();
 	}
 
+	void set_geterodin(const std::array<const cmplx_f64 *, 8> & lou_coeffs, uint16_t n_get) {
+		if (dma_enabled) {
+			for (uint32_t i = 0; i < 8; ++i) {
+				axi_dsp_set_diagram_0(lou_coeffs[0][i], i);
+				axi_dsp_set_diagram_1(lou_coeffs[1][i], i);
+				axi_dsp_set_diagram_2(lou_coeffs[2][i], i);
+				axi_dsp_set_diagram_3(lou_coeffs[3][i], i);
+				axi_dsp_set_diagram_4(lou_coeffs[4][i], i);
+				axi_dsp_set_diagram_5(lou_coeffs[5][i], i);
+				axi_dsp_set_diagram_6(lou_coeffs[6][i], i);
+				axi_dsp_set_diagram_7(lou_coeffs[7][i], i);
+				// axi_dsp_set_band_stop_edges(i, {0, 0, 0, 0});
+			}
+		}
+		n_geterodin = n_get;
+	}
+
+	uint16_t get_geterodin(){ return n_geterodin; }
+
 	void init(bool dma,
 	          uint8_t ispr,
 	          double velocity_min,
@@ -372,6 +391,8 @@ private:
 	uint16_t zona_ch_num     = 0;
 	uint32_t zona_val_sq     = 1;
 	double zona_max_val_db   = 4000;
+
+	uint16_t n_geterodin     = 0;
 
 	mutable std::mutex status_mutex;
 	Status status;
