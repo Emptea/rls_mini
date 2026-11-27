@@ -36,12 +36,13 @@ public:
 		uint32_t u220_ip_version = 0;  // get_fpga_version(): low 24 bits.
 		uint64_t u220_cycles     = 0;
 		std::array<uint64_t, 4> u220_rx_overflows{};
-		uint32_t packet_number    = 0;
-		uint64_t timestamp        = 0;
-		uint64_t dma_packet_drops = 0; // Number of detected packet sequence gaps.
+		uint32_t packet_number        = 0;
+		uint64_t timestamp            = 0;
+		uint64_t dma_packet_drops     = 0; // Number of detected packet sequence gaps.
+		uint32_t is_techlaser_present = 0;
 	};
 #pragma pack(pop)
-	static_assert(sizeof(Status) == 68, "Unexpected POI status payload size");
+	static_assert(sizeof(Status) == 72, "Unexpected POI status payload size");
 
 	void set_ip_versions(const csr_ip_ver_t & axu, uint32_t u220) {
 		std::lock_guard<std::mutex> lock(status_mutex);

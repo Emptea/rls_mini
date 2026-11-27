@@ -35,7 +35,13 @@ static bool initializeRs485(const PIString & device) {
 
 Techlaser::Techlaser() {
 	CONNECTL(&ser, threadedReadEvent, ([this](const uchar * data, ssize_t size) {
-		if (size > 0) processAngleBytes(data, size);
+		auto ref = state.getRef();
+		if (size > 0) {
+			processAngleBytes(data, size);
+			ref->is_techlaser_present = true;
+		} else {
+			ref->is_techlaser_present = false;
+		}
 	}));
 }
 
@@ -122,7 +128,8 @@ void Techlaser::processAngleBytes(const uchar * data, ssize_t size) {
 			speed_ref_time     = now;
 			// piCout << "Tech: angle " << angle;
 			// piCout << "Tech: velocity " << speed;
-			// piCout << "Tech: raw" << PICoutManipulators::Hex << static_cast<unsigned>(data[size - 2]) << static_cast<unsigned>(data[size - 1]);
+			// piCout << "Tech: raw" << PICoutManipulators::Hex << static_cast<unsigned>(data[size - 2]) << static_cast<unsigned>(data[size
+			// - 1]);
 		}
 	}
 

@@ -687,6 +687,25 @@ void GlobalData::dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_ent
 	write_rx_trace_csv(std::move(all_entries), rx_filename.string());
 }
 
+Protocol_RLS_Mini::POI_TK_Kvit GlobalData::set_POI_TK_Kvit(CpmPoi::Status * poi_status) {
+	Protocol_RLS_Mini::POI_TK_Kvit ans;
+	ans.setData(&poi_status, 1);
+	ans.nw = static_cast<uint16_t>(ans.words.size());
+	global->sendMessage(ans);
+
+	piCout << "ip ver AXU3EG:" << poi_status->axu_ip_version.MAJ_VER << "." << poi_status->axu_ip_version.MIN_VER;
+	piCout << "ip ver U220:" << poi_status->u220_ip_version;
+	piCout << "cycles U220:" << poi_status->u220_cycles;
+	for (const auto board_index: u220_group.active_boards()) {
+		piCout << "U220 idx" << board_index << "overflows:" << poi_status->u220_rx_overflows[board_index];
+	}
+	piCout << "packet number:" << poi_status->packet_number;
+	piCout << "timestamp:" << poi_status->timestamp;
+	piCout << "DMA packet drops:" << poi_status->dma_packet_drops;
+	piCout << "Techlaser status:" << poi_status->is_techlaser_present;
+	return ans;
+}
+
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	log_cpm_msg(__func__, msg);
 	if (msg.reg_takt == 0 || msg.kt == 0) {
@@ -699,10 +718,9 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 			std::lock_guard<std::mutex> lock(pending_tk_mutex);
 			pending_tk.active = false;
 		}
-		Protocol_RLS_Mini::POI_TK_Kvit ans;
-		ans.setData(&status, 1);
-		ans.nw = static_cast<uint16_t>(ans.words.size());
-		global->sendMessage(ans);
+		status.is_techlaser_present = techlaser.getState().is_techlaser_present;
+		auto pot_tk_kvit            = set_POI_TK_Kvit(&status);
+		global->sendMessage(pot_tk_kvit);
 		return;
 	}
 	if (cfg.dma_enabled) {

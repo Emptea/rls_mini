@@ -15,6 +15,7 @@ public:
 		float current_angle = 0.f; // 0 - 360
 		float current_speed = 0.f; // °/c
 		std::chrono::steady_clock::time_point angle_receive_timestamp{};
+		bool is_techlaser_present = false;
 	};
 
 	bool open(const PIString & serial);
