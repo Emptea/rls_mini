@@ -1,3 +1,4 @@
+#include "git_version.h"
 #include "rls_mini_version.h"
 #include "shared_data.h"
 
@@ -10,13 +11,10 @@
 using namespace PICoutManipulators;
 
 void printVersion() {
-	piCout << Cyan << "Versions:";
-	piCout << "  RLS Mini:" << Bold << RLS_MINI_VERSION_NAME;
-	piCout << "       PIP:" << Bold << PIP_VERSION_NAME;
+	piCout << Cyan << "Version:" << Default << APP_GIT_VERSION;
 }
 
 void help() {
-	piCout << Bold << "RLS Mini";
 	printVersion();
 	piCout << "";
 	piCout << Green << Bold << "Usage:" << Default << "\"rls_mini [-vhd]\"" << NewLine;
@@ -27,20 +25,24 @@ void help() {
 	// piCout << "-c --console " << Green << "- start with console UI";
 }
 
-
 int main(int argc, char * argv[]) {
 	PICLI cli(argc, argv);
+	piCout << Cyan << "RLS Mini";
 	cli.addArgument("version");
 	cli.addArgument("help");
 	cli.addArgument("debug");
+
 	if (cli.hasArgument("version")) {
 		printVersion();
 		return 0;
 	}
+
 	if (cli.hasArgument("help")) {
 		help();
 		return 0;
 	}
+
+	printVersion();
 	piDebug = cli.hasArgument("debug");
 
 	PISignals::setSlot([](PISignals::Signal s) {

@@ -1,86 +1,77 @@
 #ifndef protocol_rls_mini_H
 #define protocol_rls_mini_H
 
+#include <cmath>
+#include <cstdint>
 #include <piethernet.h>
 
 class Protocol_RLS_Mini {
 public:
 #pragma pack(push, 1)
 
-	enum control_point {
-		CTRL = 0x00,
-		ADC  = 0x01,
-		PHD  = 0x02,
-		PLL  = 0x03,
-		OPH  = 0x04,
-		LOU  = 0x05,
-		KN   = 0x06,
-		AD   = 0x07,
-		APU  = 0x08,
-	};
-
 	struct Header PIMETA(no-stream) {
+		static constexpr bool Broadcast = false;
 		Header(uint8_t t = 0, uint8_t c = 0) {
 			msg_type = t;
 			msg_code = c;
 		}
-		uint8_t msg_type; // Тип сообщения
 		uint8_t msg_code; // Код операции
+		uint8_t msg_type; // Тип сообщения
 	};
 
 
 	// RR
 
-	struct RR_Zapros: public Header PIMETA(dest=upr, port=5001, no-stream) {
-		static const int16_t Port = 5001;
-		static const int16_t Type = 1;
-		static const int16_t Code = 0;
+	struct RR_Zapros: public Header PIMETA(dest=rr, port=5001, no-stream) {
+		static constexpr int16_t Port = 5001;
+		static constexpr int16_t Type = 1;
+		static constexpr int16_t Code = 0;
 		RR_Zapros(): Header(Type, Code) {}
 	};
 
 
-	struct RR_Vr: public Header PIMETA(dest=upr, port=5001, no-stream) {
-		static const int16_t Port = 5001;
-		static const int16_t Type = 1;
-		static const int16_t Code = 1;
+	struct RR_Vr: public Header PIMETA(dest=rr, port=5001, no-stream) {
+		static constexpr int16_t Port = 5001;
+		static constexpr int16_t Type = 1;
+		static constexpr int16_t Code = 1;
 		RR_Vr(): Header(Type, Code) {}
 		uint16_t par = 0; // 0 - выключить вращение и имитатор вращения, 1 - включить вращение, 2 - включить имитатор вращения
 	};
 
 
-	struct RR_Izl: public Header PIMETA(dest=upr, port=5001, no-stream) {
-		static const int16_t Port = 5001;
-		static const int16_t Type = 1;
-		static const int16_t Code = 2;
+	struct RR_Izl: public Header PIMETA(dest=rr, port=5001, no-stream) {
+		static constexpr int16_t Port = 5001;
+		static constexpr int16_t Type = 1;
+		static constexpr int16_t Code = 2;
 		RR_Izl(): Header(Type, Code) {}
 		uint16_t par = 0; // 0 - выключить излучение, 1 - включить излучение
 	};
 
 
-	struct RR_Ant: public Header PIMETA(dest=upr, port=5001, no-stream) {
-		static const int16_t Port = 5001;
-		static const int16_t Type = 1;
-		static const int16_t Code = 3;
+	struct RR_Ant: public Header PIMETA(dest=rr, port=5001, no-stream) {
+		static constexpr int16_t Port = 5001;
+		static constexpr int16_t Type = 1;
+		static constexpr int16_t Code = 3;
 		RR_Ant(): Header(Type, Code) {}
 		uint16_t par = 0; // 0 - антенна отключена, 1 - антенна подключена
 	};
 
 
-	struct RR_TTek: public Header PIMETA(dest=upr, port=5001, no-stream) {
-		static const int16_t Port = 5001;
-		static const int16_t Type = 1;
-		static const int16_t Code = 4;
+	struct RR_TTek: public Header PIMETA(dest=rr, port=5001, no-stream) {
+		static constexpr int16_t Port = 5001;
+		static constexpr int16_t Type = 1;
+		static constexpr int16_t Code = 4;
 		RR_TTek(): Header(Type, Code) {}
-		uint32_t time = 0;
-		void setSeconds(double s) { time = s / timeLSB; }
-		double getSeconds() const { return time * timeLSB; }
+		uint16_t time_msw = 0;
+		uint16_t time_lsw = 0;
+		double getSeconds() const { return ((uint32_t(time_msw) << 16) | time_lsw) * timeLSB; }
 	};
 
 
-	struct RR_AzPopr: public Header PIMETA(dest=upr, port=5001, no-stream) {
-		static const int16_t Port = 5001;
-		static const int16_t Type = 1;
-		static const int16_t Code = 5;
+	struct RR_AzPopr: public Header PIMETA(dest=rr, port=5001, no-stream) {
+		static constexpr int16_t Port = 5001;
+		static constexpr int16_t Type = 1;
+		static constexpr int16_t Code = 5;
 		RR_AzPopr(): Header(Type, Code) {}
 		int16_t daz = 0;
 		void setDegrees(double v) { daz = v / degLSB; }
@@ -88,31 +79,33 @@ public:
 	};
 
 
-	struct RR_DPopr_POI: public Header PIMETA(dest=upr, port=5001, no-stream) {
-		static const int16_t Port = 5001;
-		static const int16_t Type = 1;
-		static const int16_t Code = 6;
+	struct RR_DPopr_POI: public Header PIMETA(dest=rr, port=5001, no-stream) {
+		static constexpr int16_t Port = 5001;
+		static constexpr int16_t Type = 1;
+		static constexpr int16_t Code = 6;
 		RR_DPopr_POI(): Header(Type, Code) {}
 		int16_t dd = 0; // 1 м
 	};
 
 
-	struct RR_AzPopr_POI: public Header PIMETA(dest=upr, port=5001, no-stream) {
-		static const int16_t Port = 5001;
-		static const int16_t Type = 1;
-		static const int16_t Code = 7;
+	struct RR_AzPopr_POI: public Header PIMETA(dest=rr, port=5001, no-stream) {
+		static constexpr int16_t Port = 5001;
+		static constexpr int16_t Type = 1;
+		static constexpr int16_t Code = 7;
 		RR_AzPopr_POI(): Header(Type, Code) {}
 		int16_t daz = 0;
 		void setDegrees(double v) { daz = v / degLSB; }
-		double getDegrees() const { return daz * degLSB; }
+		float getDegrees() const { return daz * degLSB; }
 	};
 
 
 	struct RR_Kvit: public Header PIMETA(dest=all, port=5000, no-stream) {
-		static const int16_t Port = 5000;
-		static const int16_t Type = 1;
-		static const int16_t Code = 0;
+		static constexpr bool Broadcast = true;
+		static constexpr int16_t Port   = 5000;
+		static constexpr int16_t Type   = 1;
+		static constexpr int16_t Code   = 0;
 		RR_Kvit(): Header(Type, Code) {}
+		uint8_t ispr_kan = 0;
 		union {
 			uint8_t bits = 0;
 			struct {
@@ -124,10 +117,9 @@ public:
 				uint8_t kuvr    : 2;
 			};
 		};
-		uint8_t ispr_kan = 0;
-		int16_t daz      = 0;
-		int16_t dd_poi   = 0; // 1 м
-		int16_t daz_poi  = 0;
+		int16_t daz     = 0;
+		int16_t dd_poi  = 0; // 1 м
+		int16_t daz_poi = 0;
 		void setDegreesDaz(double v) { daz = v / degLSB; }
 		double getDegreesDaz() const { return daz * degLSB; }
 		void setDegreesDazPOI(double v) { daz_poi = v / degLSB; }
@@ -138,34 +130,40 @@ public:
 	// POI
 
 	struct POI_Zapros: public Header PIMETA(dest=poi, port=5101, no-stream) {
-		static const int16_t Port = 5101;
-		static const int16_t Type = 2;
-		static const int16_t Code = 0;
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 2;
+		static constexpr int16_t Code = 0;
 		POI_Zapros(): Header(Type, Code) {}
 	};
 
 
 	struct POI_Shtat: public Header PIMETA(dest=poi, port=5101, no-stream) {
-		static const int16_t Port = 5101;
-		static const int16_t Type = 2;
-		static const int16_t Code = 255;
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 2;
+		static constexpr int16_t Code = 255;
 		POI_Shtat(): Header(Type, Code) {}
 	};
 
 
 	struct POI_SDC: public Header PIMETA(dest=poi, port=5101, no-stream) {
-		static const int16_t Port = 5101;
-		static const int16_t Type = 2;
-		static const int16_t Code = 1;
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 2;
+		static constexpr int16_t Code = 1;
 		POI_SDC(): Header(Type, Code) {}
-		uint16_t par = 0; // 0 - выключить СДЦ, 1 - включить СДЦ
+		union {
+			uint16_t bits = 0;
+			struct {
+				uint16_t bz: 8; // Маска включения СДЦ в ближней зоне
+				uint16_t dz: 8; // Маска включения СДЦ в далььней зоне
+			};
+		};
 	};
 
 
 	struct POI_DSA: public Header PIMETA(dest=poi, port=5101, no-stream) {
-		static const int16_t Port = 5101;
-		static const int16_t Type = 2;
-		static const int16_t Code = 2;
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 2;
+		static constexpr int16_t Code = 2;
 		POI_DSA(): Header(Type, Code) {}
 		uint16_t par  = 0; // 0 - выключить ДСА, 1 - включить ДСА
 		uint16_t vr_n = 0; // Vr начала полосы режекции, 1 м/с
@@ -174,75 +172,92 @@ public:
 
 
 	struct POI_APU: public Header PIMETA(dest=poi, port=5101, no-stream) {
-		static const int16_t Port = 5101;
-		static const int16_t Type = 2;
-		static const int16_t Code = 3;
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 2;
+		static constexpr int16_t Code = 3;
 		POI_APU(): Header(Type, Code) {}
 		uint16_t k1 = 0; // Коэффициент порога 1, цмр 0.5 дБ
 		uint16_t k2 = 0; // Коэффициент порога 2, цмр 0.5 дБ
+		double getLevelk1() const { return std::pow(10.0, k1 * dbLSB / 10.0); }
+		uint32_t getLevelk2() const { return static_cast<uint32_t>(std::lround(std::pow(10.0, k2 * dbLSB / 10.0))); }
 	};
 
 
 	struct POI_Zona: public Header PIMETA(dest=poi, port=5101, no-stream) {
-		static const int16_t Port = 5101;
-		static const int16_t Type = 2;
-		static const int16_t Code = 4;
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 2;
+		static constexpr int16_t Code = 4;
 		POI_Zona(): Header(Type, Code) {}
-		uint8_t k1 = 0; // Код строба расчета зоны
-		uint8_t _reserve;
-		uint16_t k2 = 0; // Код канала расчета зоны
+		uint8_t k1 = 0; // Код строба расчета зоны: 0 – в каналах (перед алгоритмом ЛОУ), 1 – в лучах (после алгоритма ЛОУ)
+		uint8_t _reserve = 0;
+		uint16_t k2      = 0; // Код канала расчёта зоны: номер канала/луча: 0…7
 	};
 
 
 	struct POI_Kan: public Header PIMETA(dest=poi, port=5101, no-stream) {
-		static const int16_t Port = 5101;
-		static const int16_t Type = 2;
-		static const int16_t Code = 5;
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 2;
+		static constexpr int16_t Code = 5;
 		POI_Kan(): Header(Type, Code) {}
-		uint8_t _reserve;
-		uint8_t kan = 0; // Подключенные каналы
+		union {
+			uint16_t bits = 0;
+			struct {
+				uint16_t kan : 8; // Подключенные каналы
+				uint16_t resv: 8;
+			};
+		};
 	};
 
 
 	struct POI_Kvit: public Header PIMETA(dest=soi, port=5100, no-stream) {
-		static const int16_t Port = 5100;
-		static const int16_t Type = 2;
-		static const int16_t Code = 0;
+		static constexpr bool Broadcast = true;
+		static constexpr int16_t Port   = 5100;
+		static constexpr int16_t Type   = 2;
+		static constexpr int16_t Code   = 0;
 		POI_Kvit(): Header(Type, Code) {}
 		union {
-			uint8_t bits = 0;
+			uint16_t bits = 0;
 			struct {
-				uint8_t _reserve0: 6;
-				uint8_t sdc      : 1;
-				uint8_t dsa      : 1;
+				uint16_t kan      : 8; // Подключенные каналы
+				uint16_t _reserve0: 6;
+				uint16_t dsa      : 1;
+				uint16_t sdc      : 1;
 			};
 		};
-		uint8_t kan       = 0; // Подключенные каналы
 		uint16_t dsa_vr_n = 0;
 		uint16_t dsa_vr_k = 0;
 		uint16_t apu_k1   = 0;
 		uint16_t apu_k2   = 0;
-		uint8_t zona_k1   = 0;
-		uint8_t _reserve1;
+		union {
+			uint16_t zona_bits = 0;
+			struct {
+				uint16_t _reserve1: 8;
+				uint16_t zona_k1  : 8;
+			};
+		};
 		uint16_t zona_k2 = 0;
+		void setLevelApuk1(double v) { apu_k1 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
+		void setLevelApuk2(uint32_t v) { apu_k2 = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v))); }
 	};
 
 
 	struct POI_TK_Zapros: public Header PIMETA(dest=poi, port=5101, no-stream) {
-		static const int16_t Port = 5101;
-		static const int16_t Type = 3;
-		static const int16_t Code = 0;
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 3;
+		static constexpr int16_t Code = 0;
 		POI_TK_Zapros(): Header(Type, Code) {} // 0 - запрос состояния системы ПОИ, 1 - запрос контрольной точки
-		uint16_t kt       = 0;                 // Код контрольной точки
-		uint16_t nkan     = 0;                 // Номер канала
+		uint8_t kt    = 0;                     // Код контрольной точки
+		uint8_t rg    = 0;                     // дальностный канал
+		uint16_t nkan = 0;                     // Номер канала
 		uint16_t reg_takt = 0; // Количество регистрируемых тактов: 0 - запрос состояния системы ПОИ, 1 - запрос контрольной точки
 	};
 
 
 	struct POI_TK_Kvit: public Header PIMETA(dest=soi, port=5100, no-stream) {
-		static const int16_t Port = 5100;
-		static const int16_t Type = 3;
-		static const int16_t Code = 0;
+		static constexpr bool Broadcast = true;
+		static constexpr int16_t Port   = 5100;
+		static constexpr int16_t Type   = 3;
+		static constexpr int16_t Code   = 0;
 		POI_TK_Kvit(): Header(Type, Code) {} // 0 - состояние системы ПОИ, 1 - контрольная точка
 		uint16_t nw = 0;                     // Количество слов данных
 		PIVector<uint16_t> words;
@@ -259,6 +274,10 @@ public:
 		void setData(const PIDeque<T> & d) {
 			setDataInternal(d.data(), d.size());
 		}
+		template<typename T>
+		void setData(const T * d, int cnt) {
+			setDataInternal(d, cnt);
+		}
 
 	private:
 		template<typename T>
@@ -270,13 +289,96 @@ public:
 		}
 	};
 
+	// FAP PR
+
+	struct FAP_PR_ZAPROS: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 0;
+		FAP_PR_ZAPROS(): Header(Type, Code) {}
+	};
+
+	struct FAP_PR_KU: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 1;
+		FAP_PR_KU(): Header(Type, Code) {}
+	};
+
+	struct FAP_PR_START_TEST: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 2;
+		FAP_PR_START_TEST(): Header(Type, Code) {} // 2 - начать проверку, 3 - завершить проверку
+	};
+
+	struct FAP_PR_STOP_TEST: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 3;
+		FAP_PR_STOP_TEST(): Header(Type, Code) {} // 2 - начать проверку, 3 - завершить проверку
+	};
+
+
+	struct FAP_PR_Correction PIMETA(no-stream) {
+		int16_t f = 0; // Поправка фазы, 0.01 град
+		int16_t a = 0; // Поправка амплитуды, 0.01 дБ
+		void setDegrees(double v) { f = static_cast<int16_t>(std::lround(v / 0.01)); }
+		double getDegrees() const { return f * 0.01; }
+		void setDb(double v) { a = static_cast<int16_t>(std::lround(v / 0.01)); }
+		double getDb() const { return a * 0.01; }
+	};
+
+	struct FAP_PR_POPR: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 13;
+		static constexpr int16_t Code = 4;
+		FAP_PR_POPR(): Header(Type, Code) {}
+		uint16_t save = 0; // 0 - не сохранять, 1 - сохранять
+		FAP_PR_Correction channels[8];
+	};
+
+	struct FAP_PR_KVIT: public Header PIMETA(dest=soi, port=5100, no-stream) {
+		static constexpr bool Broadcast = true;
+		static constexpr int16_t Port   = 5100;
+		static constexpr int16_t Type   = 13;
+		static constexpr int16_t Code   = 0;
+		FAP_PR_KVIT(): Header(Type, Code) {}
+		uint16_t test = 0; // 0 - текущие поправки, 1 - проверочные значения
+		FAP_PR_Correction channels[8];
+	};
+
+	// GETERODIN
+
+	struct GETERODIN_ZAPROS: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 14;
+		static constexpr int16_t Code = 0;
+		GETERODIN_ZAPROS(): Header(Type, Code) {}
+	};
+
+	struct GETERODIN_SET: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 14;
+		static constexpr int16_t Code = 1;
+		GETERODIN_SET(): Header(Type, Code) {}
+		uint16_t n_geterodin = 0; // 0-4
+	};
+
+	struct GETERODIN_KVIT: public Header PIMETA(dest=poi, port=5101, no-stream) {
+		static constexpr int16_t Port = 5101;
+		static constexpr int16_t Type = 14;
+		static constexpr int16_t Code = 0;
+		GETERODIN_KVIT(): Header(Type, Code) {}
+		uint16_t n_geterodin = 0; // 0-4
+	};
 
 	// CIT
 
 	struct CIT_Zapros: public Header PIMETA(dest=it, port=5401, no-stream) {
-		static const int16_t Port = 5401;
-		static const int16_t Type = 9;
-		static const int16_t Code = 0;
+		static constexpr int16_t Port = 5401;
+		static constexpr int16_t Type = 9;
+		static constexpr int16_t Code = 0;
 		CIT_Zapros(): Header(Type, Code) {}
 	};
 
@@ -284,22 +386,28 @@ public:
 	struct ImitatorTarget PIMETA(no-stream) {
 		uint8_t on   = 0; // 0 - Выключена, 1 - Включен
 		uint8_t reg  = 0; // 0 - POA, 1 - PBA
-		uint16_t az  = 0; // Азимут
-		uint16_t D   = 0; // Дальность, 1 м
-		int16_t um   = 0; // Угол места
-		uint16_t vr  = 0; // Радиальная скорость, 1 м/с
-		uint16_t osl = 0; // Ослабление,  0.5 дБ
-		void setDegreesAz(double v) { az = v / degLSB; }
-		double getDegreesAz() const { return az * degLSB; }
-		void setDegreesUm(double v) { um = v / 0.1; }
-		double getDegreesUm() const { return um * 0.1; }
+		uint16_t az  = 0; // Азимут, без знака, цмр 0.0054931640625 гр
+		uint16_t D   = 0; // Дальность, без знака, цмр 1 м
+		int16_t um   = 0; // Угол места, в доп.коде, цмр 0.1 град
+		int16_t vr   = 0; // Радиальная скорость, в доп.коде, цмр 1 м/с
+		uint16_t osl = 0; // Ослабление, без знака, цмр 0.5 дБ
+		void setDegreesAz(float v) { az = static_cast<uint16_t>(std::lround(v / degLSB)); }
+		float getDegreesAz() const { return az * degLSB; }
+		void setDegreesUm(float v) { um = static_cast<int16_t>(std::lround(v / 0.1f)); }
+		float getDegreesUm() const { return um * 0.1f; }
+		void setMeters(float v) { D = static_cast<uint16_t>(std::lround(v)); }
+		float getMeters() const { return D; }
+		void setVelocity(float v) { vr = static_cast<int16_t>(std::lround(v)); }
+		float getVelocity() const { return vr; }
+		void setAttenuation(float v) { osl = static_cast<uint16_t>(std::lround(v / 0.5f)); }
+		float getAttenuation() const { return osl * 0.5f; }
 	};
 
 
 	struct CIT_KU: public Header PIMETA(dest=it, port=5401, no-stream) {
-		static const int16_t Port = 5401;
-		static const int16_t Type = 9;
-		static const int16_t Code = 1;
+		static constexpr int16_t Port = 5401;
+		static constexpr int16_t Type = 9;
+		static constexpr int16_t Code = 1;
 		CIT_KU(): Header(Type, Code) {}
 		ImitatorTarget it1;
 		ImitatorTarget it2;
@@ -307,9 +415,10 @@ public:
 
 
 	struct CIT_Kvit: public Header PIMETA(dest=soi, port=5400, no-stream) {
-		static const int16_t Port = 5400;
-		static const int16_t Type = 9;
-		static const int16_t Code = 0;
+		static constexpr bool Broadcast = true;
+		static constexpr int16_t Port   = 5400;
+		static constexpr int16_t Type   = 9;
+		static constexpr int16_t Code   = 0;
 		CIT_Kvit(): Header(Type, Code) {}
 		ImitatorTarget it1;
 		ImitatorTarget it2;
@@ -319,63 +428,95 @@ public:
 	// PI
 
 	struct PI: public Header PIMETA(dest=all, port=5200, no-stream) {
-		static const int16_t Port = 5200;
-		static const int16_t Type = 4;
-		static const int16_t Code = 0;
+		static constexpr bool Broadcast = true;
+		static constexpr int16_t Port   = 5200;
+		static constexpr int16_t Type   = 4;
+		static constexpr int16_t Code   = 0;
 		PI(): Header(Type, Code) {}
-		uint16_t aztek = 0; // Азимут текущий, незадержанный в ПОИ
-		uint32_t T     = 0; // Время, задержанное в обработке
-		uint16_t az    = 0; // Азимут, задержанный в обработке
-		uint16_t zona  = 0; // Дальность отметки "Зона"
-		uint16_t nes   = 0; // Количество эхосигналов
-		                    // Дальность эхосигнала
-		                    // ...
-		                    // uint16_t[nes]
+		uint16_t aztek    = 0; // Азимут текущий, незадержанный в ПОИ
+		uint16_t time_msw = 0; // Время, задержанное в обработке
+		uint16_t time_lsw = 0; // Время, задержанное в обработке
+		uint16_t az       = 0; // Азимут, задержанный в обработке
+		uint16_t zona     = 0; // Дальность отметки "Зона"
+		uint16_t nes      = 0; // Количество эхосигналов
+		                       // Дальность эхосигнала
+		                       // ...
+		                       // uint16_t[nes]
 		void setDegreesAzTek(double v) { aztek = v / degLSB; }
-		double getDegreesAzTek() const { return aztek * degLSB; }
 		void setDegreesAz(double v) { az = v / degLSB; }
+		void setSeconds(double s) {
+			uint32_t t = uint32_t(std::round(s / timeLSB));
+			time_msw   = uint16_t(t >> 16);
+			time_lsw   = uint16_t(t);
+		}
+		double getDegreesAzTek() const { return aztek * degLSB; }
 		double getDegreesAz() const { return az * degLSB; }
-		void setSeconds(double s) { T = s / timeLSB; }
-		double getSeconds() const { return T * timeLSB; }
+		double getSeconds() const {
+			uint32_t t = (uint32_t(time_msw) << 16) | time_lsw;
+			return t * timeLSB;
+		}
 	};
 
 
 	struct KTA_VO: public Header PIMETA(dest=all, port=5202, no-stream) {
-		static const int16_t Port = 5202;
-		static const int16_t Type = 4;
-		static const int16_t Code = 1;
+		static constexpr bool Broadcast = true;
+		static constexpr int16_t Port   = 5202;
+		static constexpr int16_t Type   = 4;
+		static constexpr int16_t Code   = 1;
 		KTA_VO(): Header(Type, Code) {}
-		uint16_t N     = 0; // Номер КТА
-		uint32_t T     = 0; // Время локации
-		uint16_t az    = 0; // Азимут
-		int16_t um     = 0; // Угол места
-		uint16_t D     = 0; // Дальность, 1 м
+		uint16_t n     = 0; // Номер КТА
+		uint16_t t_msw = 0; // Время локации, без знака, цмр 0.001 с
+		uint16_t t_lsw = 0; // Время локации, без знака, цмр 0.001 с
+		uint16_t az    = 0; // Азимут, без знака, цмр 0.0054931640625
+		int16_t um     = 0; // Угол места, в доп.коде, цмр 0.1 град
+		uint16_t d     = 0; // Дальность, 1 м
 		uint16_t porog = 0; // Порог обнаружения, 0.5 дБ
 		uint16_t sp    = 0; // Отношение сигнал/порог, 0.5 дБ
 		uint16_t amp   = 0; // Амплитуда сигнала цели, 0.5 дБ
 		int16_t vr     = 0; // Радиальная скорость, 1 м/с
 		union {
-			uint8_t bits = 0;
+			uint16_t bits = 0x8080; // dum0 = 1, dum1 = 1
 			struct {
-				uint8_t _reserve0: 6;
-				uint8_t tn       : 1; // Признак тренажной цели
-				uint8_t dum      : 1; // Признак достоверности измерения угла места цели
+				uint16_t resv0: 6;
+				uint16_t tn0  : 1; // Признак тренажной цели
+				uint16_t dum0 : 1; // Признак достоверности измерения угла места цели
+				uint16_t resv1: 6;
+				uint16_t tn1  : 1; // Признак тренажной цели
+				uint16_t dum1 : 1; // Признак достоверности измерения угла места цели
 			};
 		};
-		uint8_t _reserve1 = 0;
-		void setDegreesAz(double v) { az = v / degLSB; }
-		double getDegreesAz() const { return az * degLSB; }
-		void setDegreesUm(double v) { um = v / 0.1; }
-		double getDegreesUm() const { return um * 0.1; }
-		void setSeconds(double s) { T = s / timeLSB; }
-		double getSeconds() const { return T * timeLSB; }
+		void setDegreesAz(float v) { az = uint16_t(std::roundl(v / degLSB)); }
+		float getDegreesAz() const { return az * degLSB; }
+		void setDegreesUm(float v) { um = int16_t(std::roundl(v / 0.1)); }
+		float getDegreesUm() const { return um * 0.1; }
+		void setT(double s) {
+			uint32_t t = uint32_t(std::roundl(s / timeLSB));
+			t_msw      = uint16_t(t >> 16);
+			t_lsw      = uint16_t(t);
+		}
+		void setDistance(float v) { d = uint16_t(std::roundl(v)); }
+		float getDistance() const { return d; }
+		void setVelocity(float v) { vr = int16_t(std::roundl(v)); }
+		float getVelocity() const { return vr; }
+		void setAmpPorogSp(double v_amp, double v_porog) {
+			amp   = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v_amp)));
+			porog = static_cast<uint16_t>(std::lround(10.0 / dbLSB * std::log10(v_porog)));
+			sp    = amp - porog;
+		}
+		double getT() const {
+			uint32_t t = (uint32_t(t_msw) << 16) | t_lsw;
+			return t * timeLSB;
+		}
+		double getAmpDb() const { return amp * dbLSB; }
+		double getPorogDb() const { return porog * dbLSB; }
+		double getSpDb() const { return sp * dbLSB; }
 	};
 
 
 	struct TRVO: public Header PIMETA(dest=all, port=5300, no-stream) {
-		static const int16_t Port = 5300;
-		static const int16_t Type = 5;
-		static const int16_t Code = -1;
+		static constexpr int16_t Port = 5300;
+		static constexpr int16_t Type = 5;
+		static constexpr int16_t Code = -1;
 		TRVO(): Header(Type, 0) {}
 		uint16_t N  = 0; // Номер КТА
 		uint32_t ID = 0; // Идентификатор трассы
@@ -397,9 +538,9 @@ public:
 				uint8_t _reserve0: 3;
 				uint8_t mh       : 1; // Признак наличия маневра по высоте
 				uint8_t mk       : 1; // Признак наличия маневра по курсу
-				uint8_t pv       : 1; // Признак выдачи координат и времени: 0 - на момент выдачи, 1 - на момент локации
-				uint8_t tn       : 1; // Признак тренажной цели
-				uint8_t dum      : 1; // Признак достоверности измерения угла места цели
+				uint8_t pv: 1; // Признак выдачи координат и времени: 0 - на момент выдачи, 1 - на момент локации
+				uint8_t tn : 1; // Признак тренажной цели
+				uint8_t dum: 1; // Признак достоверности измерения угла места цели
 			};
 		};
 		union {
@@ -430,17 +571,17 @@ public:
 
 
 	struct TRETA: public TRVO PIMETA(dest=all, port=5300, no-stream) {
-		static const int16_t Port = 5300;
-		static const int16_t Type = 10;
-		static const int16_t Code = -1;
+		static constexpr int16_t Port = 5300;
+		static constexpr int16_t Type = 10;
+		static constexpr int16_t Code = -1;
 		TRETA() { msg_type = 10; }
 	};
 
 
 	struct STRSOPR: public Header PIMETA(dest=reg, port=5300, no-stream) {
-		static const int16_t Port = 5300;
-		static const int16_t Type = 11;
-		static const int16_t Code = 0;
+		static constexpr int16_t Port = 5300;
+		static constexpr int16_t Type = 11;
+		static constexpr int16_t Code = 0;
 		STRSOPR(): Header(Type, Code) {}
 		uint16_t N       = 0; // Номер трассы
 		uint16_t az      = 0; // Азимут центра строба
@@ -478,9 +619,9 @@ public:
 
 
 	struct KORTR: public Header PIMETA(dest=voi, port=5301, no-stream) {
-		static const int16_t Port = 5301;
-		static const int16_t Type = 6;
-		static const int16_t Code = -1;
+		static constexpr int16_t Port = 5301;
+		static constexpr int16_t Type = 6;
+		static constexpr int16_t Code = -1;
 		KORTR(): Header(Type, 0) {}
 		// msg_type:
 		// 1 - Ввод
@@ -496,9 +637,9 @@ public:
 
 
 	struct KV_KORTR: public Header PIMETA(dest=soi, port=5300, no-stream) {
-		static const int16_t Port = 5300;
-		static const int16_t Type = 6;
-		static const int16_t Code = -1;
+		static constexpr int16_t Port = 5300;
+		static constexpr int16_t Type = 6;
+		static constexpr int16_t Code = -1;
 		KV_KORTR(): Header(Type, 0) {}
 		// msg_type:
 		// 0 - не выполнено
@@ -525,9 +666,9 @@ public:
 
 
 	struct CMD_ZZT: public Header PIMETA(dest=voi, port=5301, no-stream) {
-		static const int16_t Port = 5301;
-		static const int16_t Type = 7;
-		static const int16_t Code = -1;
+		static constexpr int16_t Port = 5301;
+		static constexpr int16_t Type = 7;
+		static constexpr int16_t Code = -1;
 		CMD_ZZT(): Header(Type, 0) {}
 		// msg_type:
 		// 0 - запрос зон
@@ -538,9 +679,9 @@ public:
 
 
 	struct ZZT: public Header PIMETA(dest=soi, port=5300, no-stream) {
-		static const int16_t Port = 5300;
-		static const int16_t Type = 7;
-		static const int16_t Code = -1;
+		static constexpr int16_t Port = 5300;
+		static constexpr int16_t Type = 7;
+		static constexpr int16_t Code = -1;
 		ZZT(): Header(Type, 0) {}
 		PIVector<Zone> zones;
 		// msg_type: количество зон
@@ -550,9 +691,9 @@ public:
 
 
 	struct CMD_ZBL: public Header PIMETA(dest=voi, port=5301, no-stream) {
-		static const int16_t Port = 5301;
-		static const int16_t Type = 8;
-		static const int16_t Code = -1;
+		static constexpr int16_t Port = 5301;
+		static constexpr int16_t Type = 8;
+		static constexpr int16_t Code = -1;
 		CMD_ZBL(): Header(Type, 0) {}
 		// msg_type:
 		// 0 - запрос зон
@@ -563,9 +704,9 @@ public:
 
 
 	struct ZBL: public Header PIMETA(dest=soi, port=5300, no-stream) {
-		static const int16_t Port = 5300;
-		static const int16_t Type = 8;
-		static const int16_t Code = -1;
+		static constexpr int16_t Port = 5300;
+		static constexpr int16_t Type = 8;
+		static constexpr int16_t Code = -1;
 		ZBL(): Header(Type, 0) {}
 		PIVector<Zone> zones;
 		// msg_type: количество зон
@@ -575,9 +716,9 @@ public:
 
 
 	struct AZIMUTH: public Header PIMETA(dest=all, port=5300, no-stream) {
-		static const int16_t Port = 5300;
-		static const int16_t Type = 9;
-		static const int16_t Code = -1;
+		static constexpr int16_t Port = 5300;
+		static constexpr int16_t Type = 9;
+		static constexpr int16_t Code = -1;
 		AZIMUTH(): Header(Type, 0) {}
 		// msg_type: Признак перезапуска ПО ВОИ
 		uint32_t T_voi  = 0; // Время ЭВМ ВОИ
@@ -598,30 +739,30 @@ public:
 	/// ???
 
 	struct VKL_REG: public Header PIMETA(dest=reg, port=6100, no-stream) {
-		static const int16_t Port = 6100;
-		static const int16_t Type = 5;
-		static const int16_t Code = 0;
+		static constexpr int16_t Port = 6100;
+		static constexpr int16_t Type = 5;
+		static constexpr int16_t Code = 0;
 		VKL_REG(): Header(Type, Code) {}
 	};
 
 	struct OTKL_REG: public Header PIMETA(dest=reg, port=6100, no-stream) {
-		static const int16_t Port = 6100;
-		static const int16_t Type = 8;
-		static const int16_t Code = 0;
+		static constexpr int16_t Port = 6100;
+		static constexpr int16_t Type = 8;
+		static constexpr int16_t Code = 0;
 		OTKL_REG(): Header(Type, Code) {}
 	};
 
 	struct ZPR_SOST_REG: public Header PIMETA(dest=reg, port=6100, no-stream) {
-		static const int16_t Port = 6100;
-		static const int16_t Type = 9;
-		static const int16_t Code = 0;
+		static constexpr int16_t Port = 6100;
+		static constexpr int16_t Type = 9;
+		static constexpr int16_t Code = 0;
 		ZPR_SOST_REG(): Header(Type, Code) {}
 	};
 
 	struct SOST_REG: public Header PIMETA(dest=soi, port=6101, no-stream) {
-		static const int16_t Port = 6101;
-		static const int16_t Type = 9;
-		static const int16_t Code = 0;
+		static constexpr int16_t Port = 6101;
+		static constexpr int16_t Type = 9;
+		static constexpr int16_t Code = 0;
 		SOST_REG(): Header(Type, Code) {}
 		uint32_t disk_size = 0; //
 		uint32_t disk_free = 0; //
@@ -640,8 +781,9 @@ public:
 #pragma pack(pop)
 
 private:
-	static constexpr double degLSB  = 0.0054931640625;
+	static constexpr float degLSB   = 0.0054931640625;
 	static constexpr double timeLSB = 0.001;
+	static constexpr double dbLSB   = 0.5;
 };
 
 
@@ -732,6 +874,268 @@ BINARY_STREAM_WRITE(Protocol_RLS_Mini::ZBL) {
 	s << PIMemoryBlock(&v, sizeof(v) - sizeof(v.zones));
 	s << PIMemoryBlock(v.zones.data(), v.zones.size() * sizeof(Protocol_RLS_Mini::Zone));
 	return s;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::Header & v) {
+	return out << "type:" << v.msg_type << "code:" << v.msg_code;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Zapros & v) {
+	return out;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Vr & v) {
+	return out << "par:" << v.par;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Izl & v) {
+	return out << "par:" << v.par;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Ant & v) {
+	return out << "par:" << v.par;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_TTek & v) {
+	return out << "time:" << v.getSeconds();
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_AzPopr & v) {
+	return out << "daz:" << v.daz;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_DPopr_POI & v) {
+	return out << "dd:" << v.dd;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_AzPopr_POI & v) {
+	return out << "daz:" << v.daz;
+}
+
+// RR_Kvit
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::RR_Kvit & v) {
+	return out << "ant:" << int(v.ant) << "izl:" << int(v.izl) << "kuizl:" << int(v.kuizl) << "vr:" << int(v.vr) << "kuvr:" << int(v.kuvr)
+	           << "ispr_kan:" << PICoutManipulators::Bin << v.ispr_kan << PICoutManipulators::Dec << "daz:" << v.daz
+	           << "dd_poi:" << v.dd_poi << "daz_poi:" << v.daz_poi;
+}
+
+// POI_Zapros
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Zapros & v) {
+	return out;
+}
+
+// POI_Shtat
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Shtat & v) {
+	return out;
+}
+
+// POI_SDC
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_SDC & v) {
+	return out << "bz:" << PICoutManipulators::Bin << v.bz << "dz:" << PICoutManipulators::Bin << v.dz;
+}
+
+// POI_DSA
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_DSA & v) {
+	return out << "par:" << v.par << "vr_n:" << v.vr_n << "vr_k:" << v.vr_k;
+}
+
+// POI_APU
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_APU & v) {
+	return out << "k1:" << v.getLevelk1() << "k2:" << v.getLevelk2();
+}
+
+// POI_Zona
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Zona & v) {
+	return out << "k1:" << int(v.k1) << "k2:" << v.k2;
+}
+
+// POI_Kan
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Kan & v) {
+	return out << "kan:" << PICoutManipulators::Bin << v.kan;
+}
+
+// POI_Kvit
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_Kvit & v) {
+	return out << "sdc:" << int(v.sdc) << "dsa:" << int(v.dsa) << "kan:" << PICoutManipulators::Bin << v.kan << "dsa_vr_n:" << v.dsa_vr_n
+	           << "dsa_vr_k:" << v.dsa_vr_k << "apu_k1:" << v.apu_k1 << "apu_k2:" << v.apu_k2 << "zona_k1:" << int(v.zona_k1)
+	           << "zona_k2:" << v.zona_k2;
+}
+
+// POI_TK_Zapros
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_TK_Zapros & v) {
+	return out << "kt:" << v.kt << "rg:" << v.rg << "nkan:" << v.nkan << "reg_takt:" << v.reg_takt;
+}
+
+// POI_TK_Kvit
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::POI_TK_Kvit & v) {
+	return out << "nw:" << v.nw << "words:";
+}
+
+// GETERODIN_KVIT
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::GETERODIN_KVIT & v) {
+	return out << "n_geterodin:" << v.n_geterodin;
+}
+
+// CIT_Zapros
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CIT_Zapros & v) {
+	return out;
+}
+
+// ImitatorTarget
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ImitatorTarget & v) {
+	return out << "on:" << int(v.on) << "reg:" << int(v.reg) << "az:" << v.az << "D:" << v.D << "um:" << v.um << "vr:" << v.vr
+	           << "osl:" << v.osl;
+}
+
+// CIT_KU
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CIT_KU & v) {
+	return out << "it1:{" << v.it1 << "}"
+	           << "it2:{" << v.it2 << "}";
+}
+
+// CIT_Kvit
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CIT_Kvit & v) {
+	return out << "it1:{" << v.it1 << "}"
+	           << "it2:{" << v.it2 << "}";
+}
+
+// PI
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::PI & v) {
+	return out << "aztek:" << v.getDegreesAzTek() << "time:" << v.getSeconds() << "az:" << v.getDegreesAz() << "zona:" << v.zona
+	           << "nes:" << v.nes;
+}
+
+// KTA_VO
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::KTA_VO & v) {
+	return out << "N:" << v.n << "T:" << v.getT() << "az:" << v.getDegreesAz() << "um:" << v.getDegreesUm() << "D:" << v.getDistance()
+	           << "porog:" << v.getPorogDb() << "sp:" << v.getSpDb() << "amp:" << v.getAmpDb() << "vr:" << v.getVelocity()
+	           << "tn0:" << int(v.tn0) << "dum0:" << int(v.dum0) << "tn1:" << int(v.tn1) << "dum1:" << int(v.dum1);
+}
+
+// TRVO
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::TRVO & v) {
+	out << "N:" << v.N << "ID:" << v.ID << "T:" << v.T << "az:" << v.az << "D:" << v.D << "um:" << v.um << "X:" << v.X << "Y:" << v.Y
+		<< "H:" << v.H << "VX:" << v.VX << "VY:" << v.VY << "VH:" << v.VH << "VK:" << v.VK << "K:" << v.K << "mh:" << int(v.mh)
+		<< "mk:" << int(v.mk) << "pv:" << int(v.pv) << "tn:" << int(v.tn) << "dum:" << int(v.dum) << "klass:" << int(v.klass)
+		<< "sopr:" << int(v.sopr) << "KTA:";
+	for (const auto & kta: v.KTA)
+		out << kta;
+	return out;
+}
+
+// TRETA
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::TRETA & v) {
+	return out << static_cast<const Protocol_RLS_Mini::TRVO &>(v);
+}
+
+// STRSOPR
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::STRSOPR & v) {
+	return out << "N:" << v.N << "az:" << v.az << "D:" << v.D << "um:" << v.um << "X:" << v.X << "Y:" << v.Y << "H:" << v.H
+	           << "Daz:" << v.Daz << "DD:" << v.DD << "Dum:" << v.Dum << "DX:" << v.DX << "DY:" << v.DY << "DH:" << v.DH
+	           << "Daz_big:" << v.Daz_big << "DD_big:" << v.DD_big << "Dum_big:" << v.Dum_big << "DX_big:" << v.DX_big
+	           << "DY_big:" << v.DY_big << "DH_big:" << v.DH_big;
+}
+
+// KORTR
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::KORTR & v) {
+	return out << "az:" << v.az << "D:" << v.D << "N:" << v.N;
+}
+
+// KV_KORTR
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::KV_KORTR & v) {
+	return out << "az:" << v.az << "D:" << v.D << "message:" << v.message;
+}
+
+// Zone
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::Zone & v) {
+	return out << "azn:" << v.azn << "Dn:" << v.Dn << "azk:" << v.azk << "Dk:" << v.Dk;
+}
+
+// CMD_ZZT
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CMD_ZZT & v) {
+	return out << "zone:{" << v.zone << "}";
+}
+
+// ZZT
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ZZT & v) {
+	out << "zones:";
+	for (const auto & zone: v.zones)
+		out << "{" << zone << "}";
+	return out;
+}
+
+// CMD_ZBL
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::CMD_ZBL & v) {
+	return out << "zone:{" << v.zone << "}";
+}
+
+// ZBL
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ZBL & v) {
+	out << "zones:";
+	for (const auto & zone: v.zones)
+		out << "{" << zone << "}";
+	return out;
+}
+
+// AZIMUTH
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::AZIMUTH & v) {
+	return out << "T_voi:" << v.T_voi << "T_poi:" << v.T_poi << "az_poi:" << v.az_poi << "az_ant:" << v.az_ant;
+}
+
+// VKL_REG
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::VKL_REG & v) {
+	return out;
+}
+
+// OTKL_REG
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::OTKL_REG & v) {
+	return out;
+}
+
+// ZPR_SOST_REG
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::ZPR_SOST_REG & v) {
+	return out;
+}
+
+// SOST_REG
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::SOST_REG & v) {
+	return out << "disk_size:" << v.disk_size << "disk_free:" << v.disk_free << "mon:" << int(v.mon) << "year:" << int(v.year)
+	           << "free_perc:" << int(v.free_perc) << "day:" << int(v.day) << "min:" << int(v.min) << "hour:" << int(v.hour)
+	           << "dhour:" << int(v.dhour) << "sec:" << int(v.sec) << "dsec:" << int(v.dsec) << "dmin:" << int(v.dmin);
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_ZAPROS & v) {
+	return out;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_KU & v) {
+	return out;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_START_TEST & v) {
+	return out << "code:" << int(v.msg_code);
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_STOP_TEST & v) {
+	return out << "code:" << int(v.msg_code);
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_Correction & v) {
+	return out << "f:" << v.getDegrees() << "a:" << v.getDb();
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_POPR & v) {
+	out << "save:" << v.save;
+	for (const auto & channel: v.channels)
+		out << "{" << channel << "}";
+	return out;
+}
+
+inline PICout operator<<(PICout out, const Protocol_RLS_Mini::FAP_PR_KVIT & v) {
+	out << "test:" << v.test;
+	for (const auto & channel: v.channels)
+		out << "{" << channel << "}";
+	return out;
 }
 
 #endif // protocol_rls_mini_H

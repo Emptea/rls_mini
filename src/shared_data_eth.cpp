@@ -20,12 +20,13 @@ void GlobalDataEth::initEth() {
 	const auto & net_conf = global->mainConfig().child("net");
 
 	/// RLSO start
-	PIStringList my_dest  = {"poi", "upr", "it", "soi", "all"};
+	PIStringList my_dest  = {"poi", "rr", "it"};
 
 	PIEthernet * _eth     = PIIODevice::createFromFullPath(net_conf.childValue("rls").toString())->cast<PIEthernet>();
 	if (_eth) {
 		eth_rlso_send = new PIEthernet(PIEthernet::UDP);
 		eth_rlso_send->setSendAddress(_eth->sendAddress());
+		eth_rlso_send->setParameter(PIEthernet::Broadcast);
 		if (_eth) {
 			/*PIString d_s_ip = "255.255.255.255";
 			if (_eth) {
@@ -66,10 +67,10 @@ void GlobalDataEth::initEth() {
 	/// RLSO end
 }
 
-
 void GlobalDataEth::stopEth() {
 	piCout << "stop eth";
 	EthStorage<GlobalDataEth>::stopEth();
+	PIMutexLocker locker(send_mutex);
 	piDeleteSafety(eth_rlso_send);
 }
 
@@ -94,6 +95,8 @@ void GlobalDataEth::receivedRLS(PIByteArray data, int port) {
 	changeEndian(data);
 
 	Protocol_RLS_Mini::Header header;
+	// TODO: добавить в конфиг
+	// piCout << header;
 	if (data.size() < sizeof(header)) return;
 	memcpy(&header, data.data(), sizeof(header));
 
@@ -117,9 +120,16 @@ void GlobalDataEth::receivedRLS(PIByteArray data, int port) {
 	RLS_TRY_PARSE(POI_TK_Zapros );
 	RLS_TRY_PARSE(CIT_Zapros    );
 	RLS_TRY_PARSE(CIT_KU        );
-	RLS_TRY_PARSE(TRVO          );
-	RLS_TRY_PARSE(TRETA         );
-	RLS_TRY_PARSE(AZIMUTH       );
+	RLS_TRY_PARSE(FAP_PR_ZAPROS );
+	RLS_TRY_PARSE(FAP_PR_KU     );
+	RLS_TRY_PARSE(FAP_PR_START_TEST   );
+	RLS_TRY_PARSE(FAP_PR_STOP_TEST   );
+	RLS_TRY_PARSE(FAP_PR_POPR   );
+	RLS_TRY_PARSE(GETERODIN_ZAPROS   );
+	RLS_TRY_PARSE(GETERODIN_SET   );
+	// RLS_TRY_PARSE(TRVO          );
+	// RLS_TRY_PARSE(TRETA         );
+	// RLS_TRY_PARSE(AZIMUTH       );
 	// clang-format on
 }
 

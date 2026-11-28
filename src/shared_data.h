@@ -2,29 +2,47 @@
 #define shared_data_H
 
 #include "axi_dsp.h"
+#include "cpm_cit.h"
+#include "cpm_poi.h"
+#include "cpm_rr.h"
 #include "fpga_dma.hpp"
+#include "imitator_u220.h"
+#include "mini_config.hpp"
 #include "rls.hpp"
+#include "rx_cycle_trace.hpp"
+#include "axu_header_logger.hpp"
 #include "shared_data_eth.h"
+#include "techlaser.h"
 #include "u220.hpp"
+#include "u220_group.h"
 #include "uhd_utils.hpp"
+#include "user_u220.h"
 
+#include <array>
+#include <atomic>
+#include <mutex>
 #include <pivaluetree.h>
+#include <thread>
 
 #define GLOBAL (GlobalData::instance())
 
 class GlobalData
-    : public PIObject
-    , public GlobalDataEth {
+	: public PIObject
+	, public GlobalDataEth {
 	PIOBJECT(GlobalData)
 
 private:
 	PISystemTime t_start;
 	PISystemTime t_end;
 	bool first_transfer = false;
+	MiniConfig cfg;
 
 public:
-	UHD_UTILS uhd_utils;
-	PIVector<U220 *> u220_ptrs;
+	const PIString u220_args =
+		"recv_frame_size=16360,num_recv_frames=128,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
+	UHD_UTILS uhd_utils{"type=b200"};
+	U220Group u220_group;
+	ImitatorU220 imitator_u220;
 	fpga_dma dma;
 
 	const u220_config_t u220_config = {
@@ -36,14 +54,13 @@ public:
 		.rx_bw      = {56e6, 56e6},
 		.ref        = "internal",
 		.cpu_format = "sc16",
-		.otw_format = "sc12",
+		.otw_format = "sc16",
 		.pps        = "internal",
-		.tx_spb     = 545200,
-		.rx_spb     = 4640  //  if you want to print hdr add 40 more samples to buf
+		.tx_spb     = 9360,
+		.rx_spb     = 4640 + 40  //  if you want to print hdr add 40 more samples to buf
+	                            // .rx_spb     = 9360 * 1  //  if you want to print hdr add 40 more samples to buf
 	};
-	const PIString u220_args = "recv_frame_size=16360,num_recv_frames=64,type=b200,enable_user_regs,fpga=/home/ubuntu/rls_mini/bin/antsdr_u220.bin";
 
-	PIVector<size_t> active_boards;
 	static GlobalData * instance();
 
 	void init();
@@ -53,8 +70,11 @@ public:
 	void processChannels();
 
 	const PIValueTree & mainConfig() const { return main_config; }
-	Protocol_RLS_Mini::RR_Kvit set_RR_Kvit();
+
+	Protocol_RLS_Mini::POI_TK_Kvit set_POI_TK_Kvit(CpmPoi::Status *status);
 	void received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg);
+
+	Protocol_RLS_Mini::RR_Kvit set_RR_Kvit();
 	void received_RR_Zapros(const Protocol_RLS_Mini::RR_Zapros & msg);
 	void received_RR_Vr(const Protocol_RLS_Mini::RR_Vr & msg);
 	void received_RR_Izl(const Protocol_RLS_Mini::RR_Izl & msg);
@@ -64,46 +84,120 @@ public:
 	void received_RR_DPopr_POI(const Protocol_RLS_Mini::RR_DPopr_POI & msg);
 	void received_RR_AzPopr_POI(const Protocol_RLS_Mini::RR_AzPopr_POI & msg);
 
+	Protocol_RLS_Mini::POI_Kvit set_POI_Kvit();
+	void received_POI_Zapros(const Protocol_RLS_Mini::POI_Zapros & msg);
+	void received_POI_Shtat(const Protocol_RLS_Mini::POI_Shtat & msg);
+	void received_POI_SDC(const Protocol_RLS_Mini::POI_SDC & msg);
+	void received_POI_DSA(const Protocol_RLS_Mini::POI_DSA & msg);
+	void received_POI_APU(const Protocol_RLS_Mini::POI_APU & msg);
+	void received_POI_Zona(const Protocol_RLS_Mini::POI_Zona & msg);
+	void received_POI_Kan(const Protocol_RLS_Mini::POI_Kan & msg);
+
+	Protocol_RLS_Mini::FAP_PR_KVIT set_FAP_PR_KVIT();
+	Protocol_RLS_Mini::FAP_PR_KVIT set_FAP_PR_KVIT(const std::array<complexf, 8UL> & prev_coeffs);
+	void received_FAP_PR_ZAPROS(const Protocol_RLS_Mini::FAP_PR_ZAPROS & msg);
+	void received_FAP_PR_KU(const Protocol_RLS_Mini::FAP_PR_KU & msg);
+	void received_FAP_PR_START_TEST(const Protocol_RLS_Mini::FAP_PR_START_TEST & msg);
+	void received_FAP_PR_STOP_TEST(const Protocol_RLS_Mini::FAP_PR_STOP_TEST & msg);
+	void received_FAP_PR_POPR(const Protocol_RLS_Mini::FAP_PR_POPR & msg);
+
+	Protocol_RLS_Mini::GETERODIN_KVIT set_GETERODIN_KVIT();
+	void received_GETERODIN_ZAPROS(const Protocol_RLS_Mini::GETERODIN_ZAPROS & msg);
+	void received_GETERODIN_SET(const Protocol_RLS_Mini::GETERODIN_SET & msg);
+
+	Protocol_RLS_Mini::PI set_PI();
+
+	Protocol_RLS_Mini::CIT_Kvit set_CIT_Kvit();
+	void received_CIT_Zapros(const Protocol_RLS_Mini::CIT_Zapros & msg);
+	void received_CIT_KU(const Protocol_RLS_Mini::CIT_KU & msg);
+
 protected:
 
 private:
 	GlobalData();
 	~GlobalData();
 
-	void u220_stop_and_drain_rx();
+	struct sdr_buffer_info {
+		const complexs * buffer = nullptr;
+		size_t samples          = 0;
+	};
+
+	struct sdr_queue {
+		sdr_buffer_info buffer;
+		bool ready = false;
+		std::mutex mutex;
+	};
+
+	sdr_queue sdr_rx;
+
+	void write_dump_hex(const char * filename) const;
 	void u220_recv();
-	void generate_ad9361_sync_in();
-	void sync_ad9361_mcs();
-	void enable_external_lo_all();
+	void u220_recv_dma();
+	void u220_recv_software();
+	void process_work_pac(const uint32_t * buffer);
+	void process_kt_pac(const uint32_t * buffer);
+	void dump_rx_traces(const std::vector<RxCycleTraceEntry> & cycle_entries);
+	void dump_time_sync_traces();
+	RxCycleTraceBuffer<32768> rx_cycle_trace;
+	bool overflow_dumped = false;
 
 	PIValueTree main_config;
-	PIProtectedVariable<PIMap<int, VectorComplexS>> current_channels;
-	PIThreadNotifier notifier_channels;
-	PIThread process_thread;
 	PIThread u220_recv_thread;
 
-	PIProtectedVariable<PIMap<int, VectorComplexS>> adc_channels;
-	VectorComplexS zero_vector;
+	PIThread cpm_thread;
+	void cpm_loop();
 
-	PIMap<int, bool> board_statuses;
-	union {
-		uint8_t bits = 0;
-		struct {
-			uint8_t _reserve: 1;
-			uint8_t ant     : 1;
-			uint8_t izl     : 1;
-			uint8_t kuizl   : 1;
-			uint8_t vr      : 2;
-			uint8_t kuvr    : 2;
-		};
-	} flags          = {0};
-	uint8_t ispr_kan = 0;
-	double daz       = 0;
-	int16_t dd_poi   = 0; // 1 м
-	double daz_poi   = 0;
+	void process_rx_buffers_dma();
+	void process_rx_buffers_software();
+	std::thread rx_processing_thread;
+	std::atomic<bool> rx_processing_running{true};
+
 	double time;
+	PIProtectedVariable<PIVector<uint32_t>> dma_channel_buf;
+	bool req_test_point       = false;
+	uint16_t req_test_channel = 0;
 
-	std::atomic_int dma_enabled = {0};
+	Techlaser techlaser;
+	CpmRr cpm_rr;
+	CpmPoi cpm_poi;
+	CpmCit cpm_cit;
+
+	struct target {
+		uint32_t n   = 0; // номер цели
+		double time  = 0; // время обнаружения
+		float az     = 0; // азимут цели. град
+		float um     = 0; // Угол места, град
+		float d      = 0; // Дальность, м
+		double amp   = 0; // Амплитуда сигнала цели, в ед АЦП
+		double porog = 0; // Порог обнаружения, в ед АЦП
+		float vr     = 0; // Радиальная скорость, 1 м/с
+	};
+
+	struct pending_tk_request {
+		bool active       = false;
+		rls::tp tp        = rls::TP_WORK;
+		uint8_t kt        = 0;
+		uint8_t rg        = 0;
+		uint16_t nkan     = 0;
+		uint16_t reg_takt = 0;
+		size_t words      = 0;
+	};
+
+	pending_tk_request pending_tk;
+	std::mutex pending_tk_mutex;
+
+	AxuHeaderLogger axu_header_logger;
+
+	void send_KTA_VO(struct target targ);
+	void send_PI(const rls::range_packet & range_pac, float targ_az);
+
+	template<typename T>
+	void log_cpm_msg(const char * name, const T & msg) const {
+		if (cfg.log_cpm_msg) {
+			piCout << "rec msg" << name;
+			piCout << msg;
+		}
+	}
 };
 
 #endif
