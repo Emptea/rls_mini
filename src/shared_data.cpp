@@ -591,8 +591,8 @@ void GlobalData::process_kt_pac(const uint32_t * buffer) {
 		words             = pending_tk.words;
 		pending_tk.active = false;
 		// cpm_poi.skip_dma_transaction.store(true);
-		axi_dsp_set_output_source(0, 0, 0, 0);
-		axi_dsp_apply();
+		// axi_dsp_set_output_source(0, 0, 0, 0);
+		// axi_dsp_apply();
 		// cpm_poi.skip_dma_transaction.store(false);
 	}
 	Protocol_RLS_Mini::POI_TK_Kvit ans;
@@ -714,7 +714,7 @@ Protocol_RLS_Mini::POI_TK_Kvit GlobalData::set_POI_TK_Kvit(CpmPoi::Status * poi_
 
 void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros & msg) {
 	log_cpm_msg(__func__, msg);
-	if (msg.reg_takt == 0 || msg.kt == 0) {
+	if (msg.reg_takt == 0 && msg.kt == rls::TP_WORK) {
 		auto status         = cpm_poi.get_status();
 		const auto & active = u220_group.active_boards();
 		if (!active.isEmpty()) status.u220_cycles = u220_group.board(active[0])->get_stats().cycles_completed;
@@ -727,6 +727,14 @@ void GlobalData::received_POI_TK_Zapros(const Protocol_RLS_Mini::POI_TK_Zapros &
 		status.is_techlaser_present = techlaser.getState().is_techlaser_present;
 		auto pot_tk_kvit            = set_POI_TK_Kvit(&status);
 		global->sendMessage(pot_tk_kvit);
+		return;
+	} else if (msg.reg_takt == 1 && msg.kt == rls::TP_WORK) {
+		{
+			std::lock_guard<std::mutex> lock(pending_tk_mutex);
+			pending_tk.active = false;
+		}
+		axi_dsp_set_output_source(0, 0, 0, 0);
+		axi_dsp_apply();
 		return;
 	}
 	if (cfg.dma_enabled) {
